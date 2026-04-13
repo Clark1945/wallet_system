@@ -6,6 +6,9 @@ spring:
     username: postgres
     password: postgres
     driver-class-name: org.postgresql.Driver
+  messages:
+    basename: messages
+    encoding: UTF-8
   sql:
     init:
       mode: always

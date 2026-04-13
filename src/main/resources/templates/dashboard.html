@@ -1,8 +1,8 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org" lang="zh-TW">
+<html xmlns:th="http://www.thymeleaf.org">
 <head>
     <meta charset="UTF-8">
-    <title>儀表板 — Wallet System</title>
+    <title>Wallet System</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { font-family: sans-serif; background: #f0f2f5; color: #333; }
@@ -65,9 +65,9 @@
 <header>
     <h1>Wallet System</h1>
     <div style="display:flex; align-items:center; gap:1rem;">
-        <span th:text="'歡迎，' + ${memberName}"></span>
+        <span th:text="#{dashboard.welcome(${memberName})}">Welcome</span>
         <form method="post" th:action="@{/logout}" style="margin:0">
-            <button class="logout-btn" type="submit">登出</button>
+            <button class="logout-btn" type="submit" th:text="#{dashboard.logout}">Logout</button>
         </form>
     </div>
 </header>
@@ -80,16 +80,16 @@
     <div class="balance-card">
         <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:1rem;">
             <div>
-                <div class="balance-label">目前餘額</div>
+                <div class="balance-label" th:text="#{dashboard.balance.label}">Current Balance</div>
                 <div class="balance-amount" th:text="'$ ' + ${#numbers.formatDecimal(wallet.balance, 1, 2)}"></div>
             </div>
             <div style="text-align:right;">
-                <div class="balance-label">我的錢包代碼</div>
+                <div class="balance-label" th:text="#{dashboard.wallet.code.label}">My Wallet Code</div>
                 <div style="display:flex; align-items:center; gap:.5rem; margin-top:.25rem;">
                     <code id="walletCode" style="font-size:1.1rem; font-weight:600; letter-spacing:.1em; color:#333;"
                           th:text="${wallet.walletCode}"></code>
                     <button onclick="copyCode()" style="padding:.25rem .6rem; font-size:.8rem; border:1px solid #ccc;
-                        border-radius:4px; cursor:pointer; background:#fff;">複製</button>
+                        border-radius:4px; cursor:pointer; background:#fff;" th:text="#{dashboard.copy}">Copy</button>
                 </div>
             </div>
         </div>
@@ -105,49 +105,48 @@
     <div class="actions">
         <!-- Deposit -->
         <div class="action-card">
-            <h3>存款</h3>
+            <h3 th:text="#{dashboard.deposit.title}">Deposit</h3>
             <form method="post" th:action="@{/deposit}">
-                <label>金額</label>
+                <label th:text="#{dashboard.amount}">Amount</label>
                 <input type="number" name="amount" min="0.01" step="0.01" placeholder="0.00" required/>
-                <button class="btn btn-deposit" type="submit">存入</button>
+                <button class="btn btn-deposit" type="submit" th:text="#{dashboard.deposit.submit}">Deposit</button>
             </form>
         </div>
 
         <!-- Withdraw -->
         <div class="action-card">
-            <h3>提款</h3>
+            <h3 th:text="#{dashboard.withdraw.title}">Withdraw</h3>
             <form method="post" th:action="@{/withdraw}">
-                <label>金額</label>
+                <label th:text="#{dashboard.amount}">Amount</label>
                 <input type="number" name="amount" min="0.01" step="0.01" placeholder="0.00" required/>
-                <button class="btn btn-withdraw" type="submit">提出</button>
+                <button class="btn btn-withdraw" type="submit" th:text="#{dashboard.withdraw.submit}">Withdraw</button>
             </form>
         </div>
 
         <!-- Transfer -->
         <div class="action-card">
-            <h3>轉帳</h3>
+            <h3 th:text="#{dashboard.transfer.title}">Transfer</h3>
             <form method="post" th:action="@{/transfer}">
-                <label>收款方錢包代碼</label>
-                <input type="text" name="toWalletCode" placeholder="例：aB3xZ9qRmK2w"
-                       maxlength="12" pattern="[A-Za-z0-9]{12}"
-                       title="請輸入 12 碼英數字錢包代碼" required/>
-                <label>金額</label>
+                <label th:text="#{dashboard.transfer.code.label}">Recipient Wallet Code</label>
+                <input type="text" name="toWalletCode" placeholder="e.g. aB3xZ9qRmK2w"
+                       maxlength="12" pattern="[A-Za-z0-9]{12}" required/>
+                <label th:text="#{dashboard.amount}">Amount</label>
                 <input type="number" name="amount" min="0.01" step="0.01" placeholder="0.00" required/>
-                <button class="btn btn-transfer" type="submit">轉出</button>
+                <button class="btn btn-transfer" type="submit" th:text="#{dashboard.transfer.submit}">Transfer</button>
             </form>
         </div>
     </div>
 
     <!-- Transaction history -->
     <div class="table-card">
-        <h3>交易紀錄</h3>
+        <h3 th:text="#{dashboard.history.title}">Transaction History</h3>
         <table th:if="${!transactions.isEmpty()}">
             <thead>
             <tr>
-                <th>時間</th>
-                <th>類型</th>
-                <th>說明</th>
-                <th style="text-align:right">金額</th>
+                <th th:text="#{dashboard.history.time}">Time</th>
+                <th th:text="#{dashboard.history.type}">Type</th>
+                <th th:text="#{dashboard.history.desc}">Description</th>
+                <th style="text-align:right" th:text="#{dashboard.history.amount}">Amount</th>
             </tr>
             </thead>
             <tbody>
@@ -156,8 +155,7 @@
                 <td>
                     <span class="type-badge"
                           th:classappend="'type-' + ${tx.type}"
-                          th:text="${tx.type == T(org.side_project.wallet_system.payment.TransactionType).DEPOSIT ? '存款' :
-                                     tx.type == T(org.side_project.wallet_system.payment.TransactionType).WITHDRAW ? '提款' : '轉帳'}">
+                          th:text="#{transaction.type.__${tx.type}__}">
                     </span>
                 </td>
                 <td th:text="${tx.description}"></td>
@@ -165,7 +163,7 @@
             </tr>
             </tbody>
         </table>
-        <div class="empty" th:if="${transactions.isEmpty()}">尚無交易紀錄</div>
+        <div class="empty" th:if="${transactions.isEmpty()}" th:text="#{dashboard.history.empty}">No transactions yet</div>
     </div>
 </main>
 

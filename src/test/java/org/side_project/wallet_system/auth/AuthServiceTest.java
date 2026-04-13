@@ -44,7 +44,7 @@ class AuthServiceTest {
 
         assertThatThrownBy(() -> authService.register("Bob", 30, "dup@test.com", "pass"))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("已被註冊");
+                .hasMessage("error.email.duplicate");
 
         then(memberRepository).should(never()).save(any());
     }

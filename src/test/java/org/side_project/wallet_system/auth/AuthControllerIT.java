@@ -64,7 +64,7 @@ class AuthControllerIT {
                         .param("password", "wrong"))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/login"))
-                .andExpect(flash().attribute("error", "Email 或密碼錯誤"));
+                .andExpect(flash().attribute("error", "Invalid email or password"));
     }
 
     @Test
@@ -80,13 +80,13 @@ class AuthControllerIT {
                         .param("password", "pass123"))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/login"))
-                .andExpect(flash().attribute("success", "註冊成功，請登入"));
+                .andExpect(flash().attribute("success", "Registration successful. Please log in."));
     }
 
     @Test
     void register_duplicateEmail_redirectsBackWithError() throws Exception {
         given(authService.register(any(), anyInt(), any(), any()))
-                .willThrow(new IllegalArgumentException("此 Email 已被註冊"));
+                .willThrow(new IllegalArgumentException("error.email.duplicate"));
 
         mockMvc.perform(post("/register")
                         .param("name", "Bob")
@@ -95,7 +95,7 @@ class AuthControllerIT {
                         .param("password", "pass123"))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/register"))
-                .andExpect(flash().attribute("error", "此 Email 已被註冊"));
+                .andExpect(flash().attribute("error", "This email is already registered"));
     }
 
     @Test

@@ -73,14 +73,14 @@ class WalletControllerIT {
                         .session(session))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/dashboard"))
-                .andExpect(flash().attribute("success", "存款成功"));
+                .andExpect(flash().attribute("success", "Deposit successful"));
 
         then(walletService).should().deposit(eq(memberId), eq(new BigDecimal("200.00")));
     }
 
     @Test
     void deposit_serviceThrows_redirectsWithError() throws Exception {
-        willThrow(new IllegalArgumentException("金額必須大於 0"))
+        willThrow(new IllegalArgumentException("error.amount.positive"))
                 .given(walletService).deposit(any(), any());
 
         mockMvc.perform(post("/deposit")
@@ -88,7 +88,7 @@ class WalletControllerIT {
                         .session(session))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/dashboard"))
-                .andExpect(flash().attribute("error", "金額必須大於 0"));
+                .andExpect(flash().attribute("error", "Amount must be greater than 0"));
     }
 
     // ── withdraw ──────────────────────────────────────────────
@@ -100,14 +100,14 @@ class WalletControllerIT {
                         .session(session))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/dashboard"))
-                .andExpect(flash().attribute("success", "提款成功"));
+                .andExpect(flash().attribute("success", "Withdrawal successful"));
 
         then(walletService).should().withdraw(eq(memberId), eq(new BigDecimal("100.00")));
     }
 
     @Test
     void withdraw_insufficientBalance_redirectsWithError() throws Exception {
-        willThrow(new IllegalArgumentException("餘額不足"))
+        willThrow(new IllegalArgumentException("error.insufficient.balance"))
                 .given(walletService).withdraw(any(), any());
 
         mockMvc.perform(post("/withdraw")
@@ -115,7 +115,7 @@ class WalletControllerIT {
                         .session(session))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/dashboard"))
-                .andExpect(flash().attribute("error", "餘額不足"));
+                .andExpect(flash().attribute("error", "Insufficient balance"));
     }
 
     // ── transfer ──────────────────────────────────────────────
@@ -128,7 +128,7 @@ class WalletControllerIT {
                         .session(session))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/dashboard"))
-                .andExpect(flash().attribute("success", "轉帳成功"));
+                .andExpect(flash().attribute("success", "Transfer successful"));
 
         then(walletService).should()
                 .transfer(eq(memberId), eq("OtherCode0001"), eq(new BigDecimal("50.00")));
@@ -136,7 +136,7 @@ class WalletControllerIT {
 
     @Test
     void transfer_invalidCode_redirectsWithError() throws Exception {
-        willThrow(new IllegalArgumentException("找不到此錢包代碼"))
+        willThrow(new IllegalArgumentException("error.wallet.not.found"))
                 .given(walletService).transfer(any(), any(), any());
 
         mockMvc.perform(post("/transfer")
@@ -145,12 +145,12 @@ class WalletControllerIT {
                         .session(session))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/dashboard"))
-                .andExpect(flash().attribute("error", "找不到此錢包代碼"));
+                .andExpect(flash().attribute("error", "Wallet code not found"));
     }
 
     @Test
     void transfer_selfTransfer_redirectsWithError() throws Exception {
-        willThrow(new IllegalArgumentException("無法轉帳給自己"))
+        willThrow(new IllegalArgumentException("error.self.transfer"))
                 .given(walletService).transfer(any(), any(), any());
 
         mockMvc.perform(post("/transfer")
@@ -159,6 +159,6 @@ class WalletControllerIT {
                         .session(session))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/dashboard"))
-                .andExpect(flash().attribute("error", "無法轉帳給自己"));
+                .andExpect(flash().attribute("error", "Cannot transfer to yourself"));
     }
 }
