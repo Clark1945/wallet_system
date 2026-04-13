@@ -20,10 +20,9 @@ spring:
         format_sql: true
 
 springdoc:
-  api-docs:
-    enabled: false
   swagger-ui:
     path: /swagger-ui.html
     url: /openapi.yaml
+    disable-swagger-default-url: true
     operations-sorter: method
     tags-sorter: alpha
