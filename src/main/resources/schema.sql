@@ -13,6 +13,9 @@ CREATE TABLE IF NOT EXISTS wallets (
     wallet_code VARCHAR(12)    NOT NULL UNIQUE
 );
 
+-- 補上 wallet_code 欄位（給已存在的舊表格）
+ALTER TABLE wallets ADD COLUMN IF NOT EXISTS wallet_code VARCHAR(12) UNIQUE;
+
 CREATE TABLE IF NOT EXISTS transactions (
     id             UUID           PRIMARY KEY,
     from_wallet_id UUID,
