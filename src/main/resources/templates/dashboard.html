@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <title>儀表板 — Wallet System</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: sans-serif; background: #f0f2f5; color: #333; }
+
+        /* ── Header ── */
+        header { background: #4f46e5; color: #fff; padding: 1rem 2rem;
+            display: flex; justify-content: space-between; align-items: center; }
+        header h1 { font-size: 1.2rem; }
+        header span { font-size: .9rem; opacity: .85; }
+        .logout-btn { background: rgba(255,255,255,.2); border: 1px solid rgba(255,255,255,.4);
+            color: #fff; padding: .4rem .9rem; border-radius: 4px; cursor: pointer; font-size: .85rem; }
+        .logout-btn:hover { background: rgba(255,255,255,.35); }
+
+        main { max-width: 860px; margin: 2rem auto; padding: 0 1rem; }
+
+        /* ── Alert ── */
+        .alert { padding: .75rem 1rem; border-radius: 4px; margin-bottom: 1.25rem; font-size: .9rem; }
+        .alert-error { background: #fde8e8; color: #c0392b; }
+        .alert-success { background: #e8f8e8; color: #27ae60; }
+
+        /* ── Balance card ── */
+        .balance-card { background: #fff; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,.08);
+            padding: 1.5rem 2rem; margin-bottom: 1.5rem; }
+        .balance-label { font-size: .85rem; color: #888; }
+        .balance-amount { font-size: 2.4rem; font-weight: 700; color: #4f46e5; margin-top: .25rem; }
+
+        /* ── Action grid ── */
+        .actions { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin-bottom: 1.5rem; }
+        @media (max-width: 640px) { .actions { grid-template-columns: 1fr; } }
+        .action-card { background: #fff; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,.08); padding: 1.25rem; }
+        .action-card h3 { font-size: 1rem; margin-bottom: 1rem; border-bottom: 1px solid #eee; padding-bottom: .5rem; }
+        .action-card label { display: block; font-size: .8rem; color: #666; margin-bottom: .2rem; }
+        .action-card input { width: 100%; padding: .5rem .7rem; border: 1px solid #ccc;
+            border-radius: 4px; font-size: .95rem; margin-bottom: .75rem; }
+        .btn { width: 100%; padding: .55rem; border: none; border-radius: 4px;
+            font-size: .9rem; cursor: pointer; color: #fff; }
+        .btn-deposit  { background: #16a34a; }
+        .btn-deposit:hover  { background: #15803d; }
+        .btn-withdraw { background: #dc2626; }
+        .btn-withdraw:hover { background: #b91c1c; }
+        .btn-transfer { background: #2563eb; }
+        .btn-transfer:hover { background: #1d4ed8; }
+
+        /* ── Transaction table ── */
+        .table-card { background: #fff; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,.08); padding: 1.25rem; }
+        .table-card h3 { font-size: 1rem; margin-bottom: 1rem; }
+        table { width: 100%; border-collapse: collapse; font-size: .88rem; }
+        th { text-align: left; padding: .5rem .75rem; background: #f8f8f8; border-bottom: 2px solid #eee; color: #555; }
+        td { padding: .55rem .75rem; border-bottom: 1px solid #f0f0f0; }
+        tr:last-child td { border-bottom: none; }
+        .type-badge { padding: .2rem .55rem; border-radius: 999px; font-size: .78rem; font-weight: 600; }
+        .type-DEPOSIT  { background: #dcfce7; color: #15803d; }
+        .type-WITHDRAW { background: #fee2e2; color: #b91c1c; }
+        .type-TRANSFER { background: #dbeafe; color: #1d4ed8; }
+        .empty { text-align: center; color: #aaa; padding: 1.5rem; }
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>Wallet System</h1>
+    <div style="display:flex; align-items:center; gap:1rem;">
+        <span th:text="'歡迎，' + ${memberName}"></span>
+        <form method="post" th:action="@{/logout}" style="margin:0">
+            <button class="logout-btn" type="submit">登出</button>
+        </form>
+    </div>
+</header>
+
+<main>
+    <div th:if="${error}" class="alert alert-error" th:text="${error}"></div>
+    <div th:if="${success}" class="alert alert-success" th:text="${success}"></div>
+
+    <!-- Balance -->
+    <div class="balance-card">
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:1rem;">
+            <div>
+                <div class="balance-label">目前餘額</div>
+                <div class="balance-amount" th:text="'$ ' + ${#numbers.formatDecimal(wallet.balance, 1, 2)}"></div>
+            </div>
+            <div style="text-align:right;">
+                <div class="balance-label">我的錢包代碼</div>
+                <div style="display:flex; align-items:center; gap:.5rem; margin-top:.25rem;">
+                    <code id="walletCode" style="font-size:1.1rem; font-weight:600; letter-spacing:.1em; color:#333;"
+                          th:text="${wallet.walletCode}"></code>
+                    <button onclick="copyCode()" style="padding:.25rem .6rem; font-size:.8rem; border:1px solid #ccc;
+                        border-radius:4px; cursor:pointer; background:#fff;">複製</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function copyCode() {
+            navigator.clipboard.writeText(document.getElementById('walletCode').textContent);
+        }
+    </script>
+
+    <!-- Actions -->
+    <div class="actions">
+        <!-- Deposit -->
+        <div class="action-card">
+            <h3>存款</h3>
+            <form method="post" th:action="@{/deposit}">
+                <label>金額</label>
+                <input type="number" name="amount" min="0.01" step="0.01" placeholder="0.00" required/>
+                <button class="btn btn-deposit" type="submit">存入</button>
+            </form>
+        </div>
+
+        <!-- Withdraw -->
+        <div class="action-card">
+            <h3>提款</h3>
+            <form method="post" th:action="@{/withdraw}">
+                <label>金額</label>
+                <input type="number" name="amount" min="0.01" step="0.01" placeholder="0.00" required/>
+                <button class="btn btn-withdraw" type="submit">提出</button>
+            </form>
+        </div>
+
+        <!-- Transfer -->
+        <div class="action-card">
+            <h3>轉帳</h3>
+            <form method="post" th:action="@{/transfer}">
+                <label>收款方錢包代碼</label>
+                <input type="text" name="toWalletCode" placeholder="例：aB3xZ9qRmK2w"
+                       maxlength="12" pattern="[A-Za-z0-9]{12}"
+                       title="請輸入 12 碼英數字錢包代碼" required/>
+                <label>金額</label>
+                <input type="number" name="amount" min="0.01" step="0.01" placeholder="0.00" required/>
+                <button class="btn btn-transfer" type="submit">轉出</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Transaction history -->
+    <div class="table-card">
+        <h3>交易紀錄</h3>
+        <table th:if="${!transactions.isEmpty()}">
+            <thead>
+            <tr>
+                <th>時間</th>
+                <th>類型</th>
+                <th>說明</th>
+                <th style="text-align:right">金額</th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr th:each="tx : ${transactions}">
+                <td th:text="${#temporals.format(tx.createdAt, 'yyyy-MM-dd HH:mm')}"></td>
+                <td>
+                    <span class="type-badge"
+                          th:classappend="'type-' + ${tx.type}"
+                          th:text="${tx.type == T(org.side_project.wallet_system.payment.TransactionType).DEPOSIT ? '存款' :
+                                     tx.type == T(org.side_project.wallet_system.payment.TransactionType).WITHDRAW ? '提款' : '轉帳'}">
+                    </span>
+                </td>
+                <td th:text="${tx.description}"></td>
+                <td style="text-align:right" th:text="'$ ' + ${#numbers.formatDecimal(tx.amount, 1, 2)}"></td>
+            </tr>
+            </tbody>
+        </table>
+        <div class="empty" th:if="${transactions.isEmpty()}">尚無交易紀錄</div>
+    </div>
+</main>
+
+</body>
+</html>
