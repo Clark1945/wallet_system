@@ -10,6 +10,7 @@ spring:
     init:
       mode: always
   jpa:
+    open-in-view: false
     hibernate:
       ddl-auto: none
     defer-datasource-initialization: true
@@ -17,3 +18,12 @@ spring:
     properties:
       hibernate:
         format_sql: true
+
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    path: /swagger-ui.html
+    url: /openapi.yaml
+    operations-sorter: method
+    tags-sorter: alpha

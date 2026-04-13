@@ -1,0 +1,238 @@
+openapi: 3.0.3
+
+info:
+  title: Wallet System API
+  description: |
+    個人電子錢包系統。
+
+    ## 認證方式
+    本系統採用 **Session-based** 認證。透過 `POST /login` 取得 session cookie (`JSESSIONID`)，
+    後續受保護的端點需在 request header 中帶上此 cookie。
+
+    ## 錢包代碼
+    每位會員在註冊時會自動產生一組 **12 碼英數字錢包代碼**（大小寫混合），
+    用於識別收款方身份（取代 Email），可在儀表板頁面複製分享。
+  version: 1.0.0
+
+servers:
+  - url: http://localhost:8080
+    description: 本地開發環境
+
+tags:
+  - name: Auth
+    description: 會員認證 — 註冊、登入、登出
+  - name: Wallet
+    description: 錢包操作 — 儀表板、存款、提款、轉帳（需登入）
+
+# 預設所有受保護端點需要 session cookie
+security:
+  - cookieAuth: []
+
+paths:
+
+  # ── Auth ──────────────────────────────────────────────────
+
+  /login:
+    get:
+      tags: [Auth]
+      summary: 顯示登入頁面
+      security: []
+      responses:
+        '200':
+          description: 登入頁面 HTML
+
+    post:
+      tags: [Auth]
+      summary: 會員登入
+      description: |
+        驗證 Email / 密碼，成功後建立 session 並回傳 `Set-Cookie: JSESSIONID`。
+        失敗則導回 `/login` 並附帶 flash error 訊息。
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: alice@example.com
+                password:
+                  type: string
+                  format: password
+                  example: password123
+      responses:
+        '302':
+          description: 成功 → `/dashboard`；失敗 → `/login`
+          headers:
+            Set-Cookie:
+              description: JSESSIONID（成功登入時設定）
+              schema:
+                type: string
+                example: JSESSIONID=abc123; Path=/; HttpOnly
+
+  /register:
+    get:
+      tags: [Auth]
+      summary: 顯示註冊頁面
+      security: []
+      responses:
+        '200':
+          description: 註冊頁面 HTML
+
+    post:
+      tags: [Auth]
+      summary: 會員註冊
+      description: |
+        建立新帳號，密碼以 BCrypt 加密存儲。
+        成功後自動產生錢包與 12 碼錢包代碼，並導向登入頁。
+        Email 重複時導回 `/register` 並附帶 flash error。
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [name, email, password]
+              properties:
+                name:
+                  type: string
+                  example: 王小明
+                age:
+                  type: integer
+                  minimum: 0
+                  example: 25
+                  description: 選填，預設 0
+                email:
+                  type: string
+                  format: email
+                  example: alice@example.com
+                password:
+                  type: string
+                  format: password
+                  minLength: 6
+                  example: password123
+      responses:
+        '302':
+          description: 成功 → `/login`；Email 重複 → `/register`
+
+  /logout:
+    post:
+      tags: [Auth]
+      summary: 登出
+      description: 清除 session，導向 `/login`。
+      responses:
+        '302':
+          description: → `/login`
+
+  # ── Wallet ────────────────────────────────────────────────
+
+  /dashboard:
+    get:
+      tags: [Wallet]
+      summary: 儀表板
+      description: |
+        顯示：
+        - 目前錢包餘額
+        - 12 碼錢包代碼（可複製分享給他人匯款）
+        - 近期交易紀錄（存款 / 提款 / 轉帳）
+      responses:
+        '200':
+          description: 儀表板頁面 HTML
+        '302':
+          description: 未登入 → `/login`
+
+  /deposit:
+    post:
+      tags: [Wallet]
+      summary: 存款
+      description: 將指定金額存入自己的錢包，金額須大於 0。
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [amount]
+              properties:
+                amount:
+                  type: number
+                  minimum: 0.01
+                  example: 1000.00
+                  description: 存款金額（正數）
+      responses:
+        '302':
+          description: 成功 / 失敗皆導向 `/dashboard`，結果以 flash 訊息顯示
+        '302 (未登入)':
+          description: → `/login`
+
+  /withdraw:
+    post:
+      tags: [Wallet]
+      summary: 提款
+      description: 從錢包提出指定金額，不可超過目前餘額。
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [amount]
+              properties:
+                amount:
+                  type: number
+                  minimum: 0.01
+                  example: 500.00
+                  description: 提款金額（正數，不超過餘額）
+      responses:
+        '302':
+          description: 成功 / 失敗皆導向 `/dashboard`，結果以 flash 訊息顯示
+
+  /transfer:
+    post:
+      tags: [Wallet]
+      summary: 轉帳
+      description: |
+        依對方 12 碼錢包代碼轉出金額。
+
+        **限制：**
+        - 不可轉給自己
+        - 金額不可超過目前餘額
+        - 錢包代碼必須存在
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [toWalletCode, amount]
+              properties:
+                toWalletCode:
+                  type: string
+                  minLength: 12
+                  maxLength: 12
+                  pattern: '^[A-Za-z0-9]{12}$'
+                  example: aB3xZ9qRmK2w
+                  description: 收款方 12 碼錢包代碼（大小寫英數字）
+                amount:
+                  type: number
+                  minimum: 0.01
+                  example: 200.00
+                  description: 轉帳金額（正數，不超過餘額）
+      responses:
+        '302':
+          description: 成功 / 失敗皆導向 `/dashboard`，結果以 flash 訊息顯示
+
+# ── Components ──────────────────────────────────────────────
+
+components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: JSESSIONID
+      description: Session cookie，由 `POST /login` 成功後自動設定
