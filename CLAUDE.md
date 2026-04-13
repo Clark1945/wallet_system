@@ -26,6 +26,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 No separate lint step is configured; the compiler plugin handles annotation processing via Lombok.
 
+**Rule: run `./mvnw test` after every code change and fix all failures before committing.**
+
 ## Architecture Overview
 
 **Stack:** Spring Boot 4.0.5 · Java 17 · Spring Data JPA · PostgreSQL · Lombok
