@@ -21,7 +21,7 @@ public class AuthService {
     @Transactional
     public Member register(String name, int age, String email, String password) {
         if (memberRepository.existsByEmail(email)) {
-            throw new IllegalArgumentException("此 Email 已被註冊");
+            throw new IllegalArgumentException("error.email.duplicate");
         }
         Member member = new Member();
         member.setName(name);

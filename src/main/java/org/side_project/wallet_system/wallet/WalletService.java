@@ -20,7 +20,7 @@ public class WalletService {
 
     public Wallet getWallet(UUID memberId) {
         return walletRepository.findByMemberId(memberId)
-                .orElseThrow(() -> new RuntimeException("找不到錢包"));
+                .orElseThrow(() -> new RuntimeException("Wallet not found"));
     }
 
     public List<Transaction> getTransactions(UUID memberId) {
@@ -31,7 +31,7 @@ public class WalletService {
     @Transactional
     public void deposit(UUID memberId, BigDecimal amount) {
         if (amount.compareTo(BigDecimal.ZERO) <= 0) {
-            throw new IllegalArgumentException("金額必須大於 0");
+            throw new IllegalArgumentException("error.amount.positive");
         }
         Wallet wallet = getWallet(memberId);
         wallet.setBalance(wallet.getBalance().add(amount));
@@ -41,18 +41,18 @@ public class WalletService {
         tx.setToWalletId(wallet.getId());
         tx.setType(TransactionType.DEPOSIT);
         tx.setAmount(amount);
-        tx.setDescription("存款");
+        tx.setDescription("Deposit");
         transactionRepository.save(tx);
     }
 
     @Transactional
     public void withdraw(UUID memberId, BigDecimal amount) {
         if (amount.compareTo(BigDecimal.ZERO) <= 0) {
-            throw new IllegalArgumentException("金額必須大於 0");
+            throw new IllegalArgumentException("error.amount.positive");
         }
         Wallet wallet = getWallet(memberId);
         if (wallet.getBalance().compareTo(amount) < 0) {
-            throw new IllegalArgumentException("餘額不足");
+            throw new IllegalArgumentException("error.insufficient.balance");
         }
         wallet.setBalance(wallet.getBalance().subtract(amount));
         walletRepository.save(wallet);
@@ -61,25 +61,25 @@ public class WalletService {
         tx.setFromWalletId(wallet.getId());
         tx.setType(TransactionType.WITHDRAW);
         tx.setAmount(amount);
-        tx.setDescription("提款");
+        tx.setDescription("Withdrawal");
         transactionRepository.save(tx);
     }
 
     @Transactional
     public void transfer(UUID fromMemberId, String toWalletCode, BigDecimal amount) {
         if (amount.compareTo(BigDecimal.ZERO) <= 0) {
-            throw new IllegalArgumentException("金額必須大於 0");
+            throw new IllegalArgumentException("error.amount.positive");
         }
         Wallet fromWallet = getWallet(fromMemberId);
         if (fromWallet.getWalletCode().equals(toWalletCode)) {
-            throw new IllegalArgumentException("無法轉帳給自己");
+            throw new IllegalArgumentException("error.self.transfer");
         }
         if (fromWallet.getBalance().compareTo(amount) < 0) {
-            throw new IllegalArgumentException("餘額不足");
+            throw new IllegalArgumentException("error.insufficient.balance");
         }
 
         Wallet toWallet = walletRepository.findByWalletCode(toWalletCode)
-                .orElseThrow(() -> new IllegalArgumentException("找不到此錢包代碼"));
+                .orElseThrow(() -> new IllegalArgumentException("error.wallet.not.found"));
 
         fromWallet.setBalance(fromWallet.getBalance().subtract(amount));
         toWallet.setBalance(toWallet.getBalance().add(amount));
@@ -91,7 +91,7 @@ public class WalletService {
         tx.setToWalletId(toWallet.getId());
         tx.setType(TransactionType.TRANSFER);
         tx.setAmount(amount);
-        tx.setDescription("轉帳給 " + toWalletCode);
+        tx.setDescription("Transfer to " + toWalletCode);
         transactionRepository.save(tx);
     }
 }

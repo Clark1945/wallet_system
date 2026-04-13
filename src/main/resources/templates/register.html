@@ -1,8 +1,8 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org" lang="zh-TW">
+<html xmlns:th="http://www.thymeleaf.org">
 <head>
     <meta charset="UTF-8">
-    <title>註冊 — Wallet System</title>
+    <title th:text="#{register.title}">Create Account</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { font-family: sans-serif; background: #f0f2f5; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
@@ -24,26 +24,29 @@
 </head>
 <body>
 <div class="card">
-    <h1>建立帳號</h1>
+    <h1 th:text="#{register.title}">Create Account</h1>
 
     <div th:if="${error}" class="alert alert-error" th:text="${error}"></div>
 
     <form method="post" th:action="@{/register}">
-        <label for="name">姓名</label>
+        <label for="name" th:text="#{register.name}">Name</label>
         <input type="text" id="name" name="name" required autofocus/>
 
-        <label for="age">年齡（選填）</label>
+        <label for="age" th:text="#{register.age}">Age (optional)</label>
         <input type="number" id="age" name="age" min="0"/>
 
-        <label for="email">Email</label>
+        <label for="email" th:text="#{register.email}">Email</label>
         <input type="email" id="email" name="email" required/>
 
-        <label for="password">密碼</label>
+        <label for="password" th:text="#{register.password}">Password (min. 6 characters)</label>
         <input type="password" id="password" name="password" required minlength="6"/>
 
-        <button type="submit">註冊</button>
+        <button type="submit" th:text="#{register.submit}">Register</button>
     </form>
-    <p>已有帳號？<a href="/login">返回登入</a></p>
+    <p>
+        <span th:text="#{register.login.prompt}">Already have an account?</span>
+        <a th:href="@{/login}" th:text="#{register.login.link}">Back to login</a>
+    </p>
 </div>
 </body>
 </html>

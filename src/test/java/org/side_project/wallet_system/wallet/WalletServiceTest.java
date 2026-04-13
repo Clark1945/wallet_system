@@ -55,7 +55,7 @@ class WalletServiceTest {
     void deposit_zeroAmount_throws() {
         assertThatThrownBy(() -> walletService.deposit(memberId, BigDecimal.ZERO))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("金額必須大於 0");
+                .hasMessage("error.amount.positive");
     }
 
     @Test
@@ -86,7 +86,7 @@ class WalletServiceTest {
     void withdraw_insufficientBalance_throws() {
         assertThatThrownBy(() -> walletService.withdraw(memberId, new BigDecimal("2000.00")))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("餘額不足");
+                .hasMessage("error.insufficient.balance");
 
         assertThat(wallet.getBalance()).isEqualByComparingTo("1000.00");
     }
@@ -121,7 +121,7 @@ class WalletServiceTest {
     void transfer_selfTransfer_throws() {
         assertThatThrownBy(() -> walletService.transfer(memberId, "MyCode000001", new BigDecimal("100")))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("無法轉帳給自己");
+                .hasMessage("error.self.transfer");
     }
 
     @Test
@@ -130,14 +130,14 @@ class WalletServiceTest {
 
         assertThatThrownBy(() -> walletService.transfer(memberId, "NotExist001x", new BigDecimal("100")))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("找不到此錢包代碼");
+                .hasMessage("error.wallet.not.found");
     }
 
     @Test
     void transfer_insufficientBalance_throws() {
         assertThatThrownBy(() -> walletService.transfer(memberId, "ToCode000001", new BigDecimal("9999")))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("餘額不足");
+                .hasMessage("error.insufficient.balance");
     }
 
     @Test
