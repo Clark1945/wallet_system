@@ -26,7 +26,8 @@ public class SecurityConfig {
         http
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/login", "/register",
-                                 "/openapi.yaml", "/swagger-ui/**", "/v3/api-docs/**").permitAll()
+                                 "/openapi.yaml", "/swagger-ui/**", "/v3/api-docs/**",
+                                 "/actuator/health", "/actuator/prometheus").permitAll()
                 .anyRequest().authenticated()
             )
             .formLogin(form -> form
