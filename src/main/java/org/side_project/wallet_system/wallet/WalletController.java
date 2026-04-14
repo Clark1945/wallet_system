@@ -3,14 +3,17 @@ package org.side_project.wallet_system.wallet;
 import jakarta.servlet.http.HttpSession;
 import lombok.RequiredArgsConstructor;
 import org.side_project.wallet_system.payment.Transaction;
+import org.side_project.wallet_system.payment.TransactionType;
 import org.springframework.context.MessageSource;
 import org.springframework.data.domain.Page;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.Locale;
 import java.util.UUID;
 
@@ -22,15 +25,25 @@ public class WalletController {
     private final MessageSource messageSource;
 
     @GetMapping("/dashboard")
-    public String dashboard(@RequestParam(defaultValue = "0") int page,
-                            HttpSession session, Model model) {
+    public String dashboard(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(required = false) String type,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
+            HttpSession session, Model model) {
+
         UUID memberId = UUID.fromString((String) session.getAttribute("memberId"));
         Wallet wallet = walletService.getWallet(memberId);
-        Page<Transaction> txPage = walletService.getTransactions(memberId, page, 10);
+
+        TransactionType txType = (type != null && !type.isBlank()) ? TransactionType.valueOf(type) : null;
+        Page<Transaction> txPage = walletService.getTransactions(memberId, txType, startDate, endDate, page, 10);
 
         model.addAttribute("wallet", wallet);
         model.addAttribute("txPage", txPage);
         model.addAttribute("memberName", session.getAttribute("memberName"));
+        model.addAttribute("filterType", type);
+        model.addAttribute("filterStart", startDate);
+        model.addAttribute("filterEnd", endDate);
         return "dashboard";
     }
 

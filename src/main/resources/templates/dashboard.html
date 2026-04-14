@@ -59,6 +59,20 @@
         .type-TRANSFER { background: #dbeafe; color: #1d4ed8; }
         .empty { text-align: center; color: #aaa; padding: 1.5rem; }
 
+        /* ── Filter form ── */
+        .filter-form { display: flex; flex-wrap: wrap; gap: .6rem; align-items: flex-end; margin-bottom: 1rem; }
+        .filter-form label { display: block; font-size: .75rem; color: #666; margin-bottom: .2rem; }
+        .filter-form input, .filter-form select {
+            padding: .4rem .6rem; border: 1px solid #ccc; border-radius: 4px; font-size: .85rem; }
+        .filter-group { display: flex; flex-direction: column; }
+        .btn-filter { padding: .42rem .9rem; background: #4f46e5; color: #fff; border: none;
+            border-radius: 4px; font-size: .85rem; cursor: pointer; }
+        .btn-filter:hover { background: #4338ca; }
+        .btn-reset { padding: .42rem .9rem; background: #fff; color: #555; border: 1px solid #ccc;
+            border-radius: 4px; font-size: .85rem; cursor: pointer; text-decoration: none;
+            display: inline-flex; align-items: center; }
+        .btn-reset:hover { background: #f3f4f6; }
+
         /* ── Pagination ── */
         .pagination { display: flex; justify-content: center; align-items: center;
             gap: .35rem; margin-top: 1rem; flex-wrap: wrap; }
@@ -151,6 +165,29 @@
     <!-- Transaction history -->
     <div class="table-card">
         <h3 th:text="#{dashboard.history.title}">Transaction History</h3>
+
+        <!-- Filter form -->
+        <form method="get" th:action="@{/dashboard}" class="filter-form">
+            <div class="filter-group">
+                <label th:text="#{filter.type}">Type</label>
+                <select name="type">
+                    <option value="" th:selected="${filterType == null || filterType == ''}" th:text="#{filter.type.all}">All</option>
+                    <option value="DEPOSIT"  th:selected="${filterType == 'DEPOSIT'}"  th:text="#{transaction.type.DEPOSIT}">Deposit</option>
+                    <option value="WITHDRAW" th:selected="${filterType == 'WITHDRAW'}" th:text="#{transaction.type.WITHDRAW}">Withdraw</option>
+                    <option value="TRANSFER" th:selected="${filterType == 'TRANSFER'}" th:text="#{transaction.type.TRANSFER}">Transfer</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <label th:text="#{filter.start.date}">From</label>
+                <input type="date" name="startDate" th:value="${filterStart}"/>
+            </div>
+            <div class="filter-group">
+                <label th:text="#{filter.end.date}">To</label>
+                <input type="date" name="endDate" th:value="${filterEnd}"/>
+            </div>
+            <button class="btn-filter" type="submit" th:text="#{filter.submit}">Search</button>
+            <a class="btn-reset" th:href="@{/dashboard}" th:text="#{filter.reset}">Reset</a>
+        </form>
         <table th:if="${!txPage.empty}">
             <thead>
             <tr>
@@ -179,17 +216,19 @@
         <!-- Pagination -->
         <div th:if="${txPage.totalPages > 1}" class="pagination">
             <a th:if="${!txPage.first}"
-               th:href="@{/dashboard(page=${txPage.number - 1})}" class="page-btn">&#8249;</a>
+               th:href="@{/dashboard(page=${txPage.number - 1}, type=${filterType}, startDate=${filterStart}, endDate=${filterEnd})}"
+               class="page-btn">&#8249;</a>
             <span th:if="${txPage.first}" class="page-btn disabled">&#8249;</span>
 
             <th:block th:each="i : ${#numbers.sequence(0, txPage.totalPages - 1)}">
-                <a th:href="@{/dashboard(page=${i})}"
+                <a th:href="@{/dashboard(page=${i}, type=${filterType}, startDate=${filterStart}, endDate=${filterEnd})}"
                    th:text="${i + 1}"
                    th:class="${i == txPage.number} ? 'page-btn active' : 'page-btn'"></a>
             </th:block>
 
             <a th:if="${!txPage.last}"
-               th:href="@{/dashboard(page=${txPage.number + 1})}" class="page-btn">&#8250;</a>
+               th:href="@{/dashboard(page=${txPage.number + 1}, type=${filterType}, startDate=${filterStart}, endDate=${filterEnd})}"
+               class="page-btn">&#8250;</a>
             <span th:if="${txPage.last}" class="page-btn disabled">&#8250;</span>
         </div>
     </div>

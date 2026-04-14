@@ -5,9 +5,12 @@ import lombok.extern.slf4j.Slf4j;
 import org.side_project.wallet_system.payment.Transaction;
 import org.side_project.wallet_system.payment.TransactionRepository;
 import org.side_project.wallet_system.payment.TransactionType;
+import org.side_project.wallet_system.payment.TransactionSpec;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
+
+import java.time.LocalDate;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
@@ -35,6 +38,18 @@ public class WalletService {
     public Page<Transaction> getTransactions(UUID memberId, int page, int size) {
         Wallet wallet = getWallet(memberId);
         return transactionRepository.findByWalletId(wallet.getId(), PageRequest.of(page, size));
+    }
+
+    public Page<Transaction> getTransactions(UUID memberId,
+                                             TransactionType type,
+                                             LocalDate startDate,
+                                             LocalDate endDate,
+                                             int page, int size) {
+        Wallet wallet = getWallet(memberId);
+        return transactionRepository.findAll(
+            TransactionSpec.filter(wallet.getId(), type, startDate, endDate),
+            PageRequest.of(page, size)
+        );
     }
 
     @Transactional
