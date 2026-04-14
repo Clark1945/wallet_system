@@ -5,6 +5,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.side_project.wallet_system.payment.Transaction;
 import org.side_project.wallet_system.payment.TransactionRepository;
 import org.side_project.wallet_system.payment.TransactionType;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -28,6 +30,11 @@ public class WalletService {
     public List<Transaction> getTransactions(UUID memberId) {
         Wallet wallet = getWallet(memberId);
         return transactionRepository.findByWalletId(wallet.getId());
+    }
+
+    public Page<Transaction> getTransactions(UUID memberId, int page, int size) {
+        Wallet wallet = getWallet(memberId);
+        return transactionRepository.findByWalletId(wallet.getId(), PageRequest.of(page, size));
     }
 
     @Transactional

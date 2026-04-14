@@ -58,6 +58,17 @@
         .type-WITHDRAW { background: #fee2e2; color: #b91c1c; }
         .type-TRANSFER { background: #dbeafe; color: #1d4ed8; }
         .empty { text-align: center; color: #aaa; padding: 1.5rem; }
+
+        /* ── Pagination ── */
+        .pagination { display: flex; justify-content: center; align-items: center;
+            gap: .35rem; margin-top: 1rem; flex-wrap: wrap; }
+        .page-btn { display: inline-flex; align-items: center; justify-content: center;
+            min-width: 2rem; height: 2rem; padding: 0 .5rem; border-radius: 4px;
+            font-size: .85rem; text-decoration: none; color: #4f46e5;
+            border: 1px solid #d1d5db; background: #fff; cursor: pointer; }
+        .page-btn:hover { background: #eef2ff; }
+        .page-btn.active { background: #4f46e5; color: #fff; border-color: #4f46e5; font-weight: 600; }
+        .page-btn.disabled { color: #bbb; border-color: #e5e7eb; cursor: default; pointer-events: none; }
     </style>
 </head>
 <body>
@@ -140,7 +151,7 @@
     <!-- Transaction history -->
     <div class="table-card">
         <h3 th:text="#{dashboard.history.title}">Transaction History</h3>
-        <table th:if="${!transactions.isEmpty()}">
+        <table th:if="${!txPage.empty}">
             <thead>
             <tr>
                 <th th:text="#{dashboard.history.time}">Time</th>
@@ -150,7 +161,7 @@
             </tr>
             </thead>
             <tbody>
-            <tr th:each="tx : ${transactions}">
+            <tr th:each="tx : ${txPage.content}">
                 <td th:text="${#temporals.format(tx.createdAt, 'yyyy-MM-dd HH:mm')}"></td>
                 <td>
                     <span class="type-badge"
@@ -163,7 +174,24 @@
             </tr>
             </tbody>
         </table>
-        <div class="empty" th:if="${transactions.isEmpty()}" th:text="#{dashboard.history.empty}">No transactions yet</div>
+        <div class="empty" th:if="${txPage.empty}" th:text="#{dashboard.history.empty}">No transactions yet</div>
+
+        <!-- Pagination -->
+        <div th:if="${txPage.totalPages > 1}" class="pagination">
+            <a th:if="${!txPage.first}"
+               th:href="@{/dashboard(page=${txPage.number - 1})}" class="page-btn">&#8249;</a>
+            <span th:if="${txPage.first}" class="page-btn disabled">&#8249;</span>
+
+            <th:block th:each="i : ${#numbers.sequence(0, txPage.totalPages - 1)}">
+                <a th:href="@{/dashboard(page=${i})}"
+                   th:text="${i + 1}"
+                   th:class="${i == txPage.number} ? 'page-btn active' : 'page-btn'"></a>
+            </th:block>
+
+            <a th:if="${!txPage.last}"
+               th:href="@{/dashboard(page=${txPage.number + 1})}" class="page-btn">&#8250;</a>
+            <span th:if="${txPage.last}" class="page-btn disabled">&#8250;</span>
+        </div>
     </div>
 </main>
 

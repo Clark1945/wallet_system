@@ -4,13 +4,13 @@ import jakarta.servlet.http.HttpSession;
 import lombok.RequiredArgsConstructor;
 import org.side_project.wallet_system.payment.Transaction;
 import org.springframework.context.MessageSource;
+import org.springframework.data.domain.Page;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import java.math.BigDecimal;
-import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
 
@@ -22,13 +22,14 @@ public class WalletController {
     private final MessageSource messageSource;
 
     @GetMapping("/dashboard")
-    public String dashboard(HttpSession session, Model model) {
+    public String dashboard(@RequestParam(defaultValue = "0") int page,
+                            HttpSession session, Model model) {
         UUID memberId = UUID.fromString((String) session.getAttribute("memberId"));
         Wallet wallet = walletService.getWallet(memberId);
-        List<Transaction> transactions = walletService.getTransactions(memberId);
+        Page<Transaction> txPage = walletService.getTransactions(memberId, page, 10);
 
         model.addAttribute("wallet", wallet);
-        model.addAttribute("transactions", transactions);
+        model.addAttribute("txPage", txPage);
         model.addAttribute("memberName", session.getAttribute("memberName"));
         return "dashboard";
     }

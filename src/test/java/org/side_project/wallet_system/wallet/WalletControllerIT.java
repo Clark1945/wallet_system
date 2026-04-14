@@ -10,6 +10,8 @@ import org.side_project.wallet_system.payment.Transaction;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.mock.web.MockHttpSession;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -54,7 +56,7 @@ class WalletControllerIT {
         session.setAttribute("memberName", "Test User");
 
         given(walletService.getWallet(memberId)).willReturn(wallet);
-        given(walletService.getTransactions(memberId)).willReturn(List.of());
+        given(walletService.getTransactions(eq(memberId), eq(0), eq(10))).willReturn(new PageImpl<>(List.of()));
     }
 
     // ── dashboard ─────────────────────────────────────────────
@@ -74,7 +76,7 @@ class WalletControllerIT {
                 .andExpect(status().isOk())
                 .andExpect(view().name("dashboard"))
                 .andExpect(model().attribute("wallet", wallet))
-                .andExpect(model().attribute("transactions", List.of()));
+                .andExpect(model().attributeExists("txPage"));
     }
 
     // ── deposit ───────────────────────────────────────────────
