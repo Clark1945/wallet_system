@@ -56,7 +56,8 @@ class WalletControllerIT {
         session.setAttribute("memberName", "Test User");
 
         given(walletService.getWallet(memberId)).willReturn(wallet);
-        given(walletService.getTransactions(eq(memberId), eq(0), eq(10))).willReturn(new PageImpl<>(List.of()));
+        given(walletService.getTransactions(eq(memberId), any(), any(), any(), eq(0), eq(10)))
+            .willReturn(new PageImpl<>(List.of()));
     }
 
     // ── dashboard ─────────────────────────────────────────────
