@@ -7,7 +7,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.side_project.wallet_system.wallet.Wallet;
 import org.side_project.wallet_system.wallet.WalletRepository;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.util.Optional;
 import java.util.UUID;
@@ -21,7 +21,7 @@ class AuthServiceTest {
 
     @Mock private MemberRepository memberRepository;
     @Mock private WalletRepository walletRepository;
-    @Mock private BCryptPasswordEncoder passwordEncoder;
+    @Mock private PasswordEncoder passwordEncoder;
     @InjectMocks private AuthService authService;
 
     @Test

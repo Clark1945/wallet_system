@@ -1,10 +1,17 @@
 CREATE TABLE IF NOT EXISTS members (
-    id       UUID         PRIMARY KEY,
-    name     VARCHAR(255) NOT NULL,
-    age      INTEGER      NOT NULL DEFAULT 0,
-    email    VARCHAR(255) NOT NULL UNIQUE,
-    password VARCHAR(255) NOT NULL
+    id            UUID         PRIMARY KEY,
+    name          VARCHAR(255) NOT NULL,
+    age           INTEGER      NOT NULL DEFAULT 0,
+    email         VARCHAR(255) NOT NULL UNIQUE,
+    password      VARCHAR(255),
+    google_id     VARCHAR(255) UNIQUE,
+    auth_provider VARCHAR(20)  NOT NULL DEFAULT 'LOCAL'
 );
+
+-- Migration for existing databases
+ALTER TABLE members ADD COLUMN IF NOT EXISTS google_id     VARCHAR(255) UNIQUE;
+ALTER TABLE members ADD COLUMN IF NOT EXISTS auth_provider VARCHAR(20)  NOT NULL DEFAULT 'LOCAL';
+ALTER TABLE members ALTER COLUMN password DROP NOT NULL;
 
 CREATE TABLE IF NOT EXISTS wallets (
     id          UUID           PRIMARY KEY,

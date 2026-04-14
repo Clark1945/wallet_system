@@ -2,9 +2,14 @@ package org.side_project.wallet_system.wallet;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.side_project.wallet_system.auth.CustomOAuth2UserService;
+import org.side_project.wallet_system.auth.LoginSuccessHandler;
+import org.side_project.wallet_system.auth.MemberRepository;
+import org.side_project.wallet_system.config.SecurityConfig;
 import org.side_project.wallet_system.payment.Transaction;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.mock.web.MockHttpSession;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -16,14 +21,20 @@ import java.util.UUID;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.*;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(WalletController.class)
+@Import(SecurityConfig.class)
 class WalletControllerIT {
 
     @Autowired MockMvc mockMvc;
     @MockitoBean WalletService walletService;
+    @MockitoBean MemberRepository memberRepository;
+    @MockitoBean CustomOAuth2UserService oauth2UserService;
+    @MockitoBean LoginSuccessHandler loginSuccessHandler;
 
     private MockHttpSession session;
     private UUID memberId;
@@ -57,7 +68,9 @@ class WalletControllerIT {
 
     @Test
     void dashboard_withSession_returnsOkAndDashboardView() throws Exception {
-        mockMvc.perform(get("/dashboard").session(session))
+        mockMvc.perform(get("/dashboard")
+                        .with(user("test@example.com"))
+                        .session(session))
                 .andExpect(status().isOk())
                 .andExpect(view().name("dashboard"))
                 .andExpect(model().attribute("wallet", wallet))
@@ -68,7 +81,7 @@ class WalletControllerIT {
 
     @Test
     void deposit_validAmount_redirectsToDashboardWithSuccess() throws Exception {
-        mockMvc.perform(post("/deposit")
+        mockMvc.perform(post("/deposit").with(csrf()).with(user("test@example.com"))
                         .param("amount", "200.00")
                         .session(session))
                 .andExpect(status().is3xxRedirection())
@@ -83,7 +96,7 @@ class WalletControllerIT {
         willThrow(new IllegalArgumentException("error.amount.positive"))
                 .given(walletService).deposit(any(), any());
 
-        mockMvc.perform(post("/deposit")
+        mockMvc.perform(post("/deposit").with(csrf()).with(user("test@example.com"))
                         .param("amount", "0")
                         .session(session))
                 .andExpect(status().is3xxRedirection())
@@ -95,7 +108,7 @@ class WalletControllerIT {
 
     @Test
     void withdraw_validAmount_redirectsToDashboardWithSuccess() throws Exception {
-        mockMvc.perform(post("/withdraw")
+        mockMvc.perform(post("/withdraw").with(csrf()).with(user("test@example.com"))
                         .param("amount", "100.00")
                         .session(session))
                 .andExpect(status().is3xxRedirection())
@@ -110,7 +123,7 @@ class WalletControllerIT {
         willThrow(new IllegalArgumentException("error.insufficient.balance"))
                 .given(walletService).withdraw(any(), any());
 
-        mockMvc.perform(post("/withdraw")
+        mockMvc.perform(post("/withdraw").with(csrf()).with(user("test@example.com"))
                         .param("amount", "99999.00")
                         .session(session))
                 .andExpect(status().is3xxRedirection())
@@ -122,7 +135,7 @@ class WalletControllerIT {
 
     @Test
     void transfer_validRequest_redirectsToDashboardWithSuccess() throws Exception {
-        mockMvc.perform(post("/transfer")
+        mockMvc.perform(post("/transfer").with(csrf()).with(user("test@example.com"))
                         .param("toWalletCode", "OtherCode0001")
                         .param("amount", "50.00")
                         .session(session))
@@ -139,7 +152,7 @@ class WalletControllerIT {
         willThrow(new IllegalArgumentException("error.wallet.not.found"))
                 .given(walletService).transfer(any(), any(), any());
 
-        mockMvc.perform(post("/transfer")
+        mockMvc.perform(post("/transfer").with(csrf()).with(user("test@example.com"))
                         .param("toWalletCode", "NotExist0001")
                         .param("amount", "50.00")
                         .session(session))
@@ -153,7 +166,7 @@ class WalletControllerIT {
         willThrow(new IllegalArgumentException("error.self.transfer"))
                 .given(walletService).transfer(any(), any(), any());
 
-        mockMvc.perform(post("/transfer")
+        mockMvc.perform(post("/transfer").with(csrf()).with(user("test@example.com"))
                         .param("toWalletCode", "TestCode0001")
                         .param("amount", "50.00")
                         .session(session))

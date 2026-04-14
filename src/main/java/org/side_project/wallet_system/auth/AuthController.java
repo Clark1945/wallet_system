@@ -1,14 +1,13 @@
 package org.side_project.wallet_system.auth;
 
-import jakarta.servlet.http.HttpSession;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.MessageSource;
 import org.springframework.stereotype.Controller;
+import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import java.util.Locale;
-import java.util.Optional;
 
 @Controller
 @RequiredArgsConstructor
@@ -23,26 +22,12 @@ public class AuthController {
     }
 
     @GetMapping("/login")
-    public String loginPage() {
-        return "login";
-    }
-
-    @PostMapping("/login")
-    public String login(@RequestParam String email,
-                        @RequestParam String password,
-                        HttpSession session,
-                        RedirectAttributes redirectAttributes,
-                        Locale locale) {
-        Optional<Member> memberOpt = authService.login(email, password);
-        if (memberOpt.isPresent()) {
-            Member member = memberOpt.get();
-            session.setAttribute("memberId", member.getId().toString());
-            session.setAttribute("memberName", member.getName());
-            return "redirect:/dashboard";
+    public String loginPage(@RequestParam(required = false) String error, Model model, Locale locale) {
+        if (error != null) {
+            model.addAttribute("error",
+                    messageSource.getMessage("error.login.invalid", null, locale));
         }
-        redirectAttributes.addFlashAttribute("error",
-                messageSource.getMessage("error.login.invalid", null, locale));
-        return "redirect:/login";
+        return "login";
     }
 
     @GetMapping("/register")
@@ -67,11 +52,5 @@ public class AuthController {
                     messageSource.getMessage(e.getMessage(), null, e.getMessage(), locale));
             return "redirect:/register";
         }
-    }
-
-    @PostMapping("/logout")
-    public String logout(HttpSession session) {
-        session.invalidate();
-        return "redirect:/login";
     }
 }
