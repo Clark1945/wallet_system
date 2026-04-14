@@ -1,6 +1,14 @@
 spring:
   application:
     name: wallet_system
+  security:
+    oauth2:
+      client:
+        registration:
+          google:
+            client-id: ${GOOGLE_CLIENT_ID}
+            client-secret: ${GOOGLE_CLIENT_SECRET}
+            scope: openid, email, profile
   datasource:
     url: jdbc:postgresql://localhost:5432/wallet_db
     username: postgres
