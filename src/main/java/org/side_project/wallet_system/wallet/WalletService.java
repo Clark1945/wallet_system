@@ -1,6 +1,7 @@
 package org.side_project.wallet_system.wallet;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.side_project.wallet_system.payment.Transaction;
 import org.side_project.wallet_system.payment.TransactionRepository;
 import org.side_project.wallet_system.payment.TransactionType;
@@ -11,6 +12,7 @@ import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class WalletService {
@@ -31,6 +33,7 @@ public class WalletService {
     @Transactional
     public void deposit(UUID memberId, BigDecimal amount) {
         if (amount.compareTo(BigDecimal.ZERO) <= 0) {
+            log.warn("Deposit rejected - non-positive amount: memberId={}, amount={}", memberId, amount);
             throw new IllegalArgumentException("error.amount.positive");
         }
         Wallet wallet = getWallet(memberId);
@@ -43,15 +46,18 @@ public class WalletService {
         tx.setAmount(amount);
         tx.setDescription("Deposit");
         transactionRepository.save(tx);
+        log.info("Deposit: memberId={}, amount={}, newBalance={}", memberId, amount, wallet.getBalance());
     }
 
     @Transactional
     public void withdraw(UUID memberId, BigDecimal amount) {
         if (amount.compareTo(BigDecimal.ZERO) <= 0) {
+            log.warn("Withdrawal rejected - non-positive amount: memberId={}, amount={}", memberId, amount);
             throw new IllegalArgumentException("error.amount.positive");
         }
         Wallet wallet = getWallet(memberId);
         if (wallet.getBalance().compareTo(amount) < 0) {
+            log.warn("Withdrawal rejected - insufficient balance: memberId={}, amount={}, balance={}", memberId, amount, wallet.getBalance());
             throw new IllegalArgumentException("error.insufficient.balance");
         }
         wallet.setBalance(wallet.getBalance().subtract(amount));
@@ -63,23 +69,30 @@ public class WalletService {
         tx.setAmount(amount);
         tx.setDescription("Withdrawal");
         transactionRepository.save(tx);
+        log.info("Withdrawal: memberId={}, amount={}, newBalance={}", memberId, amount, wallet.getBalance());
     }
 
     @Transactional
     public void transfer(UUID fromMemberId, String toWalletCode, BigDecimal amount) {
         if (amount.compareTo(BigDecimal.ZERO) <= 0) {
+            log.warn("Transfer rejected - non-positive amount: fromMemberId={}, amount={}", fromMemberId, amount);
             throw new IllegalArgumentException("error.amount.positive");
         }
         Wallet fromWallet = getWallet(fromMemberId);
         if (fromWallet.getWalletCode().equals(toWalletCode)) {
+            log.warn("Transfer rejected - self-transfer: memberId={}", fromMemberId);
             throw new IllegalArgumentException("error.self.transfer");
         }
         if (fromWallet.getBalance().compareTo(amount) < 0) {
+            log.warn("Transfer rejected - insufficient balance: fromMemberId={}, amount={}, balance={}", fromMemberId, amount, fromWallet.getBalance());
             throw new IllegalArgumentException("error.insufficient.balance");
         }
 
         Wallet toWallet = walletRepository.findByWalletCode(toWalletCode)
-                .orElseThrow(() -> new IllegalArgumentException("error.wallet.not.found"));
+                .orElseThrow(() -> {
+                    log.warn("Transfer rejected - wallet not found: toWalletCode={}", toWalletCode);
+                    return new IllegalArgumentException("error.wallet.not.found");
+                });
 
         fromWallet.setBalance(fromWallet.getBalance().subtract(amount));
         toWallet.setBalance(toWallet.getBalance().add(amount));
@@ -93,5 +106,6 @@ public class WalletService {
         tx.setAmount(amount);
         tx.setDescription("Transfer to " + toWalletCode);
         transactionRepository.save(tx);
+        log.info("Transfer: fromMemberId={}, toWalletCode={}, amount={}", fromMemberId, toWalletCode, amount);
     }
 }

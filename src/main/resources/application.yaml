@@ -30,6 +30,12 @@ spring:
       hibernate:
         format_sql: true
 
+logging:
+  level:
+    org.side_project.wallet_system: DEBUG
+  file:
+    name: logs/wallet-system.log
+
 springdoc:
   swagger-ui:
     path: /swagger-ui.html
