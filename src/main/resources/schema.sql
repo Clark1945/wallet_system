@@ -32,3 +32,8 @@ CREATE TABLE IF NOT EXISTS transactions (
     description    VARCHAR(255),
     created_at     TIMESTAMP      NOT NULL
 );
+
+CREATE INDEX IF NOT EXISTS idx_tx_from_wallet ON transactions (from_wallet_id);
+CREATE INDEX IF NOT EXISTS idx_tx_to_wallet   ON transactions (to_wallet_id);
+CREATE INDEX IF NOT EXISTS idx_tx_created_at  ON transactions (created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_tx_type        ON transactions (type);
