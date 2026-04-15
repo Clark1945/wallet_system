@@ -90,6 +90,8 @@
 <header>
     <h1>Wallet System</h1>
     <div style="display:flex; align-items:center; gap:1rem;">
+        <a th:href="@{/profile}" style="color:#fff; font-size:.9rem; opacity:.85; text-decoration:none;"
+           th:text="#{profile.nav.link}">Profile</a>
         <span th:text="#{dashboard.welcome(${memberName})}">Welcome</span>
         <form method="post" th:action="@{/logout}" style="margin:0">
             <button class="logout-btn" type="submit" th:text="#{dashboard.logout}">Logout</button>

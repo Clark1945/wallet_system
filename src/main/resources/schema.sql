@@ -37,3 +37,10 @@ CREATE INDEX IF NOT EXISTS idx_tx_from_wallet ON transactions (from_wallet_id);
 CREATE INDEX IF NOT EXISTS idx_tx_to_wallet   ON transactions (to_wallet_id);
 CREATE INDEX IF NOT EXISTS idx_tx_created_at  ON transactions (created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_tx_type        ON transactions (type);
+
+-- Profile fields migration
+ALTER TABLE members ADD COLUMN IF NOT EXISTS nickname    VARCHAR(100);
+ALTER TABLE members ADD COLUMN IF NOT EXISTS phone       VARCHAR(20);
+ALTER TABLE members ADD COLUMN IF NOT EXISTS bio         VARCHAR(255);
+ALTER TABLE members ADD COLUMN IF NOT EXISTS birthday    DATE;
+ALTER TABLE members ADD COLUMN IF NOT EXISTS avatar_path VARCHAR(255);
