@@ -6,9 +6,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.side_project.wallet_system.payment.Transaction;
-import org.side_project.wallet_system.payment.TransactionRepository;
-import org.side_project.wallet_system.payment.TransactionType;
+import org.side_project.wallet_system.transaction.TransactionRepository;
+import org.side_project.wallet_system.transaction.TransactionType;
 
 import java.math.BigDecimal;
 import java.util.Optional;

@@ -2,8 +2,8 @@ package org.side_project.wallet_system.wallet;
 
 import jakarta.servlet.http.HttpSession;
 import lombok.RequiredArgsConstructor;
-import org.side_project.wallet_system.payment.Transaction;
-import org.side_project.wallet_system.payment.TransactionType;
+import org.side_project.wallet_system.transaction.Transaction;
+import org.side_project.wallet_system.transaction.TransactionType;
 import org.springframework.context.MessageSource;
 import org.springframework.data.domain.Page;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -47,8 +47,17 @@ public class WalletController {
         return "dashboard";
     }
 
+    @GetMapping("/deposit")
+    public String depositPage(HttpSession session, Model model) {
+        UUID memberId = UUID.fromString((String) session.getAttribute("memberId"));
+        model.addAttribute("wallet", walletService.getWallet(memberId));
+        model.addAttribute("memberName", session.getAttribute("memberName"));
+        return "deposit";
+    }
+
     @PostMapping("/deposit")
     public String deposit(@RequestParam BigDecimal amount,
+                          @RequestParam(defaultValue = "stripe") String paymentMethod,
                           HttpSession session,
                           RedirectAttributes redirectAttributes,
                           Locale locale) {
@@ -60,6 +69,7 @@ public class WalletController {
         } catch (Exception e) {
             redirectAttributes.addFlashAttribute("error",
                     messageSource.getMessage(e.getMessage(), null, e.getMessage(), locale));
+            return "redirect:/deposit";
         }
         return "redirect:/dashboard";
     }

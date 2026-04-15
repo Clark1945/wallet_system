@@ -2,10 +2,10 @@ package org.side_project.wallet_system.wallet;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.side_project.wallet_system.payment.Transaction;
-import org.side_project.wallet_system.payment.TransactionRepository;
-import org.side_project.wallet_system.payment.TransactionType;
-import org.side_project.wallet_system.payment.TransactionSpec;
+import org.side_project.wallet_system.transaction.Transaction;
+import org.side_project.wallet_system.transaction.TransactionRepository;
+import org.side_project.wallet_system.transaction.TransactionType;
+import org.side_project.wallet_system.transaction.TransactionSpec;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;

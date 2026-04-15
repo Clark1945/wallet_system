@@ -6,11 +6,9 @@ import org.side_project.wallet_system.auth.CustomOAuth2UserService;
 import org.side_project.wallet_system.auth.LoginSuccessHandler;
 import org.side_project.wallet_system.auth.MemberRepository;
 import org.side_project.wallet_system.config.SecurityConfig;
-import org.side_project.wallet_system.payment.Transaction;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
-import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.mock.web.MockHttpSession;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -80,12 +78,32 @@ class WalletControllerIT {
                 .andExpect(model().attributeExists("txPage"));
     }
 
-    // ── deposit ───────────────────────────────────────────────
+    // ── GET /deposit ──────────────────────────────────────────
+
+    @Test
+    void depositPage_withoutSession_redirectsToLogin() throws Exception {
+        mockMvc.perform(get("/deposit"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/login"));
+    }
+
+    @Test
+    void depositPage_withSession_returnsOkAndDepositView() throws Exception {
+        mockMvc.perform(get("/deposit")
+                        .with(user("test@example.com"))
+                        .session(session))
+                .andExpect(status().isOk())
+                .andExpect(view().name("deposit"))
+                .andExpect(model().attribute("wallet", wallet));
+    }
+
+    // ── POST /deposit ─────────────────────────────────────────
 
     @Test
     void deposit_validAmount_redirectsToDashboardWithSuccess() throws Exception {
         mockMvc.perform(post("/deposit").with(csrf()).with(user("test@example.com"))
                         .param("amount", "200.00")
+                        .param("paymentMethod", "stripe")
                         .session(session))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/dashboard"))
@@ -95,15 +113,29 @@ class WalletControllerIT {
     }
 
     @Test
-    void deposit_serviceThrows_redirectsWithError() throws Exception {
+    void deposit_sbpaymentMethod_redirectsToDashboardWithSuccess() throws Exception {
+        mockMvc.perform(post("/deposit").with(csrf()).with(user("test@example.com"))
+                        .param("amount", "500.00")
+                        .param("paymentMethod", "sbpayment")
+                        .session(session))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/dashboard"))
+                .andExpect(flash().attribute("success", "Deposit successful"));
+
+        then(walletService).should().deposit(eq(memberId), eq(new BigDecimal("500.00")));
+    }
+
+    @Test
+    void deposit_serviceThrows_redirectsToDepositWithError() throws Exception {
         willThrow(new IllegalArgumentException("error.amount.positive"))
                 .given(walletService).deposit(any(), any());
 
         mockMvc.perform(post("/deposit").with(csrf()).with(user("test@example.com"))
                         .param("amount", "0")
+                        .param("paymentMethod", "stripe")
                         .session(session))
                 .andExpect(status().is3xxRedirection())
-                .andExpect(redirectedUrl("/dashboard"))
+                .andExpect(redirectedUrl("/deposit"))
                 .andExpect(flash().attribute("error", "Amount must be greater than 0"));
     }
 

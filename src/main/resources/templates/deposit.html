@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title th:text="#{deposit.title}">Top Up</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: sans-serif; background: #f0f2f5; color: #333; }
+
+        /* ── Header ── */
+        header { background: #4f46e5; color: #fff; padding: 1rem 2rem;
+            display: flex; justify-content: space-between; align-items: center; }
+        header h1 { font-size: 1.2rem; }
+        .logout-btn { background: rgba(255,255,255,.2); border: 1px solid rgba(255,255,255,.4);
+            color: #fff; padding: .4rem .9rem; border-radius: 4px; cursor: pointer; font-size: .85rem; }
+        .logout-btn:hover { background: rgba(255,255,255,.35); }
+
+        main { max-width: 520px; margin: 2.5rem auto; padding: 0 1rem; }
+
+        /* ── Alert ── */
+        .alert { padding: .75rem 1rem; border-radius: 4px; margin-bottom: 1.25rem; font-size: .9rem; }
+        .alert-error   { background: #fde8e8; color: #c0392b; }
+        .alert-success { background: #e8f8e8; color: #27ae60; }
+
+        /* ── Balance strip ── */
+        .balance-strip { background: #fff; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,.08);
+            padding: 1rem 1.5rem; margin-bottom: 1.25rem;
+            display: flex; justify-content: space-between; align-items: center; }
+        .balance-label { font-size: .8rem; color: #888; }
+        .balance-amount { font-size: 1.5rem; font-weight: 700; color: #4f46e5; }
+
+        /* ── Form card ── */
+        .form-card { background: #fff; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,.08); padding: 1.75rem; }
+        .form-card h2 { font-size: 1.1rem; margin-bottom: 1.5rem; color: #333; }
+
+        .field { margin-bottom: 1.4rem; }
+        .field label { display: block; font-size: .82rem; color: #555; margin-bottom: .35rem; font-weight: 500; }
+        .field input[type="number"] { width: 100%; padding: .6rem .8rem; border: 1px solid #ccc;
+            border-radius: 6px; font-size: 1.05rem; }
+        .field input[type="number"]:focus { outline: none; border-color: #4f46e5;
+            box-shadow: 0 0 0 2px rgba(79,70,229,.15); }
+
+        /* ── Payment method cards ── */
+        .method-grid { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; }
+        .method-option { position: relative; }
+        .method-option input[type="radio"] { position: absolute; opacity: 0; width: 0; height: 0; }
+        .method-label { display: flex; flex-direction: column; align-items: center; justify-content: center;
+            gap: .5rem; padding: 1rem .75rem; border: 2px solid #e5e7eb; border-radius: 8px;
+            cursor: pointer; transition: border-color .15s, background .15s; min-height: 90px; }
+        .method-label:hover { border-color: #a5b4fc; background: #f5f3ff; }
+        .method-option input[type="radio"]:checked + .method-label {
+            border-color: #4f46e5; background: #eef2ff; }
+        .method-logo { height: 68px; object-fit: contain; }
+        .method-name { font-size: .78rem; color: #555; font-weight: 500; }
+
+        /* ── Submit ── */
+        .btn-submit { width: 100%; margin-top: 1.6rem; padding: .7rem; background: #16a34a;
+            color: #fff; border: none; border-radius: 6px; font-size: 1rem; cursor: pointer; font-weight: 500; }
+        .btn-submit:hover { background: #15803d; }
+
+        /* ── Back link ── */
+        .back-link { display: inline-block; margin-top: 1.25rem; font-size: .85rem;
+            color: #6b7280; text-decoration: none; }
+        .back-link:hover { color: #4f46e5; }
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>Wallet System</h1>
+    <div style="display:flex; align-items:center; gap:1rem;">
+        <a th:href="@{/profile}" style="color:#fff; font-size:.9rem; opacity:.85; text-decoration:none;"
+           th:text="#{profile.nav.link}">Profile</a>
+        <span th:text="#{dashboard.welcome(${memberName})}" style="font-size:.9rem; opacity:.85;"></span>
+        <form method="post" th:action="@{/logout}" style="margin:0">
+            <button class="logout-btn" type="submit" th:text="#{dashboard.logout}">Logout</button>
+        </form>
+    </div>
+</header>
+
+<main>
+    <div th:if="${error}"   class="alert alert-error"   th:text="${error}"></div>
+    <div th:if="${success}" class="alert alert-success" th:text="${success}"></div>
+
+    <!-- Balance -->
+    <div class="balance-strip">
+        <div class="balance-label" th:text="#{deposit.balance.label}">Current Balance</div>
+        <div class="balance-amount" th:text="'$ ' + ${#numbers.formatDecimal(wallet.balance, 1, 2)}"></div>
+    </div>
+
+    <!-- Top-up form -->
+    <div class="form-card">
+        <h2 th:text="#{deposit.heading}">Top Up Your Wallet</h2>
+
+        <form method="post" th:action="@{/deposit}">
+            <!-- Amount -->
+            <div class="field">
+                <label th:text="#{deposit.amount.label}">Amount</label>
+                <input type="number" name="amount" min="0.01" step="0.01" placeholder="0.00" required/>
+            </div>
+
+            <!-- Payment method -->
+            <div class="field">
+                <label th:text="#{deposit.method.label}">Payment Method</label>
+                <div class="method-grid">
+                    <div class="method-option">
+                        <input type="radio" id="stripe" name="paymentMethod" value="stripe" checked/>
+                        <label class="method-label" for="stripe">
+                            <img class="method-logo" th:src="@{/stripe.png}" alt="Stripe"/>
+                        </label>
+                    </div>
+                    <div class="method-option">
+                        <input type="radio" id="sbpayment" name="paymentMethod" value="sbpayment"/>
+                        <label class="method-label" for="sbpayment">
+                            <img class="method-logo" th:src="@{/sbpayment.png}" alt="SB Payment"/>
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <button class="btn-submit" type="submit" th:text="#{deposit.submit}">Proceed to Payment</button>
+        </form>
+    </div>
+
+    <a class="back-link" th:href="@{/dashboard}" th:text="#{deposit.back}">← Back to Dashboard</a>
+</main>
+
+</body>
+</html>
