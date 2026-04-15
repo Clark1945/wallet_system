@@ -1,4 +1,4 @@
-package org.side_project.wallet_system.payment;
+package org.side_project.wallet_system.transaction;
 
 import jakarta.persistence.*;
 import lombok.Getter;

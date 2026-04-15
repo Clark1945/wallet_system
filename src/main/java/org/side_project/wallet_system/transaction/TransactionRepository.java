@@ -1,4 +1,4 @@
-package org.side_project.wallet_system.payment;
+package org.side_project.wallet_system.transaction;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;

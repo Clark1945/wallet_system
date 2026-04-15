@@ -73,6 +73,17 @@
             display: inline-flex; align-items: center; }
         .btn-reset:hover { background: #f3f4f6; }
 
+        /* ── Top-up nav card ── */
+        .topup-card { display: flex; flex-direction: column; justify-content: space-between; }
+        .topup-card h3 { font-size: 1rem; margin-bottom: .6rem; border-bottom: 1px solid #eee; padding-bottom: .5rem; }
+        .topup-desc { font-size: .82rem; color: #777; margin-bottom: 1rem; line-height: 1.5; }
+        .topup-logos { display: flex; gap: .6rem; align-items: center; margin-bottom: 1.1rem; }
+        .topup-logo { height: 44px; object-fit: contain; opacity: .5; filter: grayscale(20%); }
+        .btn-topup { display: block; width: 100%; padding: .55rem; border: none; border-radius: 4px;
+            font-size: .9rem; cursor: pointer; color: #fff; background: #16a34a; text-align: center;
+            text-decoration: none; }
+        .btn-topup:hover { background: #15803d; }
+
         /* ── Pagination ── */
         .pagination { display: flex; justify-content: center; align-items: center;
             gap: .35rem; margin-top: 1rem; flex-wrap: wrap; }
@@ -130,14 +141,15 @@
 
     <!-- Actions -->
     <div class="actions">
-        <!-- Deposit -->
-        <div class="action-card">
-            <h3 th:text="#{dashboard.deposit.title}">Deposit</h3>
-            <form method="post" th:action="@{/deposit}">
-                <label th:text="#{dashboard.amount}">Amount</label>
-                <input type="number" name="amount" min="0.01" step="0.01" placeholder="0.00" required/>
-                <button class="btn btn-deposit" type="submit" th:text="#{dashboard.deposit.submit}">Deposit</button>
-            </form>
+        <!-- Top Up -->
+        <div class="action-card topup-card">
+            <h3 th:text="#{dashboard.deposit.title}">Top Up</h3>
+            <p class="topup-desc" th:text="#{dashboard.deposit.desc}">Add funds using your preferred payment method.</p>
+            <div class="topup-logos">
+                <img class="topup-logo" th:src="@{/stripe.png}"    alt="Stripe"/>
+                <img class="topup-logo" th:src="@{/sbpayment.png}" alt="SB Payment"/>
+            </div>
+            <a class="btn-topup" th:href="@{/deposit}" th:text="#{dashboard.deposit.submit}">Top Up</a>
         </div>
 
         <!-- Withdraw -->
