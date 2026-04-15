@@ -5,6 +5,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+import java.time.LocalDate;
 import java.util.UUID;
 
 @Entity
@@ -35,4 +36,18 @@ public class Member {
     @Column(nullable = false)
     @Enumerated(EnumType.STRING)
     private AuthProvider authProvider = AuthProvider.LOCAL;
+
+    @Column(length = 100)
+    private String nickname;
+
+    @Column(length = 20)
+    private String phone;
+
+    @Column(length = 255)
+    private String bio;
+
+    private LocalDate birthday;
+
+    @Column(length = 255)
+    private String avatarPath;
 }

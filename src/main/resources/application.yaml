@@ -20,6 +20,11 @@ spring:
   sql:
     init:
       mode: always
+  servlet:
+    multipart:
+      enabled: true
+      max-file-size: 10MB
+      max-request-size: 10MB
   jpa:
     open-in-view: false
     hibernate:
@@ -47,6 +52,10 @@ management:
   metrics:
     tags:
       application: ${spring.application.name}
+
+app:
+  upload:
+    dir: uploads
 
 springdoc:
   swagger-ui:
