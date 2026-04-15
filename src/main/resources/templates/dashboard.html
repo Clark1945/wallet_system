@@ -73,16 +73,20 @@
             display: inline-flex; align-items: center; }
         .btn-reset:hover { background: #f3f4f6; }
 
-        /* ── Top-up nav card ── */
+        /* ── Top-up / Withdraw nav card ── */
         .topup-card { display: flex; flex-direction: column; justify-content: space-between; }
         .topup-card h3 { font-size: 1rem; margin-bottom: .6rem; border-bottom: 1px solid #eee; padding-bottom: .5rem; }
         .topup-desc { font-size: .82rem; color: #777; margin-bottom: 1rem; line-height: 1.5; }
-        .topup-logos { display: flex; gap: .6rem; align-items: center; margin-bottom: 1.1rem; }
+        .topup-logos { display: flex; gap: .6rem; align-items: center; flex-wrap: wrap; margin-bottom: 1.1rem; }
         .topup-logo { height: 44px; object-fit: contain; opacity: .5; filter: grayscale(20%); }
         .btn-topup { display: block; width: 100%; padding: .55rem; border: none; border-radius: 4px;
             font-size: .9rem; cursor: pointer; color: #fff; background: #16a34a; text-align: center;
             text-decoration: none; }
         .btn-topup:hover { background: #15803d; }
+        .btn-withdraw-nav { display: block; width: 100%; padding: .55rem; border: none; border-radius: 4px;
+            font-size: .9rem; cursor: pointer; color: #fff; background: #dc2626; text-align: center;
+            text-decoration: none; }
+        .btn-withdraw-nav:hover { background: #b91c1c; }
 
         /* ── Pagination ── */
         .pagination { display: flex; justify-content: center; align-items: center;
@@ -153,13 +157,15 @@
         </div>
 
         <!-- Withdraw -->
-        <div class="action-card">
+        <div class="action-card topup-card">
             <h3 th:text="#{dashboard.withdraw.title}">Withdraw</h3>
-            <form method="post" th:action="@{/withdraw}">
-                <label th:text="#{dashboard.amount}">Amount</label>
-                <input type="number" name="amount" min="0.01" step="0.01" placeholder="0.00" required/>
-                <button class="btn btn-withdraw" type="submit" th:text="#{dashboard.withdraw.submit}">Withdraw</button>
-            </form>
+            <p class="topup-desc" th:text="#{dashboard.withdraw.desc}">Transfer funds to your bank account.</p>
+            <div class="topup-logos">
+                <img class="topup-logo" th:src="@{/visa.png}"       alt="Visa"/>
+                <img class="topup-logo" th:src="@{/mastercard.png}" alt="Mastercard"/>
+                <img class="topup-logo" th:src="@{/jcb.png}"        alt="JCB"/>
+            </div>
+            <a class="btn-withdraw-nav" th:href="@{/withdraw}" th:text="#{dashboard.withdraw.submit}">Withdraw</a>
         </div>
 
         <!-- Transfer -->

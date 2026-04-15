@@ -74,6 +74,14 @@ public class WalletController {
         return "redirect:/dashboard";
     }
 
+    @GetMapping("/withdraw")
+    public String withdrawPage(HttpSession session, Model model) {
+        UUID memberId = UUID.fromString((String) session.getAttribute("memberId"));
+        model.addAttribute("wallet", walletService.getWallet(memberId));
+        model.addAttribute("memberName", session.getAttribute("memberName"));
+        return "withdraw";
+    }
+
     @PostMapping("/withdraw")
     public String withdraw(@RequestParam BigDecimal amount,
                            HttpSession session,
