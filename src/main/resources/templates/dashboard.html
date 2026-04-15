@@ -76,7 +76,8 @@
         /* ── Top-up / Withdraw nav card ── */
         .topup-card { display: flex; flex-direction: column; justify-content: space-between; }
         .topup-card h3 { font-size: 1rem; margin-bottom: .6rem; border-bottom: 1px solid #eee; padding-bottom: .5rem; }
-        .topup-desc { font-size: .82rem; color: #777; margin-bottom: 1rem; line-height: 1.5; }
+        .topup-desc { font-size: .82rem; color: #777; margin-bottom: .5rem; line-height: 1.5; }
+        .topup-note { font-size: .75rem; color: #f59e0b; margin-bottom: 1rem; }
         .topup-logos { display: flex; gap: .6rem; align-items: center; flex-wrap: wrap; margin-bottom: 1.1rem; }
         .topup-logo { height: 44px; object-fit: contain; opacity: .5; filter: grayscale(20%); }
         .btn-topup { display: block; width: 100%; padding: .55rem; border: none; border-radius: 4px;
@@ -166,6 +167,7 @@
         <div class="action-card topup-card">
             <h3 th:text="#{dashboard.withdraw.title}">Withdraw</h3>
             <p class="topup-desc" th:text="#{dashboard.withdraw.desc}">Transfer funds to your bank account.</p>
+            <p class="topup-note" th:text="#{dashboard.withdraw.note}">※ This is a simulated payment flow, not a real account.</p>
             <div class="topup-logos">
                 <img class="topup-logo" th:src="@{/visa.png}"       alt="Visa"/>
                 <img class="topup-logo" th:src="@{/mastercard.png}" alt="Mastercard"/>
