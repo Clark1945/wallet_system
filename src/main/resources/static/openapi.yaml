@@ -12,7 +12,7 @@ info:
     ## 錢包代碼
     每位會員在註冊時會自動產生一組 **12 碼英數字錢包代碼**（大小寫混合），
     用於識別收款方身份（取代 Email），可在儀表板頁面複製分享。
-  version: 1.0.0
+  version: 1.1.0
 
 servers:
   - url: http://localhost:8080
@@ -21,8 +21,10 @@ servers:
 tags:
   - name: Auth
     description: 會員認證 — 註冊、登入、登出
+  - name: Profile
+    description: 個人資料 — 查看與更新個人資訊、頭像上傳
   - name: Wallet
-    description: 錢包操作 — 儀表板、存款、提款、轉帳（需登入）
+    description: 錢包操作 — 儀表板、儲值、提款、轉帳（需登入）
 
 # 預設所有受保護端點需要 session cookie
 security:
@@ -129,6 +131,84 @@ paths:
         '302':
           description: → `/login`
 
+  # ── Profile ───────────────────────────────────────────────
+
+  /profile:
+    get:
+      tags: [Profile]
+      summary: 顯示個人資料頁面
+      description: 顯示目前登入會員的個人資訊（姓名、暱稱、電話、生日、自我介紹、頭像）。
+      responses:
+        '200':
+          description: 個人資料頁面 HTML
+        '302':
+          description: 未登入 → `/login`
+
+    post:
+      tags: [Profile]
+      summary: 更新個人資料
+      description: |
+        更新登入會員的個人資訊。`name` 為必填，其餘欄位選填。
+        成功後 session 中的 `memberName` 同步更新，導回 `/profile` 附帶 flash 訊息。
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name:
+                  type: string
+                  example: 王小明
+                nickname:
+                  type: string
+                  maxLength: 100
+                  example: Xiao Ming
+                  description: 暱稱（選填）
+                phone:
+                  type: string
+                  maxLength: 20
+                  example: '0912345678'
+                  description: 電話號碼（選填）
+                bio:
+                  type: string
+                  maxLength: 255
+                  example: Hi, I love coding!
+                  description: 自我介紹（選填）
+                birthday:
+                  type: string
+                  format: date
+                  example: '1990-05-20'
+                  description: 生日，格式 yyyy-MM-dd（選填）
+      responses:
+        '302':
+          description: 成功 / 失敗皆導回 `/profile`，結果以 flash 訊息顯示
+
+  /profile/avatar:
+    post:
+      tags: [Profile]
+      summary: 上傳頭像
+      description: |
+        上傳個人頭像圖片。接受格式：`image/jpeg`、`image/png`、`image/gif`、`image/webp`。
+        最大檔案大小：2 MB。
+        上傳成功後舊頭像檔案自動刪除。
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [avatar]
+              properties:
+                avatar:
+                  type: string
+                  format: binary
+                  description: 圖片檔案（JPG / PNG / GIF / WEBP，最大 2 MB）
+      responses:
+        '302':
+          description: 成功 / 失敗皆導回 `/profile`，結果以 flash 訊息顯示
+
   # ── Wallet ────────────────────────────────────────────────
 
   /dashboard:
@@ -139,7 +219,33 @@ paths:
         顯示：
         - 目前錢包餘額
         - 12 碼錢包代碼（可複製分享給他人匯款）
-        - 近期交易紀錄（存款 / 提款 / 轉帳）
+        - 交易紀錄（存款 / 提款 / 轉帳），支援類型篩選、日期範圍篩選與分頁
+        - 儲值 / 提款 / 轉帳操作入口（各自導向專屬頁面）
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 0
+          description: 頁碼（從 0 開始）
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum: [DEPOSIT, WITHDRAW, TRANSFER]
+          description: 篩選交易類型（選填）
+        - name: startDate
+          in: query
+          schema:
+            type: string
+            format: date
+          description: 篩選起始日期，格式 yyyy-MM-dd（選填）
+        - name: endDate
+          in: query
+          schema:
+            type: string
+            format: date
+          description: 篩選結束日期，格式 yyyy-MM-dd（選填）
       responses:
         '200':
           description: 儀表板頁面 HTML
@@ -147,10 +253,24 @@ paths:
           description: 未登入 → `/login`
 
   /deposit:
+    get:
+      tags: [Wallet]
+      summary: 顯示儲值頁面
+      description: 顯示儲值表單，包含金額輸入與支付方式選擇（Stripe / SB Payment）。
+      responses:
+        '200':
+          description: 儲值頁面 HTML
+        '302':
+          description: 未登入 → `/login`
+
     post:
       tags: [Wallet]
-      summary: 存款
-      description: 將指定金額存入自己的錢包，金額須大於 0。
+      summary: 儲值
+      description: |
+        將指定金額存入自己的錢包，金額須大於 0。
+
+        > **注意：** `paymentMethod` 目前為預留參數，金流串接尚未實作，
+        > 實際儲值邏輯與支付方式無關。
       requestBody:
         required: true
         content:
@@ -163,18 +283,35 @@ paths:
                   type: number
                   minimum: 0.01
                   example: 1000.00
-                  description: 存款金額（正數）
+                  description: 儲值金額（正數）
+                paymentMethod:
+                  type: string
+                  enum: [stripe, sbpayment]
+                  default: stripe
+                  description: 支付方式（選填，預設 stripe）
       responses:
         '302':
-          description: 成功 / 失敗皆導向 `/dashboard`，結果以 flash 訊息顯示
-        '302 (未登入)':
-          description: → `/login`
+          description: 成功 → `/dashboard`；失敗 → `/deposit`，結果以 flash 訊息顯示
 
   /withdraw:
+    get:
+      tags: [Wallet]
+      summary: 顯示提款頁面
+      description: 顯示提款表單，包含金額、銀行代碼、銀行帳號、通知 Email 欄位。
+      responses:
+        '200':
+          description: 提款頁面 HTML
+        '302':
+          description: 未登入 → `/login`
+
     post:
       tags: [Wallet]
       summary: 提款
-      description: 從錢包提出指定金額，不可超過目前餘額。
+      description: |
+        從錢包提出指定金額，不可超過目前餘額。
+
+        > **注意：** `bankCode`、`bankAccount`、`notifyEmail` 為前端預留欄位，
+        > 銀行出金與通知功能尚未實作，目前後端僅處理 `amount` 扣款邏輯。
       requestBody:
         required: true
         content:
@@ -188,11 +325,40 @@ paths:
                   minimum: 0.01
                   example: 500.00
                   description: 提款金額（正數，不超過餘額）
+                bankCode:
+                  type: string
+                  minLength: 3
+                  maxLength: 7
+                  pattern: '^\d{3,7}$'
+                  example: '012'
+                  description: 銀行代碼，3〜7 碼數字（前端欄位，後端尚未處理）
+                bankAccount:
+                  type: string
+                  minLength: 10
+                  maxLength: 16
+                  pattern: '^\d{10,16}$'
+                  example: '0123456789'
+                  description: 銀行帳號，10〜16 碼數字（前端欄位，後端尚未處理）
+                notifyEmail:
+                  type: string
+                  format: email
+                  example: alice@example.com
+                  description: 通知用 Email（前端欄位，後端尚未處理）
       responses:
         '302':
           description: 成功 / 失敗皆導向 `/dashboard`，結果以 flash 訊息顯示
 
   /transfer:
+    get:
+      tags: [Wallet]
+      summary: 顯示轉帳頁面
+      description: 顯示轉帳表單，包含收款方錢包代碼與金額輸入。
+      responses:
+        '200':
+          description: 轉帳頁面 HTML
+        '302':
+          description: 未登入 → `/login`
+
     post:
       tags: [Wallet]
       summary: 轉帳
@@ -225,7 +391,7 @@ paths:
                   description: 轉帳金額（正數，不超過餘額）
       responses:
         '302':
-          description: 成功 / 失敗皆導向 `/dashboard`，結果以 flash 訊息顯示
+          description: 成功 → `/dashboard`；失敗 → `/transfer`，結果以 flash 訊息顯示
 
 # ── Components ──────────────────────────────────────────────
 
