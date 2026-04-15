@@ -87,6 +87,12 @@
             font-size: .9rem; cursor: pointer; color: #fff; background: #dc2626; text-align: center;
             text-decoration: none; }
         .btn-withdraw-nav:hover { background: #b91c1c; }
+        .btn-transfer-nav { display: block; width: 100%; padding: .55rem; border: none; border-radius: 4px;
+            font-size: .9rem; cursor: pointer; color: #fff; background: #2563eb; text-align: center;
+            text-decoration: none; }
+        .btn-transfer-nav:hover { background: #1d4ed8; }
+        .transfer-preview { height: 40px; object-fit: contain; opacity: .5;
+            filter: grayscale(20%); margin-bottom: 1.1rem; display: block; }
 
         /* ── Pagination ── */
         .pagination { display: flex; justify-content: center; align-items: center;
@@ -169,16 +175,11 @@
         </div>
 
         <!-- Transfer -->
-        <div class="action-card">
+        <div class="action-card topup-card">
             <h3 th:text="#{dashboard.transfer.title}">Transfer</h3>
-            <form method="post" th:action="@{/transfer}">
-                <label th:text="#{dashboard.transfer.code.label}">Recipient Wallet Code</label>
-                <input type="text" name="toWalletCode" placeholder="e.g. aB3xZ9qRmK2w"
-                       maxlength="12" pattern="[A-Za-z0-9]{12}" required/>
-                <label th:text="#{dashboard.amount}">Amount</label>
-                <input type="number" name="amount" min="0.01" step="0.01" placeholder="0.00" required/>
-                <button class="btn btn-transfer" type="submit" th:text="#{dashboard.transfer.submit}">Transfer</button>
-            </form>
+            <p class="topup-desc" th:text="#{dashboard.transfer.desc}">Send funds to another wallet instantly.</p>
+            <img class="transfer-preview" th:src="@{/transfer.jpg}" alt="Transfer"/>
+            <a class="btn-transfer-nav" th:href="@{/transfer}" th:text="#{dashboard.transfer.submit}">Transfer</a>
         </div>
     </div>
 

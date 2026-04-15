@@ -166,7 +166,26 @@ class WalletControllerIT {
                 .andExpect(flash().attribute("error", "Insufficient balance"));
     }
 
-    // ── transfer ──────────────────────────────────────────────
+    // ── GET /transfer ─────────────────────────────────────────
+
+    @Test
+    void transferPage_withoutSession_redirectsToLogin() throws Exception {
+        mockMvc.perform(get("/transfer"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/login"));
+    }
+
+    @Test
+    void transferPage_withSession_returnsOkAndTransferView() throws Exception {
+        mockMvc.perform(get("/transfer")
+                        .with(user("test@example.com"))
+                        .session(session))
+                .andExpect(status().isOk())
+                .andExpect(view().name("transfer"))
+                .andExpect(model().attribute("wallet", wallet));
+    }
+
+    // ── POST /transfer ────────────────────────────────────────
 
     @Test
     void transfer_validRequest_redirectsToDashboardWithSuccess() throws Exception {
@@ -192,7 +211,7 @@ class WalletControllerIT {
                         .param("amount", "50.00")
                         .session(session))
                 .andExpect(status().is3xxRedirection())
-                .andExpect(redirectedUrl("/dashboard"))
+                .andExpect(redirectedUrl("/transfer"))
                 .andExpect(flash().attribute("error", "Wallet code not found"));
     }
 
@@ -206,7 +225,7 @@ class WalletControllerIT {
                         .param("amount", "50.00")
                         .session(session))
                 .andExpect(status().is3xxRedirection())
-                .andExpect(redirectedUrl("/dashboard"))
+                .andExpect(redirectedUrl("/transfer"))
                 .andExpect(flash().attribute("error", "Cannot transfer to yourself"));
     }
 }
