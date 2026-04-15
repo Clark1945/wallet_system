@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title th:text="#{transfer.title}">Transfer</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: sans-serif; background: #f0f2f5; color: #333; }
+
+        /* ── Header ── */
+        header { background: #4f46e5; color: #fff; padding: 1rem 2rem;
+            display: flex; justify-content: space-between; align-items: center; }
+        header h1 { font-size: 1.2rem; }
+        .logout-btn { background: rgba(255,255,255,.2); border: 1px solid rgba(255,255,255,.4);
+            color: #fff; padding: .4rem .9rem; border-radius: 4px; cursor: pointer; font-size: .85rem; }
+        .logout-btn:hover { background: rgba(255,255,255,.35); }
+
+        main { max-width: 520px; margin: 2.5rem auto; padding: 0 1rem; }
+
+        /* ── Alert ── */
+        .alert { padding: .75rem 1rem; border-radius: 4px; margin-bottom: 1.25rem; font-size: .9rem; }
+        .alert-error   { background: #fde8e8; color: #c0392b; }
+        .alert-success { background: #e8f8e8; color: #27ae60; }
+
+        /* ── Balance strip ── */
+        .balance-strip { background: #fff; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,.08);
+            padding: 1rem 1.5rem; margin-bottom: 1.25rem;
+            display: flex; justify-content: space-between; align-items: center; }
+        .balance-label { font-size: .8rem; color: #888; }
+        .balance-amount { font-size: 1.5rem; font-weight: 700; color: #4f46e5; }
+
+        /* ── Form card ── */
+        .form-card { background: #fff; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,.08); padding: 1.75rem; }
+        .form-card h2 { font-size: 1.1rem; margin-bottom: .75rem; color: #333; }
+
+        /* ── Transfer logo ── */
+        .transfer-logo { height: 52px; object-fit: contain; margin-bottom: 1.4rem; display: block; }
+
+        /* ── Fields ── */
+        .field { margin-bottom: 1.25rem; }
+        .field label { display: block; font-size: .82rem; color: #555; margin-bottom: .35rem; font-weight: 500; }
+        .field input { width: 100%; padding: .6rem .8rem; border: 1px solid #ccc;
+            border-radius: 6px; font-size: .95rem; }
+        .field input:focus { outline: none; border-color: #4f46e5;
+            box-shadow: 0 0 0 2px rgba(79,70,229,.15); }
+        .field .hint { font-size: .75rem; color: #aaa; margin-top: .3rem; }
+
+        /* ── Submit ── */
+        .btn-submit { width: 100%; margin-top: .5rem; padding: .7rem; background: #2563eb;
+            color: #fff; border: none; border-radius: 6px; font-size: 1rem; cursor: pointer; font-weight: 500; }
+        .btn-submit:hover { background: #1d4ed8; }
+
+        /* ── Back link ── */
+        .back-link { display: inline-block; margin-top: 1.25rem; font-size: .85rem;
+            color: #6b7280; text-decoration: none; }
+        .back-link:hover { color: #4f46e5; }
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>Wallet System</h1>
+    <div style="display:flex; align-items:center; gap:1rem;">
+        <a th:href="@{/profile}" style="color:#fff; font-size:.9rem; opacity:.85; text-decoration:none;"
+           th:text="#{profile.nav.link}">Profile</a>
+        <span th:text="#{dashboard.welcome(${memberName})}" style="font-size:.9rem; opacity:.85;"></span>
+        <form method="post" th:action="@{/logout}" style="margin:0">
+            <button class="logout-btn" type="submit" th:text="#{dashboard.logout}">Logout</button>
+        </form>
+    </div>
+</header>
+
+<main>
+    <div th:if="${error}"   class="alert alert-error"   th:text="${error}"></div>
+    <div th:if="${success}" class="alert alert-success" th:text="${success}"></div>
+
+    <!-- Balance -->
+    <div class="balance-strip">
+        <div class="balance-label" th:text="#{transfer.balance.label}">Current Balance</div>
+        <div class="balance-amount" th:text="'$ ' + ${#numbers.formatDecimal(wallet.balance, 1, 2)}"></div>
+    </div>
+
+    <!-- Transfer form -->
+    <div class="form-card">
+        <h2 th:text="#{transfer.heading}">Transfer Funds</h2>
+        <img class="transfer-logo" th:src="@{/transfer.jpg}" alt="Transfer"/>
+
+        <form method="post" th:action="@{/transfer}">
+
+            <!-- Recipient wallet code -->
+            <div class="field">
+                <label th:text="#{transfer.code.label}">Recipient Wallet Code</label>
+                <input type="text" name="toWalletCode"
+                       maxlength="12" pattern="[A-Za-z0-9]{12}"
+                       placeholder="e.g. aB3xZ9qRmK2w"
+                       required/>
+                <div class="hint" th:text="#{transfer.code.hint}">12-character alphanumeric code</div>
+            </div>
+
+            <!-- Amount -->
+            <div class="field">
+                <label th:text="#{transfer.amount.label}">Amount</label>
+                <input type="number" name="amount" min="0.01" step="0.01" placeholder="0.00" required/>
+            </div>
+
+            <button class="btn-submit" type="submit" th:text="#{transfer.submit}">Send</button>
+        </form>
+    </div>
+
+    <a class="back-link" th:href="@{/dashboard}" th:text="#{transfer.back}">← Back to Dashboard</a>
+</main>
+
+</body>
+</html>

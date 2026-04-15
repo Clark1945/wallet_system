@@ -99,6 +99,14 @@ public class WalletController {
         return "redirect:/dashboard";
     }
 
+    @GetMapping("/transfer")
+    public String transferPage(HttpSession session, Model model) {
+        UUID memberId = UUID.fromString((String) session.getAttribute("memberId"));
+        model.addAttribute("wallet", walletService.getWallet(memberId));
+        model.addAttribute("memberName", session.getAttribute("memberName"));
+        return "transfer";
+    }
+
     @PostMapping("/transfer")
     public String transfer(@RequestParam String toWalletCode,
                            @RequestParam BigDecimal amount,
@@ -113,6 +121,7 @@ public class WalletController {
         } catch (Exception e) {
             redirectAttributes.addFlashAttribute("error",
                     messageSource.getMessage(e.getMessage(), null, e.getMessage(), locale));
+            return "redirect:/transfer";
         }
         return "redirect:/dashboard";
     }
