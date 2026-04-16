@@ -1,3 +1,7 @@
+server:
+  # Trust X-Forwarded-* headers from reverse proxies (ngrok, load balancers)
+  forward-headers-strategy: framework
+
 spring:
   application:
     name: wallet_system
@@ -56,6 +60,14 @@ management:
 app:
   upload:
     dir: uploads
+
+sbpayment:
+  merchant-id: "19788"
+  service-id: "001"
+  hash-key: "398a58952baf329cac5efbae97ea84ba17028d02"
+  gateway-url: "https://stbfep.sps-system.com/Extra/BuyRequestAction.do"
+  # Override with ngrok URL (e.g. https://xxxx.ngrok-free.app) for real SBPS test callbacks
+  base-url: "https://caregiver-gracious-overfill.ngrok-free.dev"
 
 springdoc:
   swagger-ui:

@@ -46,7 +46,8 @@ GOOGLE_CLIENT_SECRET=...
 - `auth/` — `AuthController`, `AuthService`, `Member` (JPA entity), `MemberRepository`, `AuthProvider` (enum), `CustomUserDetails`, `CustomOAuth2User`, `CustomOAuth2UserService`, `LoginSuccessHandler`, `ResponseDto`
 - `wallet/` — `WalletController`, `WalletService`, `Wallet` (JPA entity), `WalletRepository`
 - `payment/` — `Transaction` (JPA entity), `TransactionRepository`, `TransactionType` (enum), `TransactionSpec` (JPA Criteria filtering)
-- `config/` — `SecurityConfig`, `WebConfig` (`AcceptHeaderLocaleResolver`), `TraceIdFilter`
+- `profile/` — `ProfileController`, `ProfileService` (avatar upload + profile field updates)
+- `config/` — `SecurityConfig`, `WebConfig` (`AcceptHeaderLocaleResolver` + `/uploads/**` resource handler), `TraceIdFilter`
 
 This is a **server-rendered MVC app**, not a REST API. All controllers are `@Controller` (not `@RestController`) and return Thymeleaf view names. Flash attributes carry success/error messages between redirects.
 
@@ -57,11 +58,15 @@ Spring Security handles all authentication via `SecurityConfig`. Two login metho
 - **Form login:** email + password; `BCryptPasswordEncoder` compares credentials; principal is `CustomUserDetails`
 - **Google OAuth2/OIDC:** `CustomOAuth2UserService` calls `AuthService.findOrCreateGoogleMember()` and wraps the result in `CustomOAuth2User`
 
-`LoginSuccessHandler` fires after both flows — it extracts `memberId` (UUID) and `memberName` from the principal and stores them in `HttpSession`, then redirects to `/dashboard`.
+`LoginSuccessHandler` fires after both flows — it extracts `memberId` (UUID) and `memberName` from the principal and stores them in `HttpSession` as plain strings, then redirects to `/dashboard`. Controllers pull `memberId`/`memberName` directly from `HttpSession` attributes (no `@SessionAttribute`).
 
 Public URLs (login, register, OpenAPI, actuator) are permitted in `SecurityConfig`. All others require authentication. Logout at `/logout` invalidates the session and deletes `JSESSIONID`.
 
-`Member.authProvider` (`LOCAL` or `GOOGLE`) distinguishes how the account was created; `password` is nullable for OAuth2 members.
+`Member.authProvider` (`LOCAL` or `GOOGLE`) distinguishes how the account was created; `password` is nullable for OAuth2 members. `UserDetailsService` bean filters for `LOCAL` auth only — OAuth2 members are not loaded through it.
+
+### Member Entity
+
+`Member` fields beyond the basics: `nickname`, `phone`, `bio`, `birthday` (LocalDate), `avatarPath` (relative path like `avatars/{uuid}.jpg`). All profile fields are nullable to allow partial updates.
 
 ### Wallet & Transaction Flow
 
@@ -71,25 +76,46 @@ Public URLs (login, register, OpenAPI, actuator) are permitted in `SecurityConfi
 - `Transaction` records every operation, with nullable `fromWalletId`/`toWalletId` depending on `TransactionType` (DEPOSIT / WITHDRAW / TRANSFER).
 - Transaction history supports filtering by `TransactionType` and date range via `TransactionSpec` (JPA Criteria API), plus server-side pagination.
 
+### Profile & File Uploads
+
+- `ProfileService.updateProfile()` handles name, nickname, phone, bio, birthday.
+- `ProfileService.updateAvatar()` accepts JPEG/PNG/GIF/WEBP (max 2 MB); validates via MIME `contentType` (not file extension); stores files at `uploads/avatars/{memberId}.{ext}` (overwrites on extension change).
+- Upload directory configured via `app.upload.dir` property (defaults to `uploads/` relative path); multipart limits set to 10 MB in `application.yaml`.
+- `WebConfig` registers a `/uploads/**` resource handler serving from `file:{uploadDir}` so stored files are accessible as static resources.
+- Controllers catch `IllegalArgumentException` from services and catch generic `Exception` separately for file I/O failures, mapping each to different i18n error keys.
+
+### Error Handling Pattern
+
+Services throw `IllegalArgumentException` with an i18n message key as the message. Controllers call:
+```java
+messageSource.getMessage(e.getMessage(), null, e.getMessage(), locale)
+```
+The fallback (third arg) returns the raw key if no translation exists. This pattern is used across all controllers.
+
 ### Internationalization
 
 `AcceptHeaderLocaleResolver` with supported locales: `en`, `ja`, `zh-TW` (default: `en`). Message bundles are in `src/main/resources/messages*.properties`. All user-facing strings — including error messages thrown in services — use message keys resolved via `MessageSource`.
 
 ### Observability
 
-- **TraceIdFilter** (`OncePerRequestFilter`, `HIGHEST_PRECEDENCE`): reads or generates a UUID from the `X-Trace-Id` request header, stores it in SLF4J MDC under key `traceId`, echoes it on the response header, and clears MDC in a finally block. Log output includes the trace ID on every line.
+- **TraceIdFilter** (`OncePerRequestFilter`, `HIGHEST_PRECEDENCE`): reads or generates a UUID from the `X-Trace-Id` request header, stores it in SLF4J MDC under key `traceId`, echoes it on the response header, and clears MDC in a finally block.
+- **Logging:** `logback-spring.xml` includes `traceId` in every log line via `[%X{traceId:-no-trace}]`. File appender writes rolling daily logs to `logs/` (30-day retention). App package logs at DEBUG; root at INFO. Test profile disables the file appender.
 - **Actuator + Prometheus:** `/actuator/health`, `/actuator/info`, `/actuator/prometheus` are exposed and permit-listed in SecurityConfig.
 
 ### Database
 
 - **Runtime:** PostgreSQL (`localhost:5432/wallet_db`, user: `postgres`)
 - **Tests:** H2 in-memory with `ddl-auto: create-drop`; SQL init is disabled for tests (Hibernate recreates schema from entities)
-- **DDL:** `src/main/resources/schema.sql` runs on startup (`spring.sql.init.mode: always`). `ddl-auto: none` — schema is managed manually. The file includes idempotent `ALTER TABLE ... ADD COLUMN IF NOT EXISTS` migration statements at the bottom.
+- **DDL:** `src/main/resources/schema.sql` runs on startup (`spring.sql.init.mode: always`). `ddl-auto: none` — schema is managed manually. The file uses `CREATE TABLE IF NOT EXISTS` and includes idempotent `ALTER TABLE ... ADD COLUMN IF NOT EXISTS` migration statements at the bottom for additive schema changes.
 - `script.sql` at the repo root is a standalone PostgreSQL DDL script for manual setup.
 
 ### OpenAPI / Swagger
 
-Spec-first approach: `src/main/resources/static/openapi.yaml` is the source of truth. Swagger UI is served at `/swagger-ui.html` and loads from `/openapi.yaml`. The spec documents session-cookie auth (`JSESSIONID`) and all 7 endpoints across the Auth and Wallet tags.
+Spec-first approach: `src/main/resources/static/openapi.yaml` is the source of truth (not auto-generated). Swagger UI is served at `/swagger-ui.html` and loads from `/openapi.yaml`. The spec documents session-cookie auth (`JSESSIONID`) and all endpoints across the Auth and Wallet tags.
+
+### Thymeleaf Templates
+
+Templates live in `src/main/resources/templates/`. All use inline CSS, support Thymeleaf expressions (`th:text`, `th:href`, `@{}`, `#{}`), include CSRF tokens on POST forms, and display flash attributes for success/error feedback. Key templates: `login.html`, `register.html`, `dashboard.html` (transaction history with filter form and pagination), `deposit.html`, `withdraw.html`, `transfer.html`, `profile.html` (profile fields + avatar upload).
 
 ### Test Conventions
 
@@ -99,3 +125,5 @@ Spec-first approach: `src/main/resources/static/openapi.yaml` is the source of t
 - Integration tests use `@ActiveProfiles("test")` (triggers H2 config from `application-test.yaml`)
 - Controller tests validate redirects, flash attributes, and model attributes via MockMvc result matchers
 - `WalletControllerIT` sets up session state via `MockHttpSession` with a `memberId` attribute
+- `ProfileServiceTest` uses `@TempDir` (JUnit 5) and `ReflectionTestUtils.setField()` to inject `uploadDir`
+- `ProfileControllerIT` tests multipart endpoints with `MockMultipartFile`

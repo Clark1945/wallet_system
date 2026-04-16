@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Processing payment...</title>
+    <style>
+        body { font-family: sans-serif; display: flex; flex-direction: column;
+               align-items: center; justify-content: center; min-height: 100vh;
+               background: #f0f2f5; color: #555; gap: 1rem; }
+        .spinner { width: 40px; height: 40px; border: 4px solid #e5e7eb;
+                   border-top-color: #4f46e5; border-radius: 50%;
+                   animation: spin .8s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        p { font-size: .95rem; }
+        .fallback-btn { padding: .6rem 1.4rem; background: #4f46e5; color: #fff;
+                        border: none; border-radius: 6px; cursor: pointer; font-size: .9rem; }
+    </style>
+</head>
+<body onload="document.forms[0].submit()">
+
+    <div class="spinner"></div>
+    <p>Redirecting to payment gateway&hellip;</p>
+
+    <!--
+        SBPS link-type purchase request form.
+        Per spec: ALL tag elements must be present even if empty.
+        Only detail rows (dtl_*) may be omitted entirely.
+        accept-charset="Shift_JIS" encodes form values in Shift-JIS as required by SBPS.
+    -->
+    <form th:action="${req.gatewayUrl}" method="POST" accept-charset="Shift_JIS">
+        <input type="hidden" name="pay_method"        th:value="${req.payMethod}">
+        <input type="hidden" name="merchant_id"       th:value="${req.merchantId}">
+        <input type="hidden" name="service_id"        th:value="${req.serviceId}">
+        <input type="hidden" name="cust_code"         th:value="${req.custCode}">
+        <input type="hidden" name="sps_cust_no"       th:value="${req.spsCustNo}">
+        <input type="hidden" name="sps_payment_no"    th:value="${req.spsPaymentNo}">
+        <input type="hidden" name="order_id"          th:value="${req.orderId}">
+        <input type="hidden" name="item_id"           th:value="${req.itemId}">
+        <input type="hidden" name="pay_item_id"       th:value="${req.payItemId}">
+        <input type="hidden" name="item_name"         th:value="${req.itemName}">
+        <input type="hidden" name="tax"               th:value="${req.tax}">
+        <input type="hidden" name="amount"            th:value="${req.amount}">
+        <input type="hidden" name="pay_type"          th:value="${req.payType}">
+        <input type="hidden" name="auto_charge_type"  th:value="${req.autoChargeType}">
+        <input type="hidden" name="service_type"      th:value="${req.serviceType}">
+        <input type="hidden" name="div_settele"       th:value="${req.divSettele}">
+        <input type="hidden" name="last_charge_month" th:value="${req.lastChargeMonth}">
+        <input type="hidden" name="camp_type"         th:value="${req.campType}">
+        <input type="hidden" name="tracking_id"       th:value="${req.trackingId}">
+        <input type="hidden" name="terminal_type"     th:value="${req.terminalType}">
+        <input type="hidden" name="success_url"       th:value="${req.successUrl}">
+        <input type="hidden" name="cancel_url"        th:value="${req.cancelUrl}">
+        <input type="hidden" name="error_url"         th:value="${req.errorUrl}">
+        <input type="hidden" name="pagecon_url"       th:value="${req.pageconUrl}">
+        <input type="hidden" name="free1"             th:value="${req.free1}">
+        <input type="hidden" name="free2"             th:value="${req.free2}">
+        <input type="hidden" name="free3"             th:value="${req.free3}">
+        <input type="hidden" name="free_csv"          th:value="${req.freeCsv}">
+        <!-- detail rows omitted (spec allows omission when not used) -->
+        <input type="hidden" name="request_date"      th:value="${req.requestDate}">
+        <input type="hidden" name="limit_second"      th:value="${req.limitSecond}">
+        <input type="hidden" name="sps_hashcode"      th:value="${req.spsHashcode}">
+
+        <noscript>
+            <button class="fallback-btn" type="submit">Proceed to Payment</button>
+        </noscript>
+    </form>
+
+</body>
+</html>

@@ -61,6 +61,15 @@ public class WalletController {
                           HttpSession session,
                           RedirectAttributes redirectAttributes,
                           Locale locale) {
+        if ("sbpayment".equals(paymentMethod)) {
+            if (amount.compareTo(BigDecimal.ZERO) <= 0) {
+                redirectAttributes.addFlashAttribute("error",
+                        messageSource.getMessage("error.amount.positive", null, locale));
+                return "redirect:/deposit";
+            }
+            session.setAttribute("sbpaymentPendingAmount", amount);
+            return "redirect:/payment/sbpayment/request";
+        }
         try {
             UUID memberId = UUID.fromString((String) session.getAttribute("memberId"));
             walletService.deposit(memberId, amount);

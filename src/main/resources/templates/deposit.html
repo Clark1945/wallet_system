@@ -125,5 +125,21 @@
     <a class="back-link" th:href="@{/dashboard}" th:text="#{deposit.back}">← Back to Dashboard</a>
 </main>
 
+<script>
+    (function () {
+        const form = document.querySelector('form[action]');
+        form.addEventListener('submit', function (e) {
+            const selected = document.querySelector('input[name="paymentMethod"]:checked');
+            if (selected && selected.value === 'sbpayment') {
+                // Open a named popup window, then target the form at it
+                window.open('', 'SBPaymentWindow',
+                    'width=960,height=700,scrollbars=yes,resizable=yes');
+                this.target = 'SBPaymentWindow';
+            } else {
+                this.target = '';
+            }
+        });
+    })();
+</script>
 </body>
 </html>
