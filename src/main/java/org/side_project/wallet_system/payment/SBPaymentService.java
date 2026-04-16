@@ -147,9 +147,6 @@ public class SBPaymentService {
             return false;
         }
 
-        // TODO: verify sps_hashcode using Shift-JIS encoding before trusting the result
-        // (essential for production; skipped here for test environment)
-
         String orderId = params.get("order_id");
         if (orderId == null || orderId.isBlank()) {
             log.error("SBPayment result missing order_id");
