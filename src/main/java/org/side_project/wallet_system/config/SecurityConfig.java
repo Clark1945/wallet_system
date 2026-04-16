@@ -7,8 +7,11 @@ import org.side_project.wallet_system.auth.LoginSuccessHandler;
 import org.side_project.wallet_system.auth.MemberRepository;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.annotation.Order;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
+import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
@@ -19,13 +22,31 @@ import org.springframework.security.web.SecurityFilterChain;
 @EnableWebSecurity
 public class SecurityConfig {
 
+    /**
+     * Dedicated filter chain for SBPS result CGI callback.
+     * Must be stateless — SBPS calls server-to-server with no cookies/session.
+     * SessionCreationPolicy.STATELESS prevents the session-management redirect (302)
+     * that would otherwise occur when Spring Security creates a session for a
+     * request arriving without a JSESSIONID cookie.
+     */
+    @Bean
+    @Order(1)
+    public SecurityFilterChain sbpaymentCallbackFilterChain(HttpSecurity http) throws Exception {
+        http
+            .securityMatcher("/payment/sbpayment/result")
+            .csrf(AbstractHttpConfigurer::disable)
+            .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+            .authorizeHttpRequests(a -> a.anyRequest().permitAll());
+        return http.build();
+    }
+
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http,
                                            CustomOAuth2UserService oauth2UserService,
                                            LoginSuccessHandler loginSuccessHandler) throws Exception {
         http
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/login", "/register",
+                .requestMatchers("/login", "/register", "/error",
                                  "/uploads/**",
                                  "/openapi.yaml", "/swagger-ui/**", "/v3/api-docs/**",
                                  "/actuator/health", "/actuator/prometheus").permitAll()

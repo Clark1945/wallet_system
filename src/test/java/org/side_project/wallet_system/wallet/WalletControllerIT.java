@@ -21,6 +21,7 @@ import java.util.UUID;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.*;
+import static org.mockito.Mockito.never;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
@@ -113,16 +114,28 @@ class WalletControllerIT {
     }
 
     @Test
-    void deposit_sbpaymentMethod_redirectsToDashboardWithSuccess() throws Exception {
+    void deposit_sbpaymentMethod_redirectsToSBPaymentRequest() throws Exception {
         mockMvc.perform(post("/deposit").with(csrf()).with(user("test@example.com"))
                         .param("amount", "500.00")
                         .param("paymentMethod", "sbpayment")
                         .session(session))
                 .andExpect(status().is3xxRedirection())
-                .andExpect(redirectedUrl("/dashboard"))
-                .andExpect(flash().attribute("success", "Deposit successful"));
+                .andExpect(redirectedUrl("/payment/sbpayment/request"));
 
-        then(walletService).should().deposit(eq(memberId), eq(new BigDecimal("500.00")));
+        then(walletService).should(never()).deposit(any(), any());
+    }
+
+    @Test
+    void deposit_sbpaymentWithNegativeAmount_redirectsToDepositWithError() throws Exception {
+        mockMvc.perform(post("/deposit").with(csrf()).with(user("test@example.com"))
+                        .param("amount", "0")
+                        .param("paymentMethod", "sbpayment")
+                        .session(session))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/deposit"))
+                .andExpect(flash().attribute("error", "Amount must be greater than 0"));
+
+        then(walletService).should(never()).deposit(any(), any());
     }
 
     @Test
