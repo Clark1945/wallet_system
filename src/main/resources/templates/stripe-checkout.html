@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Card Payment</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: sans-serif; background: #f0f2f5; color: #333; }
+
+        header { background: #4f46e5; color: #fff; padding: 1rem 2rem;
+            display: flex; justify-content: space-between; align-items: center; }
+        header h1 { font-size: 1.2rem; }
+
+        main { max-width: 480px; margin: 2.5rem auto; padding: 0 1rem; }
+
+        .form-card { background: #fff; border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,.08); padding: 1.75rem; }
+        .form-card h2 { font-size: 1.1rem; margin-bottom: 1.5rem; color: #333; }
+
+        .amount-strip { background: #eef2ff; border-radius: 6px; padding: .75rem 1rem;
+            margin-bottom: 1.5rem; display: flex; justify-content: space-between; align-items: center; }
+        .amount-label { font-size: .8rem; color: #6b7280; }
+        .amount-value { font-size: 1.4rem; font-weight: 700; color: #4f46e5; }
+
+        .field { margin-bottom: 1.25rem; }
+        .field label { display: block; font-size: .82rem; color: #555;
+            margin-bottom: .35rem; font-weight: 500; }
+
+        /* Stripe Element container — must have a defined height */
+        #card-element { border: 1px solid #ccc; border-radius: 6px;
+            padding: .65rem .8rem; background: #fff;
+            transition: border-color .15s, box-shadow .15s; }
+        #card-element.StripeElement--focus {
+            border-color: #4f46e5; box-shadow: 0 0 0 2px rgba(79,70,229,.15); }
+        #card-element.StripeElement--invalid { border-color: #e53e3e; }
+
+        #card-errors { color: #c0392b; font-size: .85rem;
+            margin-top: .4rem; min-height: 1.2em; }
+
+        .btn-pay { width: 100%; margin-top: 1.5rem; padding: .7rem;
+            background: #4f46e5; color: #fff; border: none; border-radius: 6px;
+            font-size: 1rem; cursor: pointer; font-weight: 500;
+            transition: background .15s; }
+        .btn-pay:hover:not(:disabled) { background: #4338ca; }
+        .btn-pay:disabled { opacity: .6; cursor: not-allowed; }
+
+        .secure-note { margin-top: 1rem; font-size: .78rem; color: #9ca3af;
+            text-align: center; }
+
+        .test-cards { margin-top: 1.25rem; border: 1px dashed #d1d5db;
+            border-radius: 6px; padding: .9rem 1rem; background: #fafafa; }
+        .test-cards p { font-size: .78rem; color: #6b7280; margin-bottom: .5rem; font-weight: 600; }
+        .test-cards table { width: 100%; border-collapse: collapse; font-size: .78rem; color: #555; }
+        .test-cards td { padding: .2rem .4rem; }
+        .test-cards td:first-child { font-family: monospace; color: #374151; letter-spacing: .05em; }
+        .test-cards td:last-child { color: #9ca3af; text-align: right; }
+
+        .back-link { display: inline-block; margin-top: 1.25rem;
+            font-size: .85rem; color: #6b7280; text-decoration: none; }
+        .back-link:hover { color: #4f46e5; }
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>Wallet System</h1>
+    <span th:text="${memberName}" style="font-size:.9rem; opacity:.85;"></span>
+</header>
+
+<main>
+    <div class="form-card">
+        <h2>Card Payment</h2>
+
+        <div class="amount-strip">
+            <span class="amount-label">Amount</span>
+            <span class="amount-value">¥<span th:text="${#numbers.formatInteger(amount, 1, 'COMMA')}"></span></span>
+        </div>
+
+        <div class="field">
+            <label>Card details</label>
+            <div id="card-element"></div>
+            <div id="card-errors" role="alert"></div>
+        </div>
+
+        <button id="pay-btn" class="btn-pay">Pay Now</button>
+
+        <p class="secure-note">🔒 Secured by Stripe. Your card information is never sent to our server.</p>
+
+        <div class="test-cards">
+            <p>Test card numbers (simulation only)</p>
+            <table>
+                <tr>
+                    <td>4242 4242 4242 4242</td>
+                    <td>Payment succeeds</td>
+                </tr>
+                <tr>
+                    <td>4000 0000 0000 3220</td>
+                    <td>3DS required</td>
+                </tr>
+                <tr>
+                    <td>4000 0000 0000 9995</td>
+                    <td>Card declined</td>
+                </tr>
+            </table>
+            <p style="margin-top:.5rem; font-weight:400;">Any future expiry date · Any 3-digit CVC</p>
+        </div>
+    </div>
+
+    <a class="back-link" th:href="@{/payment/stripe/cancel}">← Cancel and go back</a>
+</main>
+
+<script src="https://js.stripe.com/v3/"></script>
+<script th:inline="javascript">
+    /*<![CDATA[*/
+    const publishableKey = /*[[${publishableKey}]]*/ '';
+    const clientSecret   = /*[[${clientSecret}]]*/ '';
+    /*]]>*/
+
+    const stripe  = Stripe(publishableKey);
+    const elements = stripe.elements();
+
+    const cardElement = elements.create('card', {
+        style: {
+            base: {
+                fontSize: '16px',
+                color: '#333',
+                fontFamily: 'sans-serif',
+                '::placeholder': { color: '#9ca3af' }
+            },
+            invalid: { color: '#c0392b' }
+        }
+    });
+    cardElement.mount('#card-element');
+
+    const payBtn    = document.getElementById('pay-btn');
+    const cardErrors = document.getElementById('card-errors');
+
+    payBtn.addEventListener('click', async function () {
+        payBtn.disabled = true;
+        payBtn.textContent = 'Processing…';
+        cardErrors.textContent = '';
+
+        const { error, paymentIntent } = await stripe.confirmCardPayment(clientSecret, {
+            payment_method: { card: cardElement }
+        });
+
+        if (error) {
+            cardErrors.textContent = error.message;
+            payBtn.disabled = false;
+            payBtn.textContent = 'Pay Now';
+        } else if (paymentIntent.status === 'succeeded') {
+            window.location.href = '/payment/stripe/complete';
+        }
+    });
+</script>
+
+</body>
+</html>

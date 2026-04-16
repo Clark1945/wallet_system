@@ -61,6 +61,11 @@ app:
   upload:
     dir: uploads
 
+stripe:
+  secret-key: ${STRIPE_SECRET_KEY}
+  publishable-key: ${STRIPE_PUBLISHABLE_KEY}
+  webhook-secret: ${STRIPE_WEBHOOK_SECRET}
+
 sbpayment:
   merchant-id: "19788"
   service-id: "001"

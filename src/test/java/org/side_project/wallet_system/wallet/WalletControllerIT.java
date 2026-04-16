@@ -101,16 +101,15 @@ class WalletControllerIT {
     // ── POST /deposit ─────────────────────────────────────────
 
     @Test
-    void deposit_validAmount_redirectsToDashboardWithSuccess() throws Exception {
+    void deposit_stripeMethod_redirectsToStripeCheckout() throws Exception {
         mockMvc.perform(post("/deposit").with(csrf()).with(user("test@example.com"))
                         .param("amount", "200.00")
                         .param("paymentMethod", "stripe")
                         .session(session))
                 .andExpect(status().is3xxRedirection())
-                .andExpect(redirectedUrl("/dashboard"))
-                .andExpect(flash().attribute("success", "Deposit successful"));
+                .andExpect(redirectedUrl("/payment/stripe/checkout"));
 
-        then(walletService).should().deposit(eq(memberId), eq(new BigDecimal("200.00")));
+        then(walletService).should(never()).deposit(any(), any());
     }
 
     @Test
