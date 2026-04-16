@@ -92,7 +92,7 @@
     <div class="form-card">
         <h2 th:text="#{deposit.heading}">Top Up Your Wallet</h2>
 
-        <form method="post" th:action="@{/deposit}">
+        <form id="depositForm" method="post" th:action="@{/deposit}">
             <!-- Amount -->
             <div class="field">
                 <label th:text="#{deposit.amount.label}">Amount</label>
@@ -127,16 +127,16 @@
 
 <script>
     (function () {
-        const form = document.querySelector('form[action]');
-        form.addEventListener('submit', function (e) {
+        const form = document.getElementById('depositForm');
+
+        form.addEventListener('submit', function () {
             const selected = document.querySelector('input[name="paymentMethod"]:checked');
             if (selected && selected.value === 'sbpayment') {
-                // Open a named popup window, then target the form at it
-                window.open('', 'SBPaymentWindow',
-                    'width=960,height=700,scrollbars=yes,resizable=yes');
-                this.target = 'SBPaymentWindow';
+                this.target = '_blank';
+                // After the new tab opens, redirect the original page to dashboard
+                setTimeout(function () { window.location.href = '/dashboard'; }, 5000);
             } else {
-                this.target = '';
+                this.target = '_self';
             }
         });
     })();

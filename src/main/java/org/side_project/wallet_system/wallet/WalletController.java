@@ -61,26 +61,22 @@ public class WalletController {
                           HttpSession session,
                           RedirectAttributes redirectAttributes,
                           Locale locale) {
+        if (amount.compareTo(BigDecimal.ZERO) <= 0) {
+            redirectAttributes.addFlashAttribute("error",
+                    messageSource.getMessage("error.amount.positive", null, locale));
+            return "redirect:/deposit";
+        }
         if ("sbpayment".equals(paymentMethod)) {
-            if (amount.compareTo(BigDecimal.ZERO) <= 0) {
-                redirectAttributes.addFlashAttribute("error",
-                        messageSource.getMessage("error.amount.positive", null, locale));
-                return "redirect:/deposit";
-            }
             session.setAttribute("sbpaymentPendingAmount", amount);
             return "redirect:/payment/sbpayment/request";
         }
-        try {
-            UUID memberId = UUID.fromString((String) session.getAttribute("memberId"));
-            walletService.deposit(memberId, amount);
-            redirectAttributes.addFlashAttribute("success",
-                    messageSource.getMessage("flash.deposit.success", null, locale));
-        } catch (Exception e) {
-            redirectAttributes.addFlashAttribute("error",
-                    messageSource.getMessage(e.getMessage(), null, e.getMessage(), locale));
-            return "redirect:/deposit";
+        if ("stripe".equals(paymentMethod)) {
+            session.setAttribute("stripePendingAmount", amount);
+            return "redirect:/payment/stripe/checkout";
         }
-        return "redirect:/dashboard";
+        redirectAttributes.addFlashAttribute("error",
+                messageSource.getMessage("error.payment.unknown", null, "Unknown payment method", locale));
+        return "redirect:/deposit";
     }
 
     @GetMapping("/withdraw")

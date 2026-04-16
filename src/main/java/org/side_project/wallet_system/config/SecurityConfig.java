@@ -40,6 +40,23 @@ public class SecurityConfig {
         return http.build();
     }
 
+    /**
+     * Dedicated filter chain for Stripe webhook.
+     * Same rationale as the SBPS chain — Stripe calls server-to-server
+     * with no session cookie. Signature verification happens inside
+     * StripePaymentService via Webhook.constructEvent().
+     */
+    @Bean
+    @Order(2)
+    public SecurityFilterChain stripeWebhookFilterChain(HttpSecurity http) throws Exception {
+        http
+            .securityMatcher("/payment/stripe/webhook")
+            .csrf(AbstractHttpConfigurer::disable)
+            .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+            .authorizeHttpRequests(a -> a.anyRequest().permitAll());
+        return http.build();
+    }
+
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http,
                                            CustomOAuth2UserService oauth2UserService,
