@@ -44,6 +44,9 @@
         <input type="password" id="password" name="password" required/>
 
         <button type="submit" th:text="#{login.submit}">Login</button>
+        <p style="text-align:right; margin-top:.5rem; font-size:.85rem;">
+            <a th:href="@{/forgot-password}" th:text="#{login.forgot.link}">Forgot password?</a>
+        </p>
     </form>
     <div class="divider">or</div>
     <a href="/oauth2/authorization/google" class="google-btn">

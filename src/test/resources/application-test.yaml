@@ -18,6 +18,10 @@ spring:
     hibernate:
       ddl-auto: create-drop
     defer-datasource-initialization: false
+  data:
+    redis:
+      host: localhost
+      port: 6379
 
 stripe:
   secret-key: sk_test_dummy

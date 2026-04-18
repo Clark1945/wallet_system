@@ -52,3 +52,8 @@ ALTER TABLE transactions ADD COLUMN IF NOT EXISTS status VARCHAR(20);
 UPDATE transactions
 SET    status = 'COMPLETED'
 WHERE  status IS NULL;
+
+-- Member status, timestamps
+ALTER TABLE members ADD COLUMN IF NOT EXISTS status       VARCHAR(20)  NOT NULL DEFAULT 'ACTIVE';
+ALTER TABLE members ADD COLUMN IF NOT EXISTS created_at   TIMESTAMP    NOT NULL DEFAULT NOW();
+ALTER TABLE members ADD COLUMN IF NOT EXISTS last_login_at TIMESTAMP;
