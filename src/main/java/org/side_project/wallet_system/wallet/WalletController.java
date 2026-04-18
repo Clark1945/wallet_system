@@ -2,6 +2,8 @@ package org.side_project.wallet_system.wallet;
 
 import jakarta.servlet.http.HttpSession;
 import lombok.RequiredArgsConstructor;
+import org.side_project.wallet_system.config.SessionConstants;
+import org.side_project.wallet_system.config.SessionUtils;
 import org.side_project.wallet_system.transaction.Transaction;
 import org.side_project.wallet_system.transaction.TransactionType;
 import org.springframework.context.MessageSource;
@@ -32,15 +34,16 @@ public class WalletController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
             HttpSession session, Model model) {
 
-        UUID memberId = UUID.fromString((String) session.getAttribute("memberId"));
-        Wallet wallet = walletService.getWallet(memberId);
+        UUID memberId = SessionUtils.getMemberId(session);
+        if (memberId == null) return "redirect:/login";
 
+        Wallet wallet = walletService.getWallet(memberId);
         TransactionType txType = (type != null && !type.isBlank()) ? TransactionType.valueOf(type) : null;
         Page<Transaction> txPage = walletService.getTransactions(memberId, txType, startDate, endDate, page, 10);
 
         model.addAttribute("wallet", wallet);
         model.addAttribute("txPage", txPage);
-        model.addAttribute("memberName", session.getAttribute("memberName"));
+        model.addAttribute(SessionConstants.MEMBER_NAME, SessionUtils.getMemberName(session));
         model.addAttribute("filterType", type);
         model.addAttribute("filterStart", startDate);
         model.addAttribute("filterEnd", endDate);
@@ -49,9 +52,11 @@ public class WalletController {
 
     @GetMapping("/deposit")
     public String depositPage(HttpSession session, Model model) {
-        UUID memberId = UUID.fromString((String) session.getAttribute("memberId"));
+        UUID memberId = SessionUtils.getMemberId(session);
+        if (memberId == null) return "redirect:/login";
+
         model.addAttribute("wallet", walletService.getWallet(memberId));
-        model.addAttribute("memberName", session.getAttribute("memberName"));
+        model.addAttribute(SessionConstants.MEMBER_NAME, SessionUtils.getMemberName(session));
         return "deposit";
     }
 
@@ -67,11 +72,11 @@ public class WalletController {
             return "redirect:/deposit";
         }
         if ("sbpayment".equals(paymentMethod)) {
-            session.setAttribute("sbpaymentPendingAmount", amount);
+            session.setAttribute(SessionConstants.SBPAYMENT_PENDING_AMOUNT, amount);
             return "redirect:/payment/sbpayment/request";
         }
         if ("stripe".equals(paymentMethod)) {
-            session.setAttribute("stripePendingAmount", amount);
+            session.setAttribute(SessionConstants.STRIPE_PENDING_AMOUNT, amount);
             return "redirect:/payment/stripe/checkout";
         }
         redirectAttributes.addFlashAttribute("error",
@@ -81,9 +86,11 @@ public class WalletController {
 
     @GetMapping("/withdraw")
     public String withdrawPage(HttpSession session, Model model) {
-        UUID memberId = UUID.fromString((String) session.getAttribute("memberId"));
+        UUID memberId = SessionUtils.getMemberId(session);
+        if (memberId == null) return "redirect:/login";
+
         model.addAttribute("wallet", walletService.getWallet(memberId));
-        model.addAttribute("memberName", session.getAttribute("memberName"));
+        model.addAttribute(SessionConstants.MEMBER_NAME, SessionUtils.getMemberName(session));
         return "withdraw";
     }
 
@@ -95,12 +102,14 @@ public class WalletController {
                            HttpSession session,
                            RedirectAttributes redirectAttributes,
                            Locale locale) {
+        UUID memberId = SessionUtils.getMemberId(session);
+        if (memberId == null) return "redirect:/login";
+
         try {
-            UUID memberId = UUID.fromString((String) session.getAttribute("memberId"));
             walletService.initiateWithdrawal(memberId, amount, bankCode, bankAccount);
             redirectAttributes.addFlashAttribute("success",
                     messageSource.getMessage("flash.withdraw.pending", null, locale));
-        } catch (Exception e) {
+        } catch (IllegalArgumentException e) {
             redirectAttributes.addFlashAttribute("error",
                     messageSource.getMessage(e.getMessage(), null, e.getMessage(), locale));
         }
@@ -109,9 +118,11 @@ public class WalletController {
 
     @GetMapping("/transfer")
     public String transferPage(HttpSession session, Model model) {
-        UUID memberId = UUID.fromString((String) session.getAttribute("memberId"));
+        UUID memberId = SessionUtils.getMemberId(session);
+        if (memberId == null) return "redirect:/login";
+
         model.addAttribute("wallet", walletService.getWallet(memberId));
-        model.addAttribute("memberName", session.getAttribute("memberName"));
+        model.addAttribute(SessionConstants.MEMBER_NAME, SessionUtils.getMemberName(session));
         return "transfer";
     }
 
@@ -121,12 +132,14 @@ public class WalletController {
                            HttpSession session,
                            RedirectAttributes redirectAttributes,
                            Locale locale) {
+        UUID memberId = SessionUtils.getMemberId(session);
+        if (memberId == null) return "redirect:/login";
+
         try {
-            UUID memberId = UUID.fromString((String) session.getAttribute("memberId"));
             walletService.transfer(memberId, toWalletCode, amount);
             redirectAttributes.addFlashAttribute("success",
                     messageSource.getMessage("flash.transfer.success", null, locale));
-        } catch (Exception e) {
+        } catch (IllegalArgumentException e) {
             redirectAttributes.addFlashAttribute("error",
                     messageSource.getMessage(e.getMessage(), null, e.getMessage(), locale));
             return "redirect:/transfer";

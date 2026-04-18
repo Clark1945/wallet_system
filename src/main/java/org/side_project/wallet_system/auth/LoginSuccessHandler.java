@@ -7,6 +7,8 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.web.authentication.AuthenticationSuccessHandler;
 import org.springframework.stereotype.Component;
 
+import org.side_project.wallet_system.config.SessionConstants;
+
 import java.io.IOException;
 import java.util.UUID;
 
@@ -36,8 +38,8 @@ public class LoginSuccessHandler implements AuthenticationSuccessHandler {
             return;
         }
 
-        request.getSession(true).setAttribute("memberId",    memberId.toString());
-        request.getSession().setAttribute("memberName", memberName);
+        request.getSession(true).setAttribute(SessionConstants.MEMBER_ID,   memberId.toString());
+        request.getSession().setAttribute(SessionConstants.MEMBER_NAME, memberName);
         response.sendRedirect("/dashboard");
     }
 }

@@ -13,6 +13,9 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
+import org.side_project.wallet_system.config.SessionConstants;
+import org.side_project.wallet_system.config.SessionUtils;
+
 import java.math.BigDecimal;
 import java.net.URLDecoder;
 import java.nio.charset.Charset;
@@ -37,12 +40,13 @@ public class SBPaymentController {
      */
     @GetMapping("/request")
     public String paymentRequest(HttpSession session, Model model) {
-        BigDecimal amount = (BigDecimal) session.getAttribute("sbpaymentPendingAmount");
+        BigDecimal amount = (BigDecimal) session.getAttribute(SessionConstants.SBPAYMENT_PENDING_AMOUNT);
         if (amount == null) {
             log.warn("No pending SBPS amount in session — redirecting to deposit");
             return "redirect:/deposit";
         }
-        UUID memberId = UUID.fromString((String) session.getAttribute("memberId"));
+        UUID memberId = SessionUtils.getMemberId(session);
+        if (memberId == null) return "redirect:/login";
         SBPaymentRequest req = sbPaymentService.buildRequest(memberId, amount);
         model.addAttribute("req", req);
         return "sb-payment";
@@ -92,7 +96,9 @@ public class SBPaymentController {
                         URLDecoder.decode(pair.substring(idx + 1), sjis)
                     );
                 }
-            } catch (Exception ignore) {}
+            } catch (Exception e) {
+                log.warn("Failed to decode SBPS parameter pair: {}", pair, e);
+            }
         }
         return params;
     }
@@ -104,7 +110,7 @@ public class SBPaymentController {
     public String paymentComplete(HttpSession session,
                                   RedirectAttributes redirectAttributes,
                                   Locale locale) {
-        session.removeAttribute("sbpaymentPendingAmount");
+        session.removeAttribute(SessionConstants.SBPAYMENT_PENDING_AMOUNT);
         redirectAttributes.addFlashAttribute("success",
                 messageSource.getMessage("flash.deposit.success", null, locale));
         return "redirect:/dashboard";
@@ -117,7 +123,7 @@ public class SBPaymentController {
     public String paymentCancel(HttpSession session,
                                 RedirectAttributes redirectAttributes,
                                 Locale locale) {
-        session.removeAttribute("sbpaymentPendingAmount");
+        session.removeAttribute(SessionConstants.SBPAYMENT_PENDING_AMOUNT);
         redirectAttributes.addFlashAttribute("error",
                 messageSource.getMessage("flash.payment.cancelled", null, locale));
         return "redirect:/deposit";
@@ -130,7 +136,7 @@ public class SBPaymentController {
     public String paymentError(HttpSession session,
                                RedirectAttributes redirectAttributes,
                                Locale locale) {
-        session.removeAttribute("sbpaymentPendingAmount");
+        session.removeAttribute(SessionConstants.SBPAYMENT_PENDING_AMOUNT);
         redirectAttributes.addFlashAttribute("error",
                 messageSource.getMessage("flash.payment.error", null, locale));
         return "redirect:/deposit";

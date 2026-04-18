@@ -29,10 +29,14 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class WalletService {
 
+    private static final String DESC_DEPOSIT            = "Deposit";
+    private static final String DESC_WITHDRAWAL         = "Withdrawal";
+    private static final String DESC_WITHDRAWAL_TO_BANK = "Withdrawal to bank %s / %s";
+    private static final String DESC_TRANSFER_TO        = "Transfer to %s";
+
     private final WalletRepository walletRepository;
     private final TransactionRepository transactionRepository;
-
-    private final HttpClient httpClient = HttpClient.newHttpClient();
+    private final HttpClient httpClient;
 
     @Value("${mock-bank.url}")
     private String mockBankUrl;
@@ -42,7 +46,7 @@ public class WalletService {
 
     public Wallet getWallet(UUID memberId) {
         return walletRepository.findByMemberId(memberId)
-                .orElseThrow(() -> new RuntimeException("Wallet not found"));
+                .orElseThrow(() -> new WalletNotFoundException(memberId));
     }
 
     public List<Transaction> getTransactions(UUID memberId) {
@@ -83,7 +87,7 @@ public class WalletService {
         tx.setToWalletId(wallet.getId());
         tx.setType(TransactionType.DEPOSIT);
         tx.setAmount(amount);
-        tx.setDescription("Deposit");
+        tx.setDescription(DESC_DEPOSIT);
         tx.setStatus(TransactionStatus.COMPLETED);
         transactionRepository.save(tx);
         log.info("Deposit: memberId={}, amount={}, newBalance={}", memberId, amount, wallet.getBalance());
@@ -103,7 +107,7 @@ public class WalletService {
         tx.setToWalletId(wallet.getId());
         tx.setType(TransactionType.DEPOSIT);
         tx.setAmount(amount);
-        tx.setDescription("Deposit");
+        tx.setDescription(DESC_DEPOSIT);
         tx.setStatus(TransactionStatus.PENDING);
         tx = transactionRepository.save(tx);
         log.info("Deposit initiated: memberId={}, amount={}, transactionId={}", memberId, amount, tx.getId());
@@ -162,7 +166,7 @@ public class WalletService {
         tx.setFromWalletId(wallet.getId());
         tx.setType(TransactionType.WITHDRAW);
         tx.setAmount(amount);
-        tx.setDescription("Withdrawal");
+        tx.setDescription(DESC_WITHDRAWAL);
         tx.setStatus(TransactionStatus.COMPLETED);
         transactionRepository.save(tx);
         log.info("Withdrawal: memberId={}, amount={}, newBalance={}", memberId, amount, wallet.getBalance());
@@ -188,7 +192,7 @@ public class WalletService {
         tx.setFromWalletId(wallet.getId());
         tx.setType(TransactionType.WITHDRAW);
         tx.setAmount(amount);
-        tx.setDescription("Withdrawal to bank " + bankCode + " / " + bankAccount);
+        tx.setDescription(String.format(DESC_WITHDRAWAL_TO_BANK, bankCode, bankAccount));
         tx.setStatus(TransactionStatus.REQUEST_COMPLETED);
         Transaction saved = transactionRepository.save(tx);
 
@@ -285,7 +289,7 @@ public class WalletService {
         tx.setToWalletId(toWallet.getId());
         tx.setType(TransactionType.TRANSFER);
         tx.setAmount(amount);
-        tx.setDescription("Transfer to " + toWalletCode);
+        tx.setDescription(String.format(DESC_TRANSFER_TO, toWalletCode));
         tx.setStatus(TransactionStatus.COMPLETED);
         transactionRepository.save(tx);
         log.info("Transfer: fromMemberId={}, toWalletCode={}, amount={}", fromMemberId, toWalletCode, amount);

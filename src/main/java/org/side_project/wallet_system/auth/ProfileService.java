@@ -2,6 +2,7 @@ package org.side_project.wallet_system.auth;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -21,6 +22,8 @@ import java.util.stream.Stream;
 @Service
 @RequiredArgsConstructor
 public class ProfileService {
+
+    private static final long MAX_AVATAR_SIZE_BYTES = 2L * 1024 * 1024;
 
     private final MemberRepository memberRepository;
 
@@ -59,7 +62,7 @@ public class ProfileService {
         if (!isAllowedImageType(contentType)) {
             throw new IllegalArgumentException("error.avatar.type");
         }
-        if (file.getSize() > 2L * 1024 * 1024) {
+        if (file.getSize() > MAX_AVATAR_SIZE_BYTES) {
             throw new IllegalArgumentException("error.avatar.size");
         }
         String originalFilename = StringUtils.cleanPath(
@@ -77,7 +80,9 @@ public class ProfileService {
         try (Stream<Path> existing = Files.list(uploadPath)) {
             existing.filter(p -> p.getFileName().toString().startsWith(memberId.toString() + "."))
                     .forEach(p -> {
-                        try { Files.deleteIfExists(p); } catch (IOException ignored) {}
+                        try { Files.deleteIfExists(p); } catch (IOException e) {
+                            log.warn("Failed to delete old avatar file: {}", p, e);
+                        }
                     });
         }
 

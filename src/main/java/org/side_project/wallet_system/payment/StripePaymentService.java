@@ -2,11 +2,13 @@ package org.side_project.wallet_system.payment;
 
 import com.stripe.StripeClient;
 import com.stripe.exception.SignatureVerificationException;
+import com.stripe.exception.StripeException;
 import com.stripe.model.Event;
 import com.stripe.model.PaymentIntent;
 import com.stripe.model.StripeObject;
 import com.stripe.net.Webhook;
 import com.stripe.param.PaymentIntentCreateParams;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.side_project.wallet_system.wallet.WalletService;
 import org.springframework.beans.factory.annotation.Value;
@@ -20,11 +22,14 @@ import java.util.concurrent.ConcurrentHashMap;
 
 @Slf4j
 @Service
+@RequiredArgsConstructor
 public class StripePaymentService {
 
     private final StripeClient stripeClient;
     private final WalletService walletService;
-    private final String webhookSecret;
+
+    @Value("${stripe.webhook-secret}")
+    private String webhookSecret;
 
     /**
      * In-memory idempotency guard — prevents double-crediting if Stripe retries the webhook.
@@ -33,20 +38,11 @@ public class StripePaymentService {
     private final Set<String> processedIntents =
             Collections.newSetFromMap(new ConcurrentHashMap<>());
 
-    public StripePaymentService(
-            @Value("${stripe.secret-key}") String secretKey,
-            @Value("${stripe.webhook-secret}") String webhookSecret,
-            WalletService walletService) {
-        this.stripeClient = new StripeClient(secretKey);
-        this.webhookSecret = webhookSecret;
-        this.walletService = walletService;
-    }
-
     // ─────────────────────────────────────────────────────────────────────────
     // Create PaymentIntent — also creates a PENDING deposit transaction
     // ─────────────────────────────────────────────────────────────────────────
 
-    public String createPaymentIntent(UUID memberId, BigDecimal amount) throws Exception {
+    public String createPaymentIntent(UUID memberId, BigDecimal amount) throws StripeException {
         UUID transactionId = walletService.initiateDeposit(memberId, amount);
 
         PaymentIntentCreateParams params = PaymentIntentCreateParams.builder()
@@ -113,7 +109,7 @@ public class StripePaymentService {
             walletService.completeDeposit(transactionId);
             log.info("Stripe deposit completed: intentId={}, transactionId={}", intentId, transactionId);
             return true;
-        } catch (Exception e) {
+        } catch (RuntimeException e) {
             log.error("Stripe deposit failed: intentId={}, transactionId={}, error={}",
                       intentId, transactionIdStr, e.getMessage(), e);
             processedIntents.remove(intentId);
