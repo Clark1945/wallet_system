@@ -15,7 +15,7 @@ public class CustomUserDetails implements UserDetails {
         this.member = member;
     }
 
-    public UUID getMemberId()   { return member.getId(); }
+    public UUID getMemberId()    { return member.getId(); }
     public String getMemberName() { return member.getName(); }
 
     @Override public String getUsername()  { return member.getEmail(); }
@@ -24,5 +24,5 @@ public class CustomUserDetails implements UserDetails {
     @Override public boolean isAccountNonExpired()     { return true; }
     @Override public boolean isAccountNonLocked()      { return true; }
     @Override public boolean isCredentialsNonExpired() { return true; }
-    @Override public boolean isEnabled()               { return true; }
+    @Override public boolean isEnabled()               { return member.getStatus() == MemberStatus.ACTIVE; }
 }

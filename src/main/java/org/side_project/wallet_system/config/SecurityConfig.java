@@ -78,7 +78,10 @@ public class SecurityConfig {
                                            LoginSuccessHandler loginSuccessHandler) throws Exception {
         http
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/login", "/register", "/error",
+                .requestMatchers("/login", "/login/otp", "/login/otp/resend",
+                                 "/register", "/register/otp", "/register/otp/resend",
+                                 "/forgot-password", "/reset-password",
+                                 "/error",
                                  "/uploads/**",
                                  "/openapi.yaml", "/swagger-ui/**", "/v3/api-docs/**",
                                  "/actuator/health", "/actuator/prometheus").permitAll()

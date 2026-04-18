@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title th:text="${otpType == 'REGISTER'} ? #{otp.heading.register} : #{otp.heading.login}">Verify</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: sans-serif; background: #f0f2f5; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
+        .card { background: #fff; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,.12); padding: 2rem; width: 380px; }
+        h1 { text-align: center; font-size: 1.4rem; margin-bottom: .75rem; color: #333; }
+        .subtitle { text-align: center; font-size: .9rem; color: #666; margin-bottom: 1.5rem; }
+        .alert { padding: .75rem 1rem; border-radius: 4px; margin-bottom: 1rem; font-size: .9rem; }
+        .alert-error   { background: #fde8e8; color: #c0392b; }
+        .alert-success { background: #e8f8e8; color: #27ae60; }
+        .alert-info    { background: #e8f0fe; color: #1d4ed8; }
+        label { display: block; font-size: .85rem; color: #555; margin-bottom: .25rem; }
+        .otp-input {
+            width: 100%; padding: .8rem; border: 2px solid #ccc;
+            border-radius: 6px; font-size: 1.6rem; text-align: center;
+            letter-spacing: .5rem; margin-bottom: 1.25rem; font-variant-numeric: tabular-nums;
+        }
+        .otp-input:focus { border-color: #4f46e5; outline: none; }
+        button { width: 100%; padding: .75rem; background: #4f46e5; color: #fff;
+            border: none; border-radius: 4px; font-size: 1rem; cursor: pointer; }
+        button:hover { background: #4338ca; }
+        .resend-form { margin-top: 1rem; text-align: center; }
+        .resend-btn { background: none; border: none; color: #4f46e5; cursor: pointer;
+            font-size: .9rem; text-decoration: underline; padding: 0; width: auto; }
+        .resend-btn:hover { color: #4338ca; }
+    </style>
+</head>
+<body>
+<div class="card">
+    <h1 th:text="${otpType == 'REGISTER'} ? #{otp.heading.register} : #{otp.heading.login}">Verify</h1>
+    <p class="subtitle"
+       th:text="${otpType == 'REGISTER'}
+           ? #{otp.prompt.register(${email})}
+           : #{otp.prompt.login(${email})}">Enter your code</p>
+
+    <div th:if="${error}"   class="alert alert-error"   th:text="${error}"></div>
+    <div th:if="${success}" class="alert alert-success" th:text="${success}"></div>
+    <div th:if="${info}"    class="alert alert-info"    th:text="${info}"></div>
+
+    <form th:action="${otpType == 'REGISTER'} ? @{/register/otp} : @{/login/otp}" method="post">
+        <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+        <label for="code" th:text="#{otp.label.code}">Verification Code</label>
+        <input type="text" id="code" name="code" class="otp-input"
+               maxlength="6" pattern="[0-9]{6}" inputmode="numeric"
+               autocomplete="one-time-code" required autofocus/>
+        <button type="submit" th:text="#{otp.submit}">Verify</button>
+    </form>
+
+    <div class="resend-form">
+        <form th:action="${otpType == 'REGISTER'} ? @{/register/otp/resend} : @{/login/otp/resend}" method="post">
+            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+            <button type="submit" class="resend-btn" th:text="#{otp.resend}">Resend Code</button>
+        </form>
+    </div>
+</div>
+</body>
+</html>

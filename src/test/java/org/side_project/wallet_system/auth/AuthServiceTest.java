@@ -24,25 +24,29 @@ class AuthServiceTest {
     @Mock private PasswordEncoder passwordEncoder;
     @InjectMocks private AuthService authService;
 
+    // ─── initiateRegistration ────────────────────────────────────────────────────
+
     @Test
-    void register_newEmail_createsMemberAndWallet() {
-        given(memberRepository.existsByEmail("new@test.com")).willReturn(false);
+    void initiateRegistration_newEmail_createsPendingMemberWithoutWallet() {
+        given(memberRepository.findByEmail("new@test.com")).willReturn(Optional.empty());
         given(passwordEncoder.encode("pass")).willReturn("hashed");
         Member saved = new Member();
         saved.setId(UUID.randomUUID());
         given(memberRepository.save(any())).willReturn(saved);
 
-        Member result = authService.register("Alice", 25, "new@test.com", "pass");
+        Member result = authService.initiateRegistration("Alice", 25, "new@test.com", "pass");
 
         assertThat(result).isEqualTo(saved);
-        then(walletRepository).should().save(any(Wallet.class));
+        then(walletRepository).should(never()).save(any()); // wallet not created until activation
     }
 
     @Test
-    void register_duplicateEmail_throwsIllegalArgument() {
-        given(memberRepository.existsByEmail("dup@test.com")).willReturn(true);
+    void initiateRegistration_activeDuplicateEmail_throwsIllegalArgument() {
+        Member active = new Member();
+        active.setStatus(MemberStatus.ACTIVE);
+        given(memberRepository.findByEmail("dup@test.com")).willReturn(Optional.of(active));
 
-        assertThatThrownBy(() -> authService.register("Bob", 30, "dup@test.com", "pass"))
+        assertThatThrownBy(() -> authService.initiateRegistration("Bob", 30, "dup@test.com", "pass"))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("error.email.duplicate");
 
@@ -50,9 +54,46 @@ class AuthServiceTest {
     }
 
     @Test
+    void initiateRegistration_pendingDuplicateEmail_deletesAndRecreates() {
+        Member pending = new Member();
+        pending.setId(UUID.randomUUID());
+        pending.setStatus(MemberStatus.PENDING);
+        given(memberRepository.findByEmail("pending@test.com")).willReturn(Optional.of(pending));
+        given(passwordEncoder.encode("pass")).willReturn("hashed");
+        Member saved = new Member();
+        saved.setId(UUID.randomUUID());
+        given(memberRepository.save(any())).willReturn(saved);
+
+        Member result = authService.initiateRegistration("Carol", 20, "pending@test.com", "pass");
+
+        assertThat(result).isEqualTo(saved);
+        then(memberRepository).should().delete(pending);
+    }
+
+    // ─── activateRegistration ────────────────────────────────────────────────────
+
+    @Test
+    void activateRegistration_pendingMember_setsActiveAndCreatesWallet() {
+        UUID memberId = UUID.randomUUID();
+        Member pending = new Member();
+        pending.setId(memberId);
+        pending.setStatus(MemberStatus.PENDING);
+        given(memberRepository.findById(memberId)).willReturn(Optional.of(pending));
+
+        authService.activateRegistration(memberId);
+
+        assertThat(pending.getStatus()).isEqualTo(MemberStatus.ACTIVE);
+        then(memberRepository).should().save(pending);
+        then(walletRepository).should().save(any(Wallet.class));
+    }
+
+    // ─── login ───────────────────────────────────────────────────────────────────
+
+    @Test
     void login_correctCredentials_returnsMember() {
         Member member = new Member();
         member.setPassword("hashed");
+        member.setStatus(MemberStatus.ACTIVE);
         given(memberRepository.findByEmail("user@test.com")).willReturn(Optional.of(member));
         given(passwordEncoder.matches("pass", "hashed")).willReturn(true);
 
@@ -65,12 +106,26 @@ class AuthServiceTest {
     void login_wrongPassword_returnsEmpty() {
         Member member = new Member();
         member.setPassword("hashed");
+        member.setStatus(MemberStatus.ACTIVE);
         given(memberRepository.findByEmail("user@test.com")).willReturn(Optional.of(member));
         given(passwordEncoder.matches("wrong", "hashed")).willReturn(false);
 
         Optional<Member> result = authService.login("user@test.com", "wrong");
 
         assertThat(result).isEmpty();
+    }
+
+    @Test
+    void login_pendingMember_returnsEmpty() {
+        Member member = new Member();
+        member.setPassword("hashed");
+        member.setStatus(MemberStatus.PENDING);
+        given(memberRepository.findByEmail("pending@test.com")).willReturn(Optional.of(member));
+
+        Optional<Member> result = authService.login("pending@test.com", "pass");
+
+        assertThat(result).isEmpty();
+        then(passwordEncoder).shouldHaveNoInteractions(); // PENDING status filtered before password check
     }
 
     @Test
