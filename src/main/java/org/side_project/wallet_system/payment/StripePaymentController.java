@@ -15,6 +15,12 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
+import com.stripe.exception.StripeException;
+
+import java.io.IOException;
+import org.side_project.wallet_system.config.SessionConstants;
+import org.side_project.wallet_system.config.SessionUtils;
+
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.util.Locale;
@@ -39,21 +45,26 @@ public class StripePaymentController {
      */
     @GetMapping("/checkout")
     public String checkout(HttpSession session, Model model) {
-        BigDecimal amount = (BigDecimal) session.getAttribute("stripePendingAmount");
+        BigDecimal amount = (BigDecimal) session.getAttribute(SessionConstants.STRIPE_PENDING_AMOUNT);
         if (amount == null) {
             log.warn("No pending Stripe amount in session — redirecting to deposit");
             return "redirect:/deposit";
         }
-        UUID memberId = UUID.fromString((String) session.getAttribute("memberId"));
+        UUID memberId = SessionUtils.getMemberId(session);
+        if (memberId == null) return "redirect:/login";
+
         try {
             String clientSecret = stripePaymentService.createPaymentIntent(memberId, amount);
             model.addAttribute("clientSecret", clientSecret);
             model.addAttribute("publishableKey", publishableKey);
             model.addAttribute("amount", amount);
-            model.addAttribute("memberName", session.getAttribute("memberName"));
+            model.addAttribute(SessionConstants.MEMBER_NAME, SessionUtils.getMemberName(session));
             return "stripe-checkout";
-        } catch (Exception e) {
-            log.error("Failed to create Stripe PaymentIntent: {}", e.getMessage(), e);
+        } catch (StripeException e) {
+            log.error("Stripe API error creating PaymentIntent: {}", e.getMessage(), e);
+            return "redirect:/deposit";
+        } catch (IllegalArgumentException e) {
+            log.warn("Invalid deposit request: {}", e.getMessage());
             return "redirect:/deposit";
         }
     }
@@ -65,7 +76,7 @@ public class StripePaymentController {
     public String complete(HttpSession session,
                            RedirectAttributes redirectAttributes,
                            Locale locale) {
-        session.removeAttribute("stripePendingAmount");
+        session.removeAttribute(SessionConstants.STRIPE_PENDING_AMOUNT);
         redirectAttributes.addFlashAttribute("success",
                 messageSource.getMessage("flash.deposit.success", null, locale));
         return "redirect:/dashboard";
@@ -78,7 +89,7 @@ public class StripePaymentController {
     public String cancel(HttpSession session,
                          RedirectAttributes redirectAttributes,
                          Locale locale) {
-        session.removeAttribute("stripePendingAmount");
+        session.removeAttribute(SessionConstants.STRIPE_PENDING_AMOUNT);
         redirectAttributes.addFlashAttribute("error",
                 messageSource.getMessage("flash.payment.cancelled", null, locale));
         return "redirect:/deposit";
@@ -100,8 +111,8 @@ public class StripePaymentController {
             return success
                     ? ResponseEntity.ok("OK")
                     : ResponseEntity.badRequest().body("Processing failed");
-        } catch (Exception e) {
-            log.error("Failed to read Stripe webhook request: {}", e.getMessage(), e);
+        } catch (IOException e) {
+            log.error("Failed to read Stripe webhook request body: {}", e.getMessage(), e);
             return ResponseEntity.badRequest().body("Internal error");
         }
     }

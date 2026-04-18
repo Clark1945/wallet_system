@@ -3,6 +3,8 @@ package org.side_project.wallet_system.auth;
 import jakarta.servlet.http.HttpSession;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.side_project.wallet_system.config.SessionConstants;
+import org.side_project.wallet_system.config.SessionUtils;
 import org.springframework.context.MessageSource;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.stereotype.Controller;
@@ -27,10 +29,12 @@ public class ProfileController {
 
     @GetMapping("/profile")
     public String profilePage(HttpSession session, Model model) {
-        UUID memberId = UUID.fromString((String) session.getAttribute("memberId"));
+        UUID memberId = SessionUtils.getMemberId(session);
+        if (memberId == null) return "redirect:/login";
+
         Member member = profileService.getMember(memberId);
         model.addAttribute("member", member);
-        model.addAttribute("memberName", session.getAttribute("memberName"));
+        model.addAttribute(SessionConstants.MEMBER_NAME, SessionUtils.getMemberName(session));
         return "profile";
     }
 
@@ -44,10 +48,12 @@ public class ProfileController {
                                 HttpSession session,
                                 RedirectAttributes redirectAttributes,
                                 Locale locale) {
+        UUID memberId = SessionUtils.getMemberId(session);
+        if (memberId == null) return "redirect:/login";
+
         try {
-            UUID memberId = UUID.fromString((String) session.getAttribute("memberId"));
             profileService.updateProfile(memberId, name, nickname, phone, bio, birthday);
-            session.setAttribute("memberName", name);
+            session.setAttribute(SessionConstants.MEMBER_NAME, name);
             redirectAttributes.addFlashAttribute("success",
                     messageSource.getMessage("flash.profile.success", null, locale));
         } catch (IllegalArgumentException e) {
@@ -62,8 +68,10 @@ public class ProfileController {
                                HttpSession session,
                                RedirectAttributes redirectAttributes,
                                Locale locale) {
+        UUID memberId = SessionUtils.getMemberId(session);
+        if (memberId == null) return "redirect:/login";
+
         try {
-            UUID memberId = UUID.fromString((String) session.getAttribute("memberId"));
             profileService.updateAvatar(memberId, avatar);
             redirectAttributes.addFlashAttribute("success",
                     messageSource.getMessage("flash.avatar.success", null, locale));
