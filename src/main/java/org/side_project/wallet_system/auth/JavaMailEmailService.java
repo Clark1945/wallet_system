@@ -5,6 +5,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Profile;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 @Slf4j
@@ -15,6 +16,7 @@ public class JavaMailEmailService implements EmailService {
 
     private final JavaMailSender mailSender;
 
+    @Async
     @Override
     public void sendLoginOtp(String to, String otp) {
         send(to, "Your login verification code",
@@ -23,6 +25,7 @@ public class JavaMailEmailService implements EmailService {
                 "\nIf you did not attempt to log in, please ignore this email.");
     }
 
+    @Async
     @Override
     public void sendRegistrationOtp(String to, String otp) {
         send(to, "Verify your email to complete registration",
@@ -31,6 +34,7 @@ public class JavaMailEmailService implements EmailService {
                 "\nEnter this code to complete your registration.");
     }
 
+    @Async
     @Override
     public void sendPasswordResetLink(String to, String resetUrl) {
         send(to, "Reset your password",
