@@ -4,13 +4,20 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.side_project.wallet_system.transaction.Transaction;
 import org.side_project.wallet_system.transaction.TransactionRepository;
-import org.side_project.wallet_system.transaction.TransactionType;
 import org.side_project.wallet_system.transaction.TransactionSpec;
+import org.side_project.wallet_system.transaction.TransactionStatus;
+import org.side_project.wallet_system.transaction.TransactionType;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import java.time.LocalDate;
+import java.util.concurrent.CompletableFuture;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
@@ -24,6 +31,14 @@ public class WalletService {
 
     private final WalletRepository walletRepository;
     private final TransactionRepository transactionRepository;
+
+    private final HttpClient httpClient = HttpClient.newHttpClient();
+
+    @Value("${mock-bank.url}")
+    private String mockBankUrl;
+
+    @Value("${app.base-url}")
+    private String appBaseUrl;
 
     public Wallet getWallet(UUID memberId) {
         return walletRepository.findByMemberId(memberId)
@@ -52,6 +67,8 @@ public class WalletService {
         );
     }
 
+    // ── 同步儲值（向後相容，狀態直接 COMPLETED）────────────────────────────
+
     @Transactional
     public void deposit(UUID memberId, BigDecimal amount) {
         if (amount.compareTo(BigDecimal.ZERO) <= 0) {
@@ -67,9 +84,65 @@ public class WalletService {
         tx.setType(TransactionType.DEPOSIT);
         tx.setAmount(amount);
         tx.setDescription("Deposit");
+        tx.setStatus(TransactionStatus.COMPLETED);
         transactionRepository.save(tx);
         log.info("Deposit: memberId={}, amount={}, newBalance={}", memberId, amount, wallet.getBalance());
     }
+
+    // ── 非同步儲值（PENDING → COMPLETED / FAILED）────────────────────────────
+
+    @Transactional
+    public UUID initiateDeposit(UUID memberId, BigDecimal amount) {
+        if (amount.compareTo(BigDecimal.ZERO) <= 0) {
+            log.warn("Deposit rejected - non-positive amount: memberId={}, amount={}", memberId, amount);
+            throw new IllegalArgumentException("error.amount.positive");
+        }
+        Wallet wallet = getWallet(memberId);
+
+        Transaction tx = new Transaction();
+        tx.setToWalletId(wallet.getId());
+        tx.setType(TransactionType.DEPOSIT);
+        tx.setAmount(amount);
+        tx.setDescription("Deposit");
+        tx.setStatus(TransactionStatus.PENDING);
+        tx = transactionRepository.save(tx);
+        log.info("Deposit initiated: memberId={}, amount={}, transactionId={}", memberId, amount, tx.getId());
+        return tx.getId();
+    }
+
+    @Transactional
+    public void completeDeposit(UUID transactionId) {
+        transactionRepository.findById(transactionId).ifPresent(tx -> {
+            if (tx.getStatus() == TransactionStatus.PENDING) {
+                walletRepository.findById(tx.getToWalletId()).ifPresent(wallet -> {
+                    wallet.setBalance(wallet.getBalance().add(tx.getAmount()));
+                    walletRepository.save(wallet);
+                });
+                tx.setStatus(TransactionStatus.COMPLETED);
+                transactionRepository.save(tx);
+                log.info("Deposit completed: transactionId={}, amount={}", transactionId, tx.getAmount());
+            } else {
+                log.warn("completeDeposit on non-PENDING: transactionId={}, currentStatus={}",
+                        transactionId, tx.getStatus());
+            }
+        });
+    }
+
+    @Transactional
+    public void failDeposit(UUID transactionId) {
+        transactionRepository.findById(transactionId).ifPresent(tx -> {
+            if (tx.getStatus() == TransactionStatus.PENDING) {
+                tx.setStatus(TransactionStatus.FAILED);
+                transactionRepository.save(tx);
+                log.warn("Deposit failed (timeout): transactionId={}, amount={}", transactionId, tx.getAmount());
+            } else {
+                log.warn("failDeposit on non-PENDING: transactionId={}, currentStatus={}",
+                        transactionId, tx.getStatus());
+            }
+        });
+    }
+
+    // ── 同步提款（向後相容）──────────────────────────────────────────────────
 
     @Transactional
     public void withdraw(UUID memberId, BigDecimal amount) {
@@ -90,9 +163,95 @@ public class WalletService {
         tx.setType(TransactionType.WITHDRAW);
         tx.setAmount(amount);
         tx.setDescription("Withdrawal");
+        tx.setStatus(TransactionStatus.COMPLETED);
         transactionRepository.save(tx);
         log.info("Withdrawal: memberId={}, amount={}, newBalance={}", memberId, amount, wallet.getBalance());
     }
+
+    // ── 非同步提款（REQUEST_COMPLETED → COMPLETED / FAILED）─────────────────
+
+    @Transactional
+    public void initiateWithdrawal(UUID memberId, BigDecimal amount, String bankCode, String bankAccount) {
+        if (amount.compareTo(BigDecimal.ZERO) <= 0) {
+            log.warn("Withdrawal rejected - non-positive amount: memberId={}, amount={}", memberId, amount);
+            throw new IllegalArgumentException("error.amount.positive");
+        }
+        Wallet wallet = getWallet(memberId);
+        if (wallet.getBalance().compareTo(amount) < 0) {
+            log.warn("Withdrawal rejected - insufficient balance: memberId={}, amount={}, balance={}", memberId, amount, wallet.getBalance());
+            throw new IllegalArgumentException("error.insufficient.balance");
+        }
+        wallet.setBalance(wallet.getBalance().subtract(amount));
+        walletRepository.save(wallet);
+
+        Transaction tx = new Transaction();
+        tx.setFromWalletId(wallet.getId());
+        tx.setType(TransactionType.WITHDRAW);
+        tx.setAmount(amount);
+        tx.setDescription("Withdrawal to bank " + bankCode + " / " + bankAccount);
+        tx.setStatus(TransactionStatus.REQUEST_COMPLETED);
+        Transaction saved = transactionRepository.save(tx);
+
+        String transactionId = saved.getId().toString();
+        String callbackUrl = appBaseUrl + "/withdraw/webhook";
+        String body = String.format(
+            "{\"transactionId\":\"%s\",\"amount\":\"%s\",\"bankCode\":\"%s\",\"bankAccount\":\"%s\",\"callbackUrl\":\"%s\"}",
+            transactionId, amount.toPlainString(), bankCode, bankAccount, callbackUrl);
+
+        CompletableFuture.runAsync(() -> {
+            try {
+                HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(mockBankUrl + "/api/withdraw"))
+                    .header("Content-Type", "application/json")
+                    .POST(HttpRequest.BodyPublishers.ofString(body))
+                    .build();
+                httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+                log.info("Withdrawal request sent to mock bank: transactionId={}", transactionId);
+            } catch (Exception e) {
+                log.error("Failed to send withdrawal to mock bank: transactionId={}", transactionId, e);
+            }
+        });
+
+        log.info("Withdrawal initiated: memberId={}, amount={}, transactionId={}", memberId, amount, transactionId);
+    }
+
+    @Transactional
+    public void completeWithdrawal(UUID transactionId) {
+        transactionRepository.findById(transactionId).ifPresent(tx -> {
+            if (tx.getStatus() == TransactionStatus.REQUEST_COMPLETED) {
+                tx.setStatus(TransactionStatus.COMPLETED);
+                transactionRepository.save(tx);
+                log.info("Withdrawal completed: transactionId={}, amount={}", transactionId, tx.getAmount());
+            } else {
+                log.warn("completeWithdrawal on non-REQUEST_COMPLETED: transactionId={}, currentStatus={}",
+                        transactionId, tx.getStatus());
+            }
+        });
+    }
+
+    @Transactional
+    public void failWithdrawal(UUID transactionId) {
+        transactionRepository.findById(transactionId).ifPresent(tx -> {
+            if (tx.getStatus() == TransactionStatus.REQUEST_COMPLETED) {
+                tx.setStatus(TransactionStatus.FAILED);
+                transactionRepository.save(tx);
+
+                if (tx.getFromWalletId() != null) {
+                    walletRepository.findById(tx.getFromWalletId()).ifPresent(wallet -> {
+                        wallet.setBalance(wallet.getBalance().add(tx.getAmount()));
+                        walletRepository.save(wallet);
+                        log.info("Withdrawal failed - balance refunded: transactionId={}, walletId={}, amount={}",
+                                transactionId, tx.getFromWalletId(), tx.getAmount());
+                    });
+                }
+            } else {
+                log.warn("failWithdrawal on non-REQUEST_COMPLETED: transactionId={}, currentStatus={}",
+                        transactionId, tx.getStatus());
+            }
+        });
+    }
+
+    // ── 轉帳（同步，直接 COMPLETED）─────────────────────────────────────────
 
     @Transactional
     public void transfer(UUID fromMemberId, String toWalletCode, BigDecimal amount) {
@@ -127,6 +286,7 @@ public class WalletService {
         tx.setType(TransactionType.TRANSFER);
         tx.setAmount(amount);
         tx.setDescription("Transfer to " + toWalletCode);
+        tx.setStatus(TransactionStatus.COMPLETED);
         transactionRepository.save(tx);
         log.info("Transfer: fromMemberId={}, toWalletCode={}, amount={}", fromMemberId, toWalletCode, amount);
     }

@@ -54,7 +54,7 @@ public class SBPaymentService {
     /** orderId → pending payment (in-memory; acceptable for test environment) */
     private final Map<String, PendingOrder> pendingOrders = new ConcurrentHashMap<>();
 
-    private record PendingOrder(UUID memberId, BigDecimal amount) {}
+    private record PendingOrder(UUID memberId, BigDecimal amount, UUID transactionId) {}
 
     // ─────────────────────────────────────────────────────────────────────────
     // Build request
@@ -95,9 +95,10 @@ public class SBPaymentService {
             requestDate, LIMIT_SECOND
         );
 
-        pendingOrders.put(orderId, new PendingOrder(memberId, amount));
-        log.info("SBPayment request built: orderId={}, memberId={}, amount={}, requestDate={}",
-                 orderId, memberId, amount, requestDate);
+        UUID transactionId = walletService.initiateDeposit(memberId, amount);
+        pendingOrders.put(orderId, new PendingOrder(memberId, amount, transactionId));
+        log.info("SBPayment request built: orderId={}, memberId={}, transactionId={}, amount={}, requestDate={}",
+                 orderId, memberId, transactionId, amount, requestDate);
 
         return SBPaymentRequest.builder()
             .gatewayUrl(gatewayUrl)
@@ -160,12 +161,13 @@ public class SBPaymentService {
         }
 
         try {
-            walletService.deposit(pending.memberId(), pending.amount());
-            log.info("SBPayment deposit completed: orderId={}, memberId={}, amount={}",
-                     orderId, pending.memberId(), pending.amount());
+            walletService.completeDeposit(pending.transactionId());
+            log.info("SBPayment deposit completed: orderId={}, memberId={}, transactionId={}, amount={}",
+                     orderId, pending.memberId(), pending.transactionId(), pending.amount());
             return true;
         } catch (Exception e) {
-            log.error("SBPayment deposit failed: orderId={}, error={}", orderId, e.getMessage(), e);
+            log.error("SBPayment deposit failed: orderId={}, transactionId={}, error={}",
+                      orderId, pending.transactionId(), e.getMessage(), e);
             return false;
         }
     }

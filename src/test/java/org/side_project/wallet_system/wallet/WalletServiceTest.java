@@ -6,8 +6,11 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.side_project.wallet_system.transaction.Transaction;
 import org.side_project.wallet_system.transaction.TransactionRepository;
+import org.side_project.wallet_system.transaction.TransactionStatus;
 import org.side_project.wallet_system.transaction.TransactionType;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.math.BigDecimal;
 import java.util.Optional;
@@ -36,6 +39,8 @@ class WalletServiceTest {
         wallet.setBalance(new BigDecimal("1000.00"));
         wallet.setWalletCode("MyCode000001");
         lenient().when(walletRepository.findByMemberId(memberId)).thenReturn(Optional.of(wallet));
+        ReflectionTestUtils.setField(walletService, "mockBankUrl", "http://localhost:8081");
+        ReflectionTestUtils.setField(walletService, "appBaseUrl",  "http://localhost:8080");
     }
 
     // ── deposit ──────────────────────────────────────────────
@@ -143,5 +148,134 @@ class WalletServiceTest {
     void transfer_zeroAmount_throws() {
         assertThatThrownBy(() -> walletService.transfer(memberId, "ToCode000001", BigDecimal.ZERO))
                 .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    // ── status set by sync operations ────────────────────────────
+
+    @Test
+    void deposit_setsStatusCompleted() {
+        given(transactionRepository.save(any())).willAnswer(inv -> inv.getArgument(0));
+
+        walletService.deposit(memberId, new BigDecimal("100.00"));
+
+        then(transactionRepository).should().save(argThat(tx ->
+                tx.getStatus() == TransactionStatus.COMPLETED));
+    }
+
+    @Test
+    void withdraw_setsStatusCompleted() {
+        given(transactionRepository.save(any())).willAnswer(inv -> inv.getArgument(0));
+
+        walletService.withdraw(memberId, new BigDecimal("100.00"));
+
+        then(transactionRepository).should().save(argThat(tx ->
+                tx.getStatus() == TransactionStatus.COMPLETED));
+    }
+
+    @Test
+    void transfer_setsStatusCompleted() {
+        Wallet toWallet = new Wallet();
+        toWallet.setId(UUID.randomUUID());
+        toWallet.setBalance(BigDecimal.ZERO);
+        toWallet.setWalletCode("ToCode000001");
+        given(walletRepository.findByWalletCode("ToCode000001")).willReturn(Optional.of(toWallet));
+        given(transactionRepository.save(any())).willAnswer(inv -> inv.getArgument(0));
+
+        walletService.transfer(memberId, "ToCode000001", new BigDecimal("100.00"));
+
+        then(transactionRepository).should().save(argThat(tx ->
+                tx.getStatus() == TransactionStatus.COMPLETED));
+    }
+
+    // ── initiateDeposit ──────────────────────────────────────────
+
+    @Test
+    void initiateDeposit_valid_createsPendingTx() {
+        Transaction saved = new Transaction();
+        saved.setId(UUID.randomUUID());
+        given(transactionRepository.save(any())).willReturn(saved);
+
+        UUID txId = walletService.initiateDeposit(memberId, new BigDecimal("500.00"));
+
+        assertThat(txId).isEqualTo(saved.getId());
+        assertThat(wallet.getBalance()).isEqualByComparingTo("1000.00"); // balance unchanged
+        then(transactionRepository).should().save(argThat(tx ->
+                tx.getStatus() == TransactionStatus.PENDING
+                && tx.getType() == TransactionType.DEPOSIT
+                && tx.getAmount().compareTo(new BigDecimal("500.00")) == 0));
+    }
+
+    @Test
+    void initiateDeposit_zero_throws() {
+        assertThatThrownBy(() -> walletService.initiateDeposit(memberId, BigDecimal.ZERO))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("error.amount.positive");
+    }
+
+    // ── completeDeposit ──────────────────────────────────────────
+
+    @Test
+    void completeDeposit_pending_addsBalanceAndCompletes() {
+        UUID txId = UUID.randomUUID();
+        Transaction tx = new Transaction();
+        tx.setId(txId);
+        tx.setToWalletId(wallet.getId());
+        tx.setAmount(new BigDecimal("200.00"));
+        tx.setStatus(TransactionStatus.PENDING);
+        given(transactionRepository.findById(txId)).willReturn(Optional.of(tx));
+        given(walletRepository.findById(wallet.getId())).willReturn(Optional.of(wallet));
+
+        walletService.completeDeposit(txId);
+
+        assertThat(wallet.getBalance()).isEqualByComparingTo("1200.00");
+        assertThat(tx.getStatus()).isEqualTo(TransactionStatus.COMPLETED);
+    }
+
+    @Test
+    void completeDeposit_nonPending_doesNothing() {
+        UUID txId = UUID.randomUUID();
+        Transaction tx = new Transaction();
+        tx.setId(txId);
+        tx.setStatus(TransactionStatus.COMPLETED);
+        given(transactionRepository.findById(txId)).willReturn(Optional.of(tx));
+
+        walletService.completeDeposit(txId);
+
+        assertThat(wallet.getBalance()).isEqualByComparingTo("1000.00");
+        then(walletRepository).should(never()).save(any());
+    }
+
+    // ── failDeposit ──────────────────────────────────────────────
+
+    @Test
+    void failDeposit_pending_setsFailed_noRefund() {
+        UUID txId = UUID.randomUUID();
+        Transaction tx = new Transaction();
+        tx.setId(txId);
+        tx.setAmount(new BigDecimal("300.00"));
+        tx.setStatus(TransactionStatus.PENDING);
+        given(transactionRepository.findById(txId)).willReturn(Optional.of(tx));
+
+        walletService.failDeposit(txId);
+
+        assertThat(tx.getStatus()).isEqualTo(TransactionStatus.FAILED);
+        assertThat(wallet.getBalance()).isEqualByComparingTo("1000.00"); // no refund — balance was never added
+        then(walletRepository).should(never()).save(any());
+    }
+
+    // ── initiateWithdrawal ───────────────────────────────────────
+
+    @Test
+    void initiateWithdrawal_valid_createsRequestCompletedTx() {
+        Transaction saved = new Transaction();
+        saved.setId(UUID.randomUUID());
+        given(transactionRepository.save(any())).willReturn(saved);
+
+        walletService.initiateWithdrawal(memberId, new BigDecimal("400.00"), "012", "1234567890");
+
+        assertThat(wallet.getBalance()).isEqualByComparingTo("600.00");
+        then(transactionRepository).should().save(argThat(tx ->
+                tx.getStatus() == TransactionStatus.REQUEST_COMPLETED
+                && tx.getType() == TransactionType.WITHDRAW));
     }
 }

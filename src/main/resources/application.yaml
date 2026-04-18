@@ -60,6 +60,10 @@ management:
 app:
   upload:
     dir: uploads
+  base-url: "http://localhost:8080"
+
+mock-bank:
+  url: "http://localhost:8081"
 
 stripe:
   secret-key: ${STRIPE_SECRET_KEY}
@@ -71,8 +75,7 @@ sbpayment:
   service-id: "001"
   hash-key: "398a58952baf329cac5efbae97ea84ba17028d02"
   gateway-url: "https://stbfep.sps-system.com/Extra/BuyRequestAction.do"
-  # Override with ngrok URL (e.g. https://xxxx.ngrok-free.app) for real SBPS test callbacks
-  base-url: "https://caregiver-gracious-overfill.ngrok-free.dev"
+  base-url: "https://siltier-davon-untough.ngrok-free.dev"
 
 springdoc:
   swagger-ui:
