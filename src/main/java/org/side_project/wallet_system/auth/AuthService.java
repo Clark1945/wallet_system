@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.side_project.wallet_system.wallet.Wallet;
 import org.side_project.wallet_system.wallet.WalletRepository;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -21,6 +22,12 @@ public class AuthService {
     private final MemberRepository memberRepository;
     private final WalletRepository walletRepository;
     private final PasswordEncoder passwordEncoder;
+    private final OtpService otpService;
+    private final EmailService emailService;
+    private final PasswordResetService passwordResetService;
+
+    @Value("${app.base-url}")
+    private String appBaseUrl;
 
     @Transactional
     public Member initiateRegistration(String name, int age, String email, String password) {
@@ -45,6 +52,41 @@ public class AuthService {
         member = memberRepository.save(member);
         log.info("PENDING member created: id={}, email={}", member.getId(), email);
         return member;
+    }
+
+    public void sendRegistrationOtp(UUID memberId, String email) {
+        String otp = otpService.generateAndStore(memberId, OtpType.REGISTER);
+        emailService.sendRegistrationOtp(email, otp);
+    }
+
+    public void verifyAndActivate(UUID memberId, String code) {
+        if (!otpService.verify(memberId, OtpType.REGISTER, code)) {
+            throw new IllegalArgumentException("error.otp.invalid");
+        }
+        activateRegistration(memberId);
+    }
+
+    public void sendLoginOtp(UUID memberId, String email) {
+        String otp = otpService.generateAndStore(memberId, OtpType.LOGIN);
+        emailService.sendLoginOtp(email, otp);
+    }
+
+    public void verifyLoginOtpCode(UUID memberId, String code) {
+        if (!otpService.verify(memberId, OtpType.LOGIN, code)) {
+            throw new IllegalArgumentException("error.otp.invalid");
+        }
+    }
+
+    public void initiatePasswordReset(String email) {
+        findByEmail(email).ifPresent(member -> {
+            if (member.getStatus() == MemberStatus.ACTIVE
+                    && member.getAuthProvider() == AuthProvider.LOCAL) {
+                String token    = passwordResetService.generateToken(member.getId());
+                String resetUrl = appBaseUrl + "/reset-password?mid=" + member.getId() + "&token=" + token;
+                emailService.sendPasswordResetLink(email, resetUrl);
+                log.info("Password reset link sent: memberId={}", member.getId());
+            }
+        });
     }
 
     @Transactional
@@ -111,12 +153,6 @@ public class AuthService {
             log.info("Google member created: id={}, email={}", member.getId(), email);
             return member;
         });
-    }
-
-    // Kept for backward compatibility
-    @Transactional
-    public Member register(String name, int age, String email, String password) {
-        return initiateRegistration(name, age, email, password);
     }
 
     private void createWalletFor(Member member) {

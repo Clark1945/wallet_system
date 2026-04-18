@@ -10,7 +10,6 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.side_project.wallet_system.config.SecurityConfig;
 import org.side_project.wallet_system.config.SessionConstants;
 
-import java.util.Optional;
 import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.*;
@@ -19,14 +18,12 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@WebMvcTest(AuthController.class)
-@Import(SecurityConfig.class)
+@WebMvcTest({AuthController.class, AuthPageController.class})
+@Import({SecurityConfig.class, AuthFlowService.class})
 class AuthControllerIT {
 
     @Autowired MockMvc mockMvc;
     @MockitoBean AuthService authService;
-    @MockitoBean OtpService otpService;
-    @MockitoBean EmailService emailService;
     @MockitoBean PasswordResetService passwordResetService;
     @MockitoBean MemberRepository memberRepository;
     @MockitoBean CustomOAuth2UserService oauth2UserService;
@@ -63,7 +60,6 @@ class AuthControllerIT {
         Member member = new Member();
         member.setId(UUID.randomUUID());
         given(authService.initiateRegistration(any(), anyInt(), any(), any())).willReturn(member);
-        given(otpService.generateAndStore(any(), eq(OtpType.REGISTER))).willReturn("123456");
 
         mockMvc.perform(post("/register").with(csrf())
                         .param("name", "Bob")
@@ -115,7 +111,7 @@ class AuthControllerIT {
         UUID memberId = UUID.randomUUID();
         MockHttpSession session = new MockHttpSession();
         session.setAttribute(SessionConstants.OTP_MEMBER_ID, memberId.toString());
-        given(otpService.verify(eq(memberId), eq(OtpType.REGISTER), eq("123456"))).willReturn(true);
+        // verifyAndActivate is void — default mock does nothing (success path)
 
         mockMvc.perform(post("/register/otp").with(csrf()).session(session)
                         .param("code", "123456"))
@@ -129,7 +125,8 @@ class AuthControllerIT {
         UUID memberId = UUID.randomUUID();
         MockHttpSession session = new MockHttpSession();
         session.setAttribute(SessionConstants.OTP_MEMBER_ID, memberId.toString());
-        given(otpService.verify(any(), eq(OtpType.REGISTER), any())).willReturn(false);
+        willThrow(new IllegalArgumentException("error.otp.invalid"))
+                .given(authService).verifyAndActivate(any(), any());
 
         mockMvc.perform(post("/register/otp").with(csrf()).session(session)
                         .param("code", "000000"))
@@ -165,7 +162,7 @@ class AuthControllerIT {
         session.setAttribute(SessionConstants.PENDING_OTP, true);
         session.setAttribute(SessionConstants.MEMBER_ID, memberId.toString());
         session.setAttribute(SessionConstants.OTP_EMAIL, "user@test.com");
-        given(otpService.verify(eq(memberId), eq(OtpType.LOGIN), eq("654321"))).willReturn(true);
+        // verifyLoginOtpCode is void — default mock does nothing (success path)
 
         mockMvc.perform(post("/login/otp").with(csrf()).session(session)
                         .param("code", "654321"))
@@ -184,7 +181,7 @@ class AuthControllerIT {
 
     @Test
     void sendPasswordReset_always_showsGenericConfirm() throws Exception {
-        given(authService.findByEmail(any())).willReturn(Optional.empty());
+        // initiatePasswordReset is void — default mock does nothing
 
         mockMvc.perform(post("/forgot-password").with(csrf())
                         .param("email", "nobody@test.com"))
