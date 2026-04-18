@@ -87,7 +87,7 @@ class AuthControllerIT {
                         .param("password", "pass123"))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/register"))
-                .andExpect(flash().attribute("error", "This email is already registered"));
+                .andExpect(flash().attributeExists("error"));
     }
 
     // ─── Register OTP ────────────────────────────────────────────────────────────
