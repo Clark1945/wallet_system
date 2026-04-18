@@ -57,6 +57,21 @@ public class SecurityConfig {
         return http.build();
     }
 
+    /**
+     * Dedicated filter chain for mock bank withdrawal webhook.
+     * Called server-to-server by the mock bank — no session cookie present.
+     */
+    @Bean
+    @Order(3)
+    public SecurityFilterChain withdrawWebhookFilterChain(HttpSecurity http) throws Exception {
+        http
+            .securityMatcher("/withdraw/webhook")
+            .csrf(AbstractHttpConfigurer::disable)
+            .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+            .authorizeHttpRequests(a -> a.anyRequest().permitAll());
+        return http.build();
+    }
+
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http,
                                            CustomOAuth2UserService oauth2UserService,

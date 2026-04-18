@@ -27,8 +27,7 @@ public class StripePaymentService {
     private final String webhookSecret;
 
     /**
-     * In-memory idempotency guard — prevents double-crediting if Stripe
-     * retries the webhook or the browser hits /complete more than once.
+     * In-memory idempotency guard — prevents double-crediting if Stripe retries the webhook.
      * Acceptable for test/side-project; replace with DB flag in production.
      */
     private final Set<String> processedIntents =
@@ -44,19 +43,17 @@ public class StripePaymentService {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    // Create PaymentIntent
+    // Create PaymentIntent — also creates a PENDING deposit transaction
     // ─────────────────────────────────────────────────────────────────────────
 
-    /**
-     * Creates a Stripe PaymentIntent and returns its client_secret for
-     * use by Stripe.js on the checkout page.
-     * JPY has no sub-unit — Stripe expects the integer yen amount directly.
-     */
     public String createPaymentIntent(UUID memberId, BigDecimal amount) throws Exception {
+        UUID transactionId = walletService.initiateDeposit(memberId, amount);
+
         PaymentIntentCreateParams params = PaymentIntentCreateParams.builder()
                 .setAmount(amount.longValue())
                 .setCurrency("jpy")
                 .putMetadata("memberId", memberId.toString())
+                .putMetadata("transactionId", transactionId.toString())
                 .setPaymentMethodOptions(
                         PaymentIntentCreateParams.PaymentMethodOptions.builder()
                                 .setCard(
@@ -69,21 +66,15 @@ public class StripePaymentService {
                 .build();
 
         PaymentIntent intent = stripeClient.paymentIntents().create(params);
-        log.info("Stripe PaymentIntent created: id={}, memberId={}, amount={}",
-                 intent.getId(), memberId, amount);
+        log.info("Stripe PaymentIntent created: id={}, memberId={}, transactionId={}, amount={}",
+                 intent.getId(), memberId, transactionId, amount);
         return intent.getClientSecret();
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    // Process webhook event
+    // Process webhook — on success, complete the PENDING deposit transaction
     // ─────────────────────────────────────────────────────────────────────────
 
-    /**
-     * Verifies the Stripe-Signature header, then — for
-     * payment_intent.succeeded events — credits the member's wallet.
-     * Returns true if the event was handled successfully (caller should
-     * respond 200), false if Stripe should retry (caller should respond 400).
-     */
     public boolean processWebhookEvent(String payload, String sigHeader) {
         Event event;
         try {
@@ -94,7 +85,6 @@ public class StripePaymentService {
         }
 
         if (!"payment_intent.succeeded".equals(event.getType())) {
-            // Acknowledge non-payment events without processing
             log.debug("Stripe webhook: ignoring event type={}", event.getType());
             return true;
         }
@@ -111,24 +101,22 @@ public class StripePaymentService {
             return true;
         }
 
-        String memberIdStr = intent.getMetadata().get("memberId");
-        if (memberIdStr == null || memberIdStr.isBlank()) {
-            log.error("Stripe webhook: missing memberId metadata for intentId={}", intentId);
+        String transactionIdStr = intent.getMetadata().get("transactionId");
+        if (transactionIdStr == null || transactionIdStr.isBlank()) {
+            log.error("Stripe webhook: missing transactionId metadata for intentId={}", intentId);
+            processedIntents.remove(intentId);
             return false;
         }
 
-        // JPY: Stripe amount is already in yen, no conversion needed
-        BigDecimal amount = BigDecimal.valueOf(intent.getAmount());
-
         try {
-            UUID memberId = UUID.fromString(memberIdStr);
-            walletService.deposit(memberId, amount);
-            log.info("Stripe deposit completed: intentId={}, memberId={}, amount={}",
-                     intentId, memberId, amount);
+            UUID transactionId = UUID.fromString(transactionIdStr);
+            walletService.completeDeposit(transactionId);
+            log.info("Stripe deposit completed: intentId={}, transactionId={}", intentId, transactionId);
             return true;
         } catch (Exception e) {
-            log.error("Stripe deposit failed: intentId={}, error={}", intentId, e.getMessage(), e);
-            processedIntents.remove(intentId); // allow retry
+            log.error("Stripe deposit failed: intentId={}, transactionId={}, error={}",
+                      intentId, transactionIdStr, e.getMessage(), e);
+            processedIntents.remove(intentId);
             return false;
         }
     }

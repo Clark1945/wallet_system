@@ -30,11 +30,16 @@ No separate lint step; the compiler plugin handles annotation processing via Lom
 
 ### Required Environment Variables
 
-Google OAuth2 login requires these at runtime (tests do not need them):
+These are required at runtime (tests do not need them):
 ```
 GOOGLE_CLIENT_ID=...
 GOOGLE_CLIENT_SECRET=...
+STRIPE_SECRET_KEY=...
+STRIPE_PUBLISHABLE_KEY=...
+STRIPE_WEBHOOK_SECRET=...
 ```
+
+SBPS credentials are hardcoded in `application.yaml` (test sandbox values — do not use in production).
 
 ## Architecture Overview
 
@@ -43,10 +48,10 @@ GOOGLE_CLIENT_SECRET=...
 **Base package:** `org.side_project.wallet_system`
 
 **Module layout** under `src/main/java/.../wallet_system/`:
-- `auth/` — `AuthController`, `AuthService`, `Member` (JPA entity), `MemberRepository`, `AuthProvider` (enum), `CustomUserDetails`, `CustomOAuth2User`, `CustomOAuth2UserService`, `LoginSuccessHandler`, `ResponseDto`
+- `auth/` — `AuthController`, `AuthService`, `Member` (JPA entity), `MemberRepository`, `AuthProvider` (enum), `CustomUserDetails`, `CustomOAuth2User`, `CustomOAuth2UserService`, `LoginSuccessHandler`, `ResponseDto`, `ProfileController`, `ProfileService` (avatar upload + profile field updates)
 - `wallet/` — `WalletController`, `WalletService`, `Wallet` (JPA entity), `WalletRepository`
-- `payment/` — `Transaction` (JPA entity), `TransactionRepository`, `TransactionType` (enum), `TransactionSpec` (JPA Criteria filtering)
-- `profile/` — `ProfileController`, `ProfileService` (avatar upload + profile field updates)
+- `transaction/` — `Transaction` (JPA entity), `TransactionRepository`, `TransactionType` (enum), `TransactionSpec` (JPA Criteria filtering)
+- `payment/` — `StripePaymentController`, `StripePaymentService`, `SBPaymentController`, `SBPaymentService`, `SBPaymentRequest`
 - `config/` — `SecurityConfig`, `WebConfig` (`AcceptHeaderLocaleResolver` + `/uploads/**` resource handler), `TraceIdFilter`
 
 This is a **server-rendered MVC app**, not a REST API. All controllers are `@Controller` (not `@RestController`) and return Thymeleaf view names. Flash attributes carry success/error messages between redirects.
@@ -76,9 +81,22 @@ Public URLs (login, register, OpenAPI, actuator) are permitted in `SecurityConfi
 - `Transaction` records every operation, with nullable `fromWalletId`/`toWalletId` depending on `TransactionType` (DEPOSIT / WITHDRAW / TRANSFER).
 - Transaction history supports filtering by `TransactionType` and date range via `TransactionSpec` (JPA Criteria API), plus server-side pagination.
 
+### Payment Gateway Integrations
+
+Two external payment gateways integrate with `WalletService.deposit()` for wallet top-ups:
+
+**Stripe** (`payment/StripePaymentService`, `payment/StripePaymentController`):
+- Creates a PaymentIntent (JPY, no sub-unit conversion). Returns `clientSecret` to `stripe-checkout.html` for Stripe.js with automatic 3DS.
+- Webhook at `/payment/stripe/webhook` verifies `Stripe-Signature` then calls `deposit()` on `payment_intent.succeeded`. Uses in-memory `processedIntents` set to guard against duplicate webhook delivery.
+
+**SBPS / SoftBank Payment Service** (`payment/SBPaymentService`, `payment/SBPaymentController`):
+- Link-type integration: builds an `SBPaymentRequest` with a SHA-1 hashcode (all fields concatenated + `hashKey`), posts a form to SBPS gateway (`sb-payment.html`). `request_date` must be in JST.
+- Result CGI callback at `/payment/sbpayment/result` verifies `res_result=OK`, looks up the in-memory `pendingOrders` map by `order_id`, then calls `deposit()`.
+- Both gateways use in-memory idempotency state (acceptable for this test/side-project environment).
+
 ### Profile & File Uploads
 
-- `ProfileService.updateProfile()` handles name, nickname, phone, bio, birthday.
+- `ProfileService.updateProfile()` handles name, nickname, phone, bio, birthday (in `auth/` package).
 - `ProfileService.updateAvatar()` accepts JPEG/PNG/GIF/WEBP (max 2 MB); validates via MIME `contentType` (not file extension); stores files at `uploads/avatars/{memberId}.{ext}` (overwrites on extension change).
 - Upload directory configured via `app.upload.dir` property (defaults to `uploads/` relative path); multipart limits set to 10 MB in `application.yaml`.
 - `WebConfig` registers a `/uploads/**` resource handler serving from `file:{uploadDir}` so stored files are accessible as static resources.
@@ -115,7 +133,7 @@ Spec-first approach: `src/main/resources/static/openapi.yaml` is the source of t
 
 ### Thymeleaf Templates
 
-Templates live in `src/main/resources/templates/`. All use inline CSS, support Thymeleaf expressions (`th:text`, `th:href`, `@{}`, `#{}`), include CSRF tokens on POST forms, and display flash attributes for success/error feedback. Key templates: `login.html`, `register.html`, `dashboard.html` (transaction history with filter form and pagination), `deposit.html`, `withdraw.html`, `transfer.html`, `profile.html` (profile fields + avatar upload).
+Templates live in `src/main/resources/templates/`. All use inline CSS, support Thymeleaf expressions (`th:text`, `th:href`, `@{}`, `#{}`), include CSRF tokens on POST forms, and display flash attributes for success/error feedback. Key templates: `login.html`, `register.html`, `dashboard.html` (transaction history with filter form and pagination), `deposit.html`, `withdraw.html`, `transfer.html`, `profile.html` (profile fields + avatar upload), `stripe-checkout.html` (Stripe.js payment form), `sb-payment.html` (auto-submitting form to SBPS gateway).
 
 ### Test Conventions
 

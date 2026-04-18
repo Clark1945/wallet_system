@@ -89,14 +89,17 @@ public class WalletController {
 
     @PostMapping("/withdraw")
     public String withdraw(@RequestParam BigDecimal amount,
+                           @RequestParam String bankCode,
+                           @RequestParam String bankAccount,
+                           @RequestParam String notifyEmail,
                            HttpSession session,
                            RedirectAttributes redirectAttributes,
                            Locale locale) {
         try {
             UUID memberId = UUID.fromString((String) session.getAttribute("memberId"));
-            walletService.withdraw(memberId, amount);
+            walletService.initiateWithdrawal(memberId, amount, bankCode, bankAccount);
             redirectAttributes.addFlashAttribute("success",
-                    messageSource.getMessage("flash.withdraw.success", null, locale));
+                    messageSource.getMessage("flash.withdraw.pending", null, locale));
         } catch (Exception e) {
             redirectAttributes.addFlashAttribute("error",
                     messageSource.getMessage(e.getMessage(), null, e.getMessage(), locale));

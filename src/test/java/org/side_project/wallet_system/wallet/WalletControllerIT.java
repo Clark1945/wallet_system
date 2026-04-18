@@ -154,24 +154,32 @@ class WalletControllerIT {
     // ── withdraw ──────────────────────────────────────────────
 
     @Test
-    void withdraw_validAmount_redirectsToDashboardWithSuccess() throws Exception {
+    void withdraw_validAmount_redirectsToDashboardWithPending() throws Exception {
         mockMvc.perform(post("/withdraw").with(csrf()).with(user("test@example.com"))
                         .param("amount", "100.00")
+                        .param("bankCode", "012")
+                        .param("bankAccount", "1234567890")
+                        .param("notifyEmail", "test@example.com")
                         .session(session))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/dashboard"))
-                .andExpect(flash().attribute("success", "Withdrawal successful"));
+                .andExpect(flash().attribute("success",
+                        "Withdrawal submitted. Funds will be transferred within a few seconds."));
 
-        then(walletService).should().withdraw(eq(memberId), eq(new BigDecimal("100.00")));
+        then(walletService).should().initiateWithdrawal(
+                eq(memberId), eq(new BigDecimal("100.00")), eq("012"), eq("1234567890"));
     }
 
     @Test
     void withdraw_insufficientBalance_redirectsWithError() throws Exception {
         willThrow(new IllegalArgumentException("error.insufficient.balance"))
-                .given(walletService).withdraw(any(), any());
+                .given(walletService).initiateWithdrawal(any(), any(), any(), any());
 
         mockMvc.perform(post("/withdraw").with(csrf()).with(user("test@example.com"))
                         .param("amount", "99999.00")
+                        .param("bankCode", "012")
+                        .param("bankAccount", "1234567890")
+                        .param("notifyEmail", "test@example.com")
                         .session(session))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/dashboard"))

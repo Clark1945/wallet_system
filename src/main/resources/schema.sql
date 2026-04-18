@@ -44,3 +44,11 @@ ALTER TABLE members ADD COLUMN IF NOT EXISTS phone       VARCHAR(20);
 ALTER TABLE members ADD COLUMN IF NOT EXISTS bio         VARCHAR(255);
 ALTER TABLE members ADD COLUMN IF NOT EXISTS birthday    DATE;
 ALTER TABLE members ADD COLUMN IF NOT EXISTS avatar_path VARCHAR(255);
+
+-- Withdrawal status migration
+ALTER TABLE transactions ADD COLUMN IF NOT EXISTS status VARCHAR(20);
+
+-- Backfill: all existing transactions without status are treated as COMPLETED
+UPDATE transactions
+SET    status = 'COMPLETED'
+WHERE  status IS NULL;

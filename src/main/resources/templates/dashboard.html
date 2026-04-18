@@ -57,6 +57,11 @@
         .type-DEPOSIT  { background: #dcfce7; color: #15803d; }
         .type-WITHDRAW { background: #fee2e2; color: #b91c1c; }
         .type-TRANSFER { background: #dbeafe; color: #1d4ed8; }
+        .status-badge { padding: .2rem .55rem; border-radius: 999px; font-size: .75rem; font-weight: 600; }
+        .status-PENDING            { background: #fef9c3; color: #a16207; }
+        .status-REQUEST_COMPLETED  { background: #dbeafe; color: #1d4ed8; }
+        .status-COMPLETED          { background: #dcfce7; color: #15803d; }
+        .status-FAILED             { background: #fee2e2; color: #b91c1c; }
         .empty { text-align: center; color: #aaa; padding: 1.5rem; }
 
         /* ── Filter form ── */
@@ -187,7 +192,17 @@
 
     <!-- Transaction history -->
     <div class="table-card">
-        <h3 th:text="#{dashboard.history.title}">Transaction History</h3>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
+            <h3 style="margin-bottom:0" th:text="#{dashboard.history.title}">Transaction History</h3>
+            <button onclick="location.reload()"
+                    style="display:inline-flex; align-items:center; gap:.35rem; padding:.38rem .75rem;
+                           background:#fff; border:1px solid #d1d5db; border-radius:4px;
+                           font-size:.82rem; color:#555; cursor:pointer;"
+                    onmouseover="this.style.background='#f3f4f6'" onmouseout="this.style.background='#fff'"
+                    th:title="#{dashboard.history.refresh}">
+                &#8635; <span th:text="#{dashboard.history.refresh}">Refresh</span>
+            </button>
+        </div>
 
         <!-- Filter form -->
         <form method="get" th:action="@{/dashboard}" class="filter-form">
@@ -217,6 +232,7 @@
                 <th th:text="#{dashboard.history.time}">Time</th>
                 <th th:text="#{dashboard.history.type}">Type</th>
                 <th th:text="#{dashboard.history.desc}">Description</th>
+                <th th:text="#{dashboard.history.status}">Status</th>
                 <th style="text-align:right" th:text="#{dashboard.history.amount}">Amount</th>
             </tr>
             </thead>
@@ -230,6 +246,14 @@
                     </span>
                 </td>
                 <td th:text="${tx.description}"></td>
+                <td>
+                    <span th:if="${tx.status != null}"
+                          class="status-badge"
+                          th:classappend="'status-' + ${tx.status}"
+                          th:text="#{transaction.status.__${tx.status}__}">
+                    </span>
+                    <span th:if="${tx.status == null}" style="color:#bbb;">—</span>
+                </td>
                 <td style="text-align:right" th:text="'$ ' + ${#numbers.formatDecimal(tx.amount, 1, 2)}"></td>
             </tr>
             </tbody>

@@ -33,6 +33,10 @@ public class Transaction {
 
     private String description;
 
+    @Enumerated(EnumType.STRING)
+    @Column(length = 20)
+    private TransactionStatus status;
+
     @Column(nullable = false)
     private LocalDateTime createdAt;
 

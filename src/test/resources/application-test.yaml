@@ -23,3 +23,9 @@ stripe:
   secret-key: sk_test_dummy
   publishable-key: pk_test_dummy
   webhook-secret: whsec_dummy
+
+app:
+  base-url: "http://localhost:8080"
+
+mock-bank:
+  url: "http://localhost:8081"
