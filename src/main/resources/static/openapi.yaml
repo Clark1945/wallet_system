@@ -3,52 +3,79 @@ openapi: 3.0.3
 info:
   title: Wallet System API
   description: |
-    個人電子錢包系統。
+    Personal e-wallet system.
 
-    ## 認證方式
-    本系統採用 **Session-based** 認證。透過 `POST /login` 取得 session cookie (`JSESSIONID`)，
-    後續受保護的端點需在 request header 中帶上此 cookie。
+    ## Authentication
+    This system uses **Session-based** authentication. Obtain a session cookie (`JSESSIONID`)
+    via `POST /login/otp` (after OTP verification), then include the cookie in all subsequent
+    requests to protected endpoints.
 
-    ## 錢包代碼
-    每位會員在註冊時會自動產生一組 **12 碼英數字錢包代碼**（大小寫混合），
-    用於識別收款方身份（取代 Email），可在儀表板頁面複製分享。
-  version: 1.1.0
+    ## Wallet Code
+    Each member automatically receives a **12-character alphanumeric wallet code** (mixed case)
+    after completing Email OTP verification during registration. This code is used to identify
+    the payee in peer-to-peer transfers (instead of Email) and can be copied from the dashboard.
+  version: 1.2.0
 
 servers:
   - url: http://localhost:8080
-    description: 本地開發環境
+    description: Local development
 
 tags:
   - name: Auth
-    description: 會員認證 — 註冊、登入、登出
+    description: Authentication — registration, login, OTP verification, password reset
   - name: Profile
-    description: 個人資料 — 查看與更新個人資訊、頭像上傳
+    description: Profile — view and update personal info, avatar upload
   - name: Wallet
-    description: 錢包操作 — 儀表板、儲值、提款、轉帳（需登入）
+    description: Wallet operations — dashboard, deposit, withdraw, transfer (login required)
+  - name: Payment
+    description: Payment gateways — Stripe, SoftBank Payment, withdrawal webhook
 
-# 預設所有受保護端點需要 session cookie
+# All protected endpoints require session cookie by default
 security:
   - cookieAuth: []
 
 paths:
+
+  # ── Root ──────────────────────────────────────────────────
+
+  /:
+    get:
+      tags: [Wallet]
+      summary: Root redirect
+      description: Redirects to the dashboard.
+      responses:
+        '302':
+          description: → `/dashboard` (unauthenticated → `/login`)
 
   # ── Auth ──────────────────────────────────────────────────
 
   /login:
     get:
       tags: [Auth]
-      summary: 顯示登入頁面
+      summary: Show login page
       security: []
+      parameters:
+        - name: error
+          in: query
+          schema:
+            type: string
+          description: When present, displays "Invalid email or password" message
+        - name: locked
+          in: query
+          schema:
+            type: string
+          description: When present, displays "Account locked" message
       responses:
         '200':
-          description: 登入頁面 HTML
+          description: Login page HTML
 
     post:
       tags: [Auth]
-      summary: 會員登入
+      summary: Member login
       description: |
-        驗證 Email / 密碼，成功後建立 session 並回傳 `Set-Cookie: JSESSIONID`。
-        失敗則導回 `/login` 並附帶 flash error 訊息。
+        Validates email / password. On success, sends a login OTP and redirects to `/login/otp`.
+        On failure, redirects to `/login?error`.
+        After 5 consecutive failures the account is locked for 15 minutes and redirects to `/login?locked`.
       security: []
       requestBody:
         required: true
@@ -68,30 +95,100 @@ paths:
                   example: password123
       responses:
         '302':
-          description: 成功 → `/dashboard`；失敗 → `/login`
+          description: Success → `/login/otp`; failure → `/login?error`; locked → `/login?locked`
+
+  /login/otp:
+    get:
+      tags: [Auth]
+      summary: Show login OTP page
+      security: []
+      parameters:
+        - name: token
+          in: query
+          required: false
+          schema:
+            type: string
+          description: OTP session token (from the post-login redirect)
+      responses:
+        '200':
+          description: OTP input page HTML
+        '302':
+          description: Invalid or expired token → `/login`
+
+    post:
+      tags: [Auth]
+      summary: Verify login OTP
+      description: |
+        Verifies the 6-digit OTP entered by the user. On success, creates a login session
+        and redirects to `/dashboard`. After 5 failed attempts the OTP is invalidated and
+        the user must log in again.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [token, code]
+              properties:
+                token:
+                  type: string
+                  description: OTP session token
+                code:
+                  type: string
+                  minLength: 6
+                  maxLength: 6
+                  example: '123456'
+                  description: 6-digit OTP
+      responses:
+        '302':
+          description: Success → `/dashboard` (sets JSESSIONID); failure → `/login/otp?token=...`
           headers:
             Set-Cookie:
-              description: JSESSIONID（成功登入時設定）
+              description: JSESSIONID (set after successful OTP verification)
               schema:
                 type: string
                 example: JSESSIONID=abc123; Path=/; HttpOnly
 
+  /login/otp/resend:
+    post:
+      tags: [Auth]
+      summary: Resend login OTP
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [token]
+              properties:
+                token:
+                  type: string
+                  description: OTP session token
+      responses:
+        '302':
+          description: → `/login/otp?token=...` (with success or error flash message)
+
   /register:
     get:
       tags: [Auth]
-      summary: 顯示註冊頁面
+      summary: Show registration page
       security: []
       responses:
         '200':
-          description: 註冊頁面 HTML
+          description: Registration page HTML
 
     post:
       tags: [Auth]
-      summary: 會員註冊
+      summary: Initiate registration
       description: |
-        建立新帳號，密碼以 BCrypt 加密存儲。
-        成功後自動產生錢包與 12 碼錢包代碼，並導向登入頁。
-        Email 重複時導回 `/register` 並附帶 flash error。
+        Creates a pending account with BCrypt-hashed password and sends an Email OTP.
+        On success, redirects to `/register/otp` for Email verification.
+        On duplicate email, redirects back to `/register` with a flash error.
+
+        > **Note:** The wallet and 12-character wallet code are created **after OTP verification**
+        > (`/register/otp`), not at this step.
       security: []
       requestBody:
         required: true
@@ -103,12 +200,7 @@ paths:
               properties:
                 name:
                   type: string
-                  example: 王小明
-                age:
-                  type: integer
-                  minimum: 0
-                  example: 25
-                  description: 選填，預設 0
+                  example: Alice Wang
                 email:
                   type: string
                   format: email
@@ -120,36 +212,197 @@ paths:
                   example: password123
       responses:
         '302':
-          description: 成功 → `/login`；Email 重複 → `/register`
+          description: Success → `/register/otp`; duplicate email → `/register`
+
+  /register/otp:
+    get:
+      tags: [Auth]
+      summary: Show registration OTP page
+      security: []
+      parameters:
+        - name: token
+          in: query
+          required: false
+          schema:
+            type: string
+          description: OTP session token (from the post-registration redirect)
+      responses:
+        '200':
+          description: OTP input page HTML
+        '302':
+          description: Invalid or expired token → `/register`
+
+    post:
+      tags: [Auth]
+      summary: Verify registration OTP and activate account
+      description: |
+        Verifies the OTP, activates the account, and automatically creates the wallet
+        with a 12-character wallet code. On success, redirects to `/login`.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [token, code]
+              properties:
+                token:
+                  type: string
+                  description: OTP session token
+                code:
+                  type: string
+                  minLength: 6
+                  maxLength: 6
+                  example: '654321'
+                  description: 6-digit OTP
+      responses:
+        '302':
+          description: Success → `/login`; failure → `/register/otp?token=...`
+
+  /register/otp/resend:
+    post:
+      tags: [Auth]
+      summary: Resend registration OTP
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [token]
+              properties:
+                token:
+                  type: string
+                  description: OTP session token
+      responses:
+        '302':
+          description: → `/register/otp?token=...` (with success or error flash message)
 
   /logout:
     post:
       tags: [Auth]
-      summary: 登出
-      description: 清除 session，導向 `/login`。
+      summary: Logout
+      description: Invalidates the session, deletes the JSESSIONID cookie, and redirects to `/login`.
       responses:
         '302':
           description: → `/login`
+
+  /forgot-password:
+    get:
+      tags: [Auth]
+      summary: Show forgot password page
+      security: []
+      responses:
+        '200':
+          description: Forgot password page HTML
+
+    post:
+      tags: [Auth]
+      summary: Send password reset email
+      description: |
+        If the email exists and belongs to a local account (not Google OAuth2), sends a reset link.
+        The same success message is shown regardless of whether the email exists (prevents account enumeration).
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: alice@example.com
+      responses:
+        '302':
+          description: → `/forgot-password` (with success flash message)
+
+  /reset-password:
+    get:
+      tags: [Auth]
+      summary: Validate password reset token
+      description: |
+        Validates the token from the reset email link. If valid, stores reset permission in
+        the session and redirects to the reset form. Invalid or expired tokens redirect to `/login`.
+      security: []
+      parameters:
+        - name: mid
+          in: query
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Member UUID
+        - name: token
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Password reset token (URL-safe, stored in session)
+      responses:
+        '302':
+          description: Valid → `/reset-password/form`; invalid → `/login`
+
+    post:
+      tags: [Auth]
+      summary: Execute password reset
+      description: |
+        Updates the account password (BCrypt-hashed), clears the session reset permission,
+        and redirects to `/login`.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [password]
+              properties:
+                password:
+                  type: string
+                  format: password
+                  minLength: 6
+                  example: newPassword123
+      responses:
+        '302':
+          description: Success → `/login`; failure → `/reset-password/form`
+
+  /reset-password/form:
+    get:
+      tags: [Auth]
+      summary: Show password reset form
+      description: Requires prior validation via `GET /reset-password` (session must hold reset permission).
+      security: []
+      responses:
+        '200':
+          description: Password reset form HTML
+        '302':
+          description: Invalid session → `/login`
 
   # ── Profile ───────────────────────────────────────────────
 
   /profile:
     get:
       tags: [Profile]
-      summary: 顯示個人資料頁面
-      description: 顯示目前登入會員的個人資訊（姓名、暱稱、電話、生日、自我介紹、頭像）。
+      summary: Show profile page
+      description: Displays the current member's profile (name, nickname, phone, birthday, bio, avatar).
       responses:
         '200':
-          description: 個人資料頁面 HTML
+          description: Profile page HTML
         '302':
-          description: 未登入 → `/login`
+          description: Unauthenticated → `/login`
 
     post:
       tags: [Profile]
-      summary: 更新個人資料
+      summary: Update profile
       description: |
-        更新登入會員的個人資訊。`name` 為必填，其餘欄位選填。
-        成功後 session 中的 `memberName` 同步更新，導回 `/profile` 附帶 flash 訊息。
+        Updates the current member's personal info. `name` is required; all other fields are optional.
+        On success, the `memberName` session attribute is updated and the user is redirected back
+        to `/profile` with a flash message.
       requestBody:
         required: true
         content:
@@ -160,39 +413,38 @@ paths:
               properties:
                 name:
                   type: string
-                  example: 王小明
+                  example: Alice Wang
                 nickname:
                   type: string
                   maxLength: 100
-                  example: Xiao Ming
-                  description: 暱稱（選填）
+                  example: Alice
+                  description: Display name (optional)
                 phone:
                   type: string
                   maxLength: 20
                   example: '0912345678'
-                  description: 電話號碼（選填）
+                  description: Phone number (optional)
                 bio:
                   type: string
                   maxLength: 255
                   example: Hi, I love coding!
-                  description: 自我介紹（選填）
+                  description: Bio / self-introduction (optional)
                 birthday:
                   type: string
                   format: date
                   example: '1990-05-20'
-                  description: 生日，格式 yyyy-MM-dd（選填）
+                  description: Date of birth, format yyyy-MM-dd (optional)
       responses:
         '302':
-          description: 成功 / 失敗皆導回 `/profile`，結果以 flash 訊息顯示
+          description: Success or failure both redirect to `/profile` with a flash message
 
   /profile/avatar:
     post:
       tags: [Profile]
-      summary: 上傳頭像
+      summary: Upload avatar
       description: |
-        上傳個人頭像圖片。接受格式：`image/jpeg`、`image/png`、`image/gif`、`image/webp`。
-        最大檔案大小：2 MB。
-        上傳成功後舊頭像檔案自動刪除。
+        Uploads a profile avatar. Accepted MIME types: `image/jpeg`, `image/png`, `image/gif`, `image/webp`.
+        Maximum file size: 2 MB. The previous avatar file is deleted on successful upload.
       requestBody:
         required: true
         content:
@@ -204,73 +456,75 @@ paths:
                 avatar:
                   type: string
                   format: binary
-                  description: 圖片檔案（JPG / PNG / GIF / WEBP，最大 2 MB）
+                  description: Image file (JPG / PNG / GIF / WEBP, max 2 MB)
       responses:
         '302':
-          description: 成功 / 失敗皆導回 `/profile`，結果以 flash 訊息顯示
+          description: Success or failure both redirect to `/profile` with a flash message
 
   # ── Wallet ────────────────────────────────────────────────
 
   /dashboard:
     get:
       tags: [Wallet]
-      summary: 儀表板
+      summary: Dashboard
       description: |
-        顯示：
-        - 目前錢包餘額
-        - 12 碼錢包代碼（可複製分享給他人匯款）
-        - 交易紀錄（存款 / 提款 / 轉帳），支援類型篩選、日期範圍篩選與分頁
-        - 儲值 / 提款 / 轉帳操作入口（各自導向專屬頁面）
+        Displays:
+        - Current wallet balance
+        - 12-character wallet code (copyable for receiving transfers)
+        - Transaction history (DEPOSIT / WITHDRAW / TRANSFER) with type filter, date range filter, and pagination
+        - Entry points to deposit, withdraw, and transfer pages
       parameters:
         - name: page
           in: query
           schema:
             type: integer
             default: 0
-          description: 頁碼（從 0 開始）
+          description: Page number (0-based)
         - name: type
           in: query
           schema:
             type: string
             enum: [DEPOSIT, WITHDRAW, TRANSFER]
-          description: 篩選交易類型（選填）
+          description: Filter by transaction type (optional)
         - name: startDate
           in: query
           schema:
             type: string
             format: date
-          description: 篩選起始日期，格式 yyyy-MM-dd（選填）
+          description: Filter start date, format yyyy-MM-dd (optional)
         - name: endDate
           in: query
           schema:
             type: string
             format: date
-          description: 篩選結束日期，格式 yyyy-MM-dd（選填）
+          description: Filter end date, format yyyy-MM-dd (optional)
       responses:
         '200':
-          description: 儀表板頁面 HTML
+          description: Dashboard page HTML
         '302':
-          description: 未登入 → `/login`
+          description: Unauthenticated → `/login`
 
   /deposit:
     get:
       tags: [Wallet]
-      summary: 顯示儲值頁面
-      description: 顯示儲值表單，包含金額輸入與支付方式選擇（Stripe / SB Payment）。
+      summary: Show deposit page
+      description: Displays the deposit form with amount input and payment method selection (Stripe / SB Payment).
       responses:
         '200':
-          description: 儲值頁面 HTML
+          description: Deposit page HTML
         '302':
-          description: 未登入 → `/login`
+          description: Unauthenticated → `/login`
 
     post:
       tags: [Wallet]
-      summary: 儲值
+      summary: Initiate deposit
       description: |
-        將指定金額存入自己的錢包，金額須大於 0。
+        Stores the requested amount in the session and redirects to the corresponding payment gateway page.
 
-        > **注意：** `paymentMethod` 目前為預留參數，金流串接尚未實作，
-        > 實際儲值邏輯與支付方式無關。
+        - `stripe` → `/payment/stripe/checkout` (Stripe.js with 3DS)
+        - `sbpayment` → `/payment/sbpayment/request` (SBPS auto-submit form)
+
+        Actual wallet credit happens after a successful payment gateway webhook callback.
       requestBody:
         required: true
         content:
@@ -283,35 +537,38 @@ paths:
                   type: number
                   minimum: 0.01
                   example: 1000.00
-                  description: 儲值金額（正數）
+                  description: Deposit amount (positive)
                 paymentMethod:
                   type: string
                   enum: [stripe, sbpayment]
                   default: stripe
-                  description: 支付方式（選填，預設 stripe）
+                  description: Payment method (optional, defaults to stripe)
       responses:
         '302':
-          description: 成功 → `/dashboard`；失敗 → `/deposit`，結果以 flash 訊息顯示
+          description: stripe → `/payment/stripe/checkout`; sbpayment → `/payment/sbpayment/request`; failure → `/deposit`
 
   /withdraw:
     get:
       tags: [Wallet]
-      summary: 顯示提款頁面
-      description: 顯示提款表單，包含金額、銀行代碼、銀行帳號、通知 Email 欄位。
+      summary: Show withdraw page
+      description: Displays the withdrawal form with amount, bank code, bank account, and notification email fields.
       responses:
         '200':
-          description: 提款頁面 HTML
+          description: Withdraw page HTML
         '302':
-          description: 未登入 → `/login`
+          description: Unauthenticated → `/login`
 
     post:
       tags: [Wallet]
-      summary: 提款
+      summary: Initiate withdrawal
       description: |
-        從錢包提出指定金額，不可超過目前餘額。
+        Deducts the specified amount from the wallet and creates a PENDING transaction,
+        then asynchronously notifies the mock bank. The final status (COMPLETED / FAILED)
+        is updated via `POST /withdraw/webhook`. On failure, the balance is automatically refunded.
 
-        > **注意：** `bankCode`、`bankAccount`、`notifyEmail` 為前端預留欄位，
-        > 銀行出金與通知功能尚未實作，目前後端僅處理 `amount` 扣款邏輯。
+        > **Note:** `bankCode`, `bankAccount`, and `notifyEmail` are front-end fields.
+        > The current backend only processes the `amount` deduction; bank payout and
+        > notification are handled by the mock-bank service.
       requestBody:
         required: true
         content:
@@ -324,51 +581,51 @@ paths:
                   type: number
                   minimum: 0.01
                   example: 500.00
-                  description: 提款金額（正數，不超過餘額）
+                  description: Withdrawal amount (positive, must not exceed balance)
                 bankCode:
                   type: string
                   minLength: 3
                   maxLength: 7
                   pattern: '^\d{3,7}$'
                   example: '012'
-                  description: 銀行代碼，3〜7 碼數字（前端欄位，後端尚未處理）
+                  description: Bank code, 3–7 digits (front-end field)
                 bankAccount:
                   type: string
                   minLength: 10
                   maxLength: 16
                   pattern: '^\d{10,16}$'
                   example: '0123456789'
-                  description: 銀行帳號，10〜16 碼數字（前端欄位，後端尚未處理）
+                  description: Bank account number, 10–16 digits (front-end field)
                 notifyEmail:
                   type: string
                   format: email
                   example: alice@example.com
-                  description: 通知用 Email（前端欄位，後端尚未處理）
+                  description: Notification email (front-end field)
       responses:
         '302':
-          description: 成功 / 失敗皆導向 `/dashboard`，結果以 flash 訊息顯示
+          description: Success → `/dashboard` (transaction PENDING, awaiting webhook); failure → `/withdraw`
 
   /transfer:
     get:
       tags: [Wallet]
-      summary: 顯示轉帳頁面
-      description: 顯示轉帳表單，包含收款方錢包代碼與金額輸入。
+      summary: Show transfer page
+      description: Displays the transfer form with payee wallet code and amount fields.
       responses:
         '200':
-          description: 轉帳頁面 HTML
+          description: Transfer page HTML
         '302':
-          description: 未登入 → `/login`
+          description: Unauthenticated → `/login`
 
     post:
       tags: [Wallet]
-      summary: 轉帳
+      summary: Transfer funds
       description: |
-        依對方 12 碼錢包代碼轉出金額。
+        Transfers the specified amount to another wallet identified by its 12-character wallet code.
 
-        **限制：**
-        - 不可轉給自己
-        - 金額不可超過目前餘額
-        - 錢包代碼必須存在
+        **Restrictions:**
+        - Cannot transfer to yourself
+        - Amount must not exceed current balance
+        - Wallet code must exist
       requestBody:
         required: true
         content:
@@ -383,15 +640,194 @@ paths:
                   maxLength: 12
                   pattern: '^[A-Za-z0-9]{12}$'
                   example: aB3xZ9qRmK2w
-                  description: 收款方 12 碼錢包代碼（大小寫英數字）
+                  description: Payee's 12-character wallet code (alphanumeric, mixed case)
                 amount:
                   type: number
                   minimum: 0.01
                   example: 200.00
-                  description: 轉帳金額（正數，不超過餘額）
+                  description: Transfer amount (positive, must not exceed balance)
       responses:
         '302':
-          description: 成功 → `/dashboard`；失敗 → `/transfer`，結果以 flash 訊息顯示
+          description: Success → `/dashboard`; failure → `/transfer` with flash message
+
+  # ── Payment — Stripe ──────────────────────────────────────
+
+  /payment/stripe/checkout:
+    get:
+      tags: [Payment]
+      summary: Stripe checkout page
+      description: |
+        Reads the pending amount from the session, calls the Stripe API to create a PaymentIntent,
+        and renders `stripe-checkout.html` with the `clientSecret` for Stripe.js to handle 3DS and payment confirmation.
+        Redirects to `/deposit` if no pending amount is found in the session.
+      responses:
+        '200':
+          description: Stripe checkout page HTML (includes Stripe.js)
+        '302':
+          description: No pending amount → `/deposit`; unauthenticated → `/login`; Stripe API error → `/deposit`
+
+  /payment/stripe/complete:
+    get:
+      tags: [Payment]
+      summary: Stripe payment success callback
+      description: |
+        Browser is redirected here by Stripe.js after successful payment.
+        Clears the pending amount from the session and redirects to the dashboard with a success message.
+
+        > **Note:** Actual wallet credit is handled by `POST /payment/stripe/webhook`; this endpoint only handles the browser redirect.
+      responses:
+        '302':
+          description: → `/dashboard` (with success flash message)
+
+  /payment/stripe/cancel:
+    get:
+      tags: [Payment]
+      summary: Stripe payment cancel callback
+      description: Browser is redirected here when the user closes or cancels the Stripe checkout. Clears the pending amount.
+      responses:
+        '302':
+          description: → `/deposit` (with cancellation flash message)
+
+  /payment/stripe/webhook:
+    post:
+      tags: [Payment]
+      summary: Stripe webhook (server-to-server)
+      description: |
+        Called by Stripe servers to deliver `payment_intent.succeeded` events; performs the actual wallet credit.
+        Verifies the request using the `Stripe-Signature` header. Uses an in-memory set to prevent duplicate processing.
+        Any non-2xx response triggers a Stripe retry.
+      security: []
+      parameters:
+        - name: Stripe-Signature
+          in: header
+          required: true
+          schema:
+            type: string
+          description: Stripe webhook signature for request verification
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              description: Raw Stripe Event JSON (do not re-serialize)
+      responses:
+        '200':
+          description: Processed successfully, returns `OK`
+        '400':
+          description: Signature verification failed or processing error
+
+  # ── Payment — SoftBank Payment ────────────────────────────
+
+  /payment/sbpayment/request:
+    get:
+      tags: [Payment]
+      summary: SBPS payment request page
+      description: |
+        Reads the pending amount from the session, builds an SBPS payment request (including SHA-1 hashcode),
+        and renders an auto-submit form (`sb-payment.html`) that posts to the SBPS gateway.
+        Redirects to `/deposit` if no pending amount is found in the session.
+      responses:
+        '200':
+          description: SBPS auto-submit form page HTML
+        '302':
+          description: No pending amount → `/deposit`; unauthenticated → `/login`
+
+  /payment/sbpayment/result:
+    post:
+      tags: [Payment]
+      summary: SBPS result CGI (server-to-server)
+      description: |
+        Result CGI endpoint called by the SBPS server.
+        Verifies `res_result=OK` and looks up the `order_id` in the in-memory `pendingOrders` map to perform the wallet credit.
+        Request body is **Shift-JIS (Windows-31J)** URL-encoded form data.
+        Response format: success `OK,`, failure `NG,<message>`.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                res_result:
+                  type: string
+                  example: OK
+                  description: Payment result (OK / NG)
+                order_id:
+                  type: string
+                  description: Order ID matching an entry in pendingOrders
+                res_pay_amount:
+                  type: string
+                  description: Actual payment amount
+      responses:
+        '200':
+          description: Success returns `OK,`; failure returns `NG,<message>`
+
+  /payment/sbpayment/complete:
+    get:
+      tags: [Payment]
+      summary: SBPS payment success callback
+      description: Browser is redirected here by SBPS after successful payment. Clears the pending amount.
+      responses:
+        '302':
+          description: → `/dashboard` (with success flash message)
+
+  /payment/sbpayment/cancel:
+    get:
+      tags: [Payment]
+      summary: SBPS payment cancel callback
+      description: Browser is redirected here when the user cancels payment on the SBPS page. Clears the pending amount.
+      responses:
+        '302':
+          description: → `/deposit` (with cancellation flash message)
+
+  /payment/sbpayment/error:
+    get:
+      tags: [Payment]
+      summary: SBPS payment error callback
+      description: Browser is redirected here when SBPS reports a payment error. Clears the pending amount.
+      responses:
+        '302':
+          description: → `/deposit` (with error flash message)
+
+  # ── Withdraw Webhook ──────────────────────────────────────
+
+  /withdraw/webhook:
+    post:
+      tags: [Payment]
+      summary: Withdrawal result webhook (server-to-server)
+      description: |
+        Called by the mock bank service to report the final withdrawal result.
+        - `result=SUCCESS`: marks the transaction as COMPLETED
+        - Any other value (including `FAILED`): marks the transaction as FAILED and refunds the balance
+        Returns 400 if `transactionId` is missing or malformed.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [transactionId, result]
+              properties:
+                transactionId:
+                  type: string
+                  format: uuid
+                  example: 4cee06dc-0d00-469c-bbe0-6d065fc18445
+                  description: Withdrawal transaction UUID
+                result:
+                  type: string
+                  enum: [SUCCESS, FAILED]
+                  example: SUCCESS
+                  description: Withdrawal outcome
+      responses:
+        '200':
+          description: Processed successfully
+        '400':
+          description: Missing or malformed transactionId
+        '500':
+          description: Failed to update transaction status (internal error)
 
 # ── Components ──────────────────────────────────────────────
 
@@ -401,4 +837,4 @@ components:
       type: apiKey
       in: cookie
       name: JSESSIONID
-      description: Session cookie，由 `POST /login` 成功後自動設定
+      description: Session cookie set after successful OTP verification at `POST /login/otp`
