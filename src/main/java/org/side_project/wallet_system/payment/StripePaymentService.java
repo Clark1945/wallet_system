@@ -15,10 +15,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
-import java.util.Collections;
-import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 
 @Slf4j
 @Service
@@ -30,13 +27,6 @@ public class StripePaymentService {
 
     @Value("${stripe.webhook-secret}")
     private String webhookSecret;
-
-    /**
-     * In-memory idempotency guard — prevents double-crediting if Stripe retries the webhook.
-     * Acceptable for test/side-project; replace with DB flag in production.
-     */
-    private final Set<String> processedIntents =
-            Collections.newSetFromMap(new ConcurrentHashMap<>());
 
     // ─────────────────────────────────────────────────────────────────────────
     // Create PaymentIntent — also creates a PENDING deposit transaction
@@ -62,6 +52,7 @@ public class StripePaymentService {
                 .build();
 
         PaymentIntent intent = stripeClient.paymentIntents().create(params);
+        walletService.linkPaymentExternalId(transactionId, intent.getId());
         log.info("Stripe PaymentIntent created: id={}, memberId={}, transactionId={}, amount={}",
                  intent.getId(), memberId, transactionId, amount);
         return intent.getClientSecret();
@@ -92,15 +83,9 @@ public class StripePaymentService {
         }
 
         String intentId = intent.getId();
-        if (!processedIntents.add(intentId)) {
-            log.info("Stripe webhook: duplicate event for intentId={}, skipping", intentId);
-            return true;
-        }
-
         String transactionIdStr = intent.getMetadata().get("transactionId");
         if (transactionIdStr == null || transactionIdStr.isBlank()) {
             log.error("Stripe webhook: missing transactionId metadata for intentId={}", intentId);
-            processedIntents.remove(intentId);
             return false;
         }
 
@@ -112,7 +97,6 @@ public class StripePaymentService {
         } catch (RuntimeException e) {
             log.error("Stripe deposit failed: intentId={}, transactionId={}, error={}",
                       intentId, transactionIdStr, e.getMessage(), e);
-            processedIntents.remove(intentId);
             return false;
         }
     }

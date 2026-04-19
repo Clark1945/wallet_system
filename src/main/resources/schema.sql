@@ -57,3 +57,6 @@ WHERE  status IS NULL;
 ALTER TABLE members ADD COLUMN IF NOT EXISTS status       VARCHAR(20)  NOT NULL DEFAULT 'ACTIVE';
 ALTER TABLE members ADD COLUMN IF NOT EXISTS created_at   TIMESTAMP    NOT NULL DEFAULT NOW();
 ALTER TABLE members ADD COLUMN IF NOT EXISTS last_login_at TIMESTAMP;
+
+-- Payment gateway idempotency key (Stripe pi_... or SBPS orderId)
+ALTER TABLE transactions ADD COLUMN IF NOT EXISTS payment_external_id VARCHAR(255) UNIQUE;

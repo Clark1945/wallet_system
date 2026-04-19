@@ -15,7 +15,6 @@ import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 
 @Slf4j
 @Service
@@ -50,11 +49,6 @@ public class SBPaymentService {
     private static final String SERVICE_TYPE  = "0";
     private static final String TERMINAL_TYPE = "0";
     private static final String LIMIT_SECOND  = "600";
-
-    /** orderId → pending payment (in-memory; acceptable for test environment) */
-    private final Map<String, PendingOrder> pendingOrders = new ConcurrentHashMap<>();
-
-    private record PendingOrder(UUID memberId, BigDecimal amount, UUID transactionId) {}
 
     // ─────────────────────────────────────────────────────────────────────────
     // Build request
@@ -96,7 +90,7 @@ public class SBPaymentService {
         );
 
         UUID transactionId = walletService.initiateDeposit(memberId, amount);
-        pendingOrders.put(orderId, new PendingOrder(memberId, amount, transactionId));
+        walletService.linkPaymentExternalId(transactionId, orderId);
         log.info("SBPayment request built: orderId={}, memberId={}, transactionId={}, amount={}, requestDate={}",
                  orderId, memberId, transactionId, amount, requestDate);
 
@@ -154,20 +148,15 @@ public class SBPaymentService {
             return false;
         }
 
-        PendingOrder pending = pendingOrders.remove(orderId);
-        if (pending == null) {
-            log.error("SBPayment result: no pending order found for orderId={}", orderId);
-            return false;
-        }
-
         try {
-            walletService.completeDeposit(pending.transactionId());
-            log.info("SBPayment deposit completed: orderId={}, memberId={}, transactionId={}, amount={}",
-                     orderId, pending.memberId(), pending.transactionId(), pending.amount());
+            if (!walletService.completeDepositByExternalId(orderId)) {
+                log.error("SBPayment result: no pending order found for orderId={}", orderId);
+                return false;
+            }
+            log.info("SBPayment deposit completed: orderId={}", orderId);
             return true;
         } catch (Exception e) {
-            log.error("SBPayment deposit failed: orderId={}, transactionId={}, error={}",
-                      orderId, pending.transactionId(), e.getMessage(), e);
+            log.error("SBPayment deposit failed: orderId={}, error={}", orderId, e.getMessage(), e);
             return false;
         }
     }

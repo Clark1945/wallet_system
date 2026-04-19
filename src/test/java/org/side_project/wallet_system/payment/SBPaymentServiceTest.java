@@ -14,6 +14,9 @@ import java.util.Map;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -74,7 +77,7 @@ class SBPaymentServiceTest {
     }
 
     @Test
-    void buildRequest_callsInitiateDeposit() {
+    void buildRequest_callsInitiateDepositAndLinksExternalId() {
         UUID memberId = UUID.randomUUID();
         UUID transactionId = UUID.randomUUID();
         BigDecimal amount = new BigDecimal("2000");
@@ -83,6 +86,7 @@ class SBPaymentServiceTest {
         service.buildRequest(memberId, amount);
 
         then(walletService).should().initiateDeposit(memberId, amount);
+        then(walletService).should().linkPaymentExternalId(eq(transactionId), anyString());
     }
 
     // ─── processResult ────────────────────────────────────────────────────────
@@ -104,37 +108,32 @@ class SBPaymentServiceTest {
 
     @Test
     void processResult_unknownOrderId_returnsFalse() {
+        given(walletService.completeDepositByExternalId("nonexistent-order")).willReturn(false);
+
         Map<String, String> params = Map.of("res_result", "OK", "order_id", "nonexistent-order");
 
         assertThat(service.processResult(params)).isFalse();
-        then(walletService).shouldHaveNoInteractions();
+        then(walletService).should().completeDepositByExternalId("nonexistent-order");
     }
 
     @Test
     void processResult_validOrder_completesDepositAndReturnsTrue() {
-        UUID memberId = UUID.randomUUID();
-        UUID transactionId = UUID.randomUUID();
-        BigDecimal amount = new BigDecimal("1000");
-        given(walletService.initiateDeposit(memberId, amount)).willReturn(transactionId);
+        String orderId = "valid-order-001";
+        given(walletService.completeDepositByExternalId(orderId)).willReturn(true);
 
-        SBPaymentRequest req = service.buildRequest(memberId, amount);
+        Map<String, String> params = Map.of("res_result", "OK", "order_id", orderId);
 
-        Map<String, String> params = Map.of("res_result", "OK", "order_id", req.getOrderId());
         assertThat(service.processResult(params)).isTrue();
-        then(walletService).should().completeDeposit(transactionId);
+        then(walletService).should().completeDepositByExternalId(orderId);
     }
 
     @Test
     void processResult_walletServiceThrows_returnsFalse() {
-        UUID memberId = UUID.randomUUID();
-        UUID transactionId = UUID.randomUUID();
-        BigDecimal amount = new BigDecimal("1000");
-        given(walletService.initiateDeposit(memberId, amount)).willReturn(transactionId);
-        SBPaymentRequest req = service.buildRequest(memberId, amount);
+        String orderId = "error-order-001";
+        willThrow(new RuntimeException("DB error")).given(walletService).completeDepositByExternalId(orderId);
 
-        willThrow(new RuntimeException("DB error")).given(walletService).completeDeposit(transactionId);
+        Map<String, String> params = Map.of("res_result", "OK", "order_id", orderId);
 
-        Map<String, String> params = Map.of("res_result", "OK", "order_id", req.getOrderId());
         assertThat(service.processResult(params)).isFalse();
     }
 }

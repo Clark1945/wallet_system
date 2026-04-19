@@ -37,6 +37,9 @@ public class Transaction {
     @Column(length = 20)
     private TransactionStatus status;
 
+    @Column(unique = true)
+    private String paymentExternalId;
+
     @Column(nullable = false)
     private LocalDateTime createdAt;
 

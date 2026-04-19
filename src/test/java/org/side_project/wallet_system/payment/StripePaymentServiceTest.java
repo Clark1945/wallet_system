@@ -54,6 +54,7 @@ class StripePaymentServiceTest {
         given(walletService.initiateDeposit(memberId, amount)).willReturn(transactionId);
 
         PaymentIntent mockIntent = mock(PaymentIntent.class);
+        given(mockIntent.getId()).willReturn("pi_test_intent_id");
         given(mockIntent.getClientSecret()).willReturn("pi_test_secret_key");
         given(stripeClient.paymentIntents().create(any(PaymentIntentCreateParams.class)))
                 .willReturn(mockIntent);
@@ -62,6 +63,7 @@ class StripePaymentServiceTest {
 
         assertThat(secret).isEqualTo("pi_test_secret_key");
         then(walletService).should().initiateDeposit(memberId, amount);
+        then(walletService).should().linkPaymentExternalId(transactionId, "pi_test_intent_id");
     }
 
     // ─── processWebhookEvent ──────────────────────────────────────────────────
@@ -132,11 +134,12 @@ class StripePaymentServiceTest {
             webhookMock.when(() -> Webhook.constructEvent(any(), any(), any()))
                     .thenReturn(event);
 
-            service.processWebhookEvent("payload", "sig");    // first call — processed
+            service.processWebhookEvent("payload", "sig");    // first call
             boolean result = service.processWebhookEvent("payload", "sig");  // duplicate
 
             assertThat(result).isTrue();
-            then(walletService).should(times(1)).completeDeposit(any()); // only once
+            // Both calls reach completeDeposit; the DB PENDING check prevents double-crediting
+            then(walletService).should(times(2)).completeDeposit(any());
         }
     }
 

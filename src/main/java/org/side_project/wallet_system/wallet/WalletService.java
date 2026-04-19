@@ -133,6 +133,21 @@ public class WalletService {
     }
 
     @Transactional
+    public void linkPaymentExternalId(UUID transactionId, String externalId) {
+        transactionRepository.findById(transactionId).ifPresent(tx -> {
+            tx.setPaymentExternalId(externalId);
+            transactionRepository.save(tx);
+        });
+    }
+
+    @Transactional
+    public boolean completeDepositByExternalId(String externalId) {
+        return transactionRepository.findByPaymentExternalId(externalId)
+                .map(tx -> { completeDeposit(tx.getId()); return true; })
+                .orElse(false);
+    }
+
+    @Transactional
     public void failDeposit(UUID transactionId) {
         transactionRepository.findById(transactionId).ifPresent(tx -> {
             if (tx.getStatus() == TransactionStatus.PENDING) {
