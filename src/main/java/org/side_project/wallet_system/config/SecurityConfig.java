@@ -1,10 +1,10 @@
 package org.side_project.wallet_system.config;
 
-import org.side_project.wallet_system.auth.AuthProvider;
-import org.side_project.wallet_system.auth.CustomOAuth2UserService;
-import org.side_project.wallet_system.auth.CustomUserDetails;
-import org.side_project.wallet_system.auth.LoginSuccessHandler;
-import org.side_project.wallet_system.auth.MemberRepository;
+import org.side_project.wallet_system.auth.objects.AuthProvider;
+import org.side_project.wallet_system.auth.oauth.CustomOAuth2UserService;
+import org.side_project.wallet_system.auth.oauth.CustomUserDetails;
+import org.side_project.wallet_system.auth.oauth.LoginSuccessHandler;
+import org.side_project.wallet_system.auth.repository.MemberRepository;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;

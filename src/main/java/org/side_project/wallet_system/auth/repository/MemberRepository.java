@@ -1,5 +1,6 @@
-package org.side_project.wallet_system.auth;
+package org.side_project.wallet_system.auth.repository;
 
+import org.side_project.wallet_system.auth.objects.Member;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.Optional;

@@ -1,7 +1,9 @@
-package org.side_project.wallet_system.auth;
+package org.side_project.wallet_system.auth.service;
 
 import jakarta.servlet.http.HttpSession;
 import lombok.RequiredArgsConstructor;
+import org.side_project.wallet_system.auth.objects.Member;
+import org.side_project.wallet_system.auth.objects.OtpType;
 import org.side_project.wallet_system.config.SessionConstants;
 import org.springframework.context.MessageSource;
 import org.springframework.stereotype.Service;

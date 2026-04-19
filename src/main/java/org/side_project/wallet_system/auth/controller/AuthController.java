@@ -2,7 +2,7 @@ package org.side_project.wallet_system.auth.controller;
 
 import jakarta.servlet.http.HttpSession;
 import lombok.RequiredArgsConstructor;
-import org.side_project.wallet_system.auth.AuthFlowService;
+import org.side_project.wallet_system.auth.service.AuthFlowService;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;

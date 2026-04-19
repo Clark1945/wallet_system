@@ -2,6 +2,12 @@ package org.side_project.wallet_system.auth;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.side_project.wallet_system.auth.controller.ProfileController;
+import org.side_project.wallet_system.auth.oauth.CustomOAuth2UserService;
+import org.side_project.wallet_system.auth.oauth.LoginSuccessHandler;
+import org.side_project.wallet_system.auth.objects.Member;
+import org.side_project.wallet_system.auth.repository.MemberRepository;
+import org.side_project.wallet_system.auth.service.ProfileService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
@@ -19,7 +25,6 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.willThrow;
-import static org.mockito.BDDMockito.willDoNothing;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
@@ -32,10 +37,14 @@ class ProfileControllerIT {
     @Autowired
     MockMvc mockMvc;
 
-    @MockitoBean ProfileService profileService;
-    @MockitoBean MemberRepository memberRepository;
-    @MockitoBean CustomOAuth2UserService oauth2UserService;
-    @MockitoBean LoginSuccessHandler loginSuccessHandler;
+    @MockitoBean
+    ProfileService profileService;
+    @MockitoBean
+    MemberRepository memberRepository;
+    @MockitoBean
+    CustomOAuth2UserService oauth2UserService;
+    @MockitoBean
+    LoginSuccessHandler loginSuccessHandler;
 
     private MockHttpSession session;
     private UUID memberId;

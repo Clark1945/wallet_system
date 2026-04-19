@@ -1,4 +1,4 @@
-package org.side_project.wallet_system.auth;
+package org.side_project.wallet_system.auth.oauth;
 
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.oauth2.core.oidc.OidcIdToken;

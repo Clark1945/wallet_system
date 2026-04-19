@@ -1,10 +1,14 @@
-package org.side_project.wallet_system.auth;
+package org.side_project.wallet_system.auth.oauth;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.side_project.wallet_system.auth.email.EmailService;
+import org.side_project.wallet_system.auth.service.OtpService;
+import org.side_project.wallet_system.auth.objects.OtpType;
+import org.side_project.wallet_system.auth.service.AuthService;
 import org.side_project.wallet_system.config.SessionConstants;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.web.authentication.AuthenticationSuccessHandler;

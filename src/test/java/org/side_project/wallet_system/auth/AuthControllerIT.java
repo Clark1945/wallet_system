@@ -3,10 +3,18 @@ package org.side_project.wallet_system.auth;
 import org.junit.jupiter.api.Test;
 import org.side_project.wallet_system.auth.controller.AuthController;
 import org.side_project.wallet_system.auth.controller.AuthPageController;
+import org.side_project.wallet_system.auth.oauth.CustomOAuth2UserService;
+import org.side_project.wallet_system.auth.oauth.LoginSuccessHandler;
+import org.side_project.wallet_system.auth.objects.Member;
+import org.side_project.wallet_system.auth.objects.OtpType;
+import org.side_project.wallet_system.auth.repository.MemberRepository;
+import org.side_project.wallet_system.auth.service.AuthFlowService;
+import org.side_project.wallet_system.auth.service.AuthService;
+import org.side_project.wallet_system.auth.service.OtpService;
+import org.side_project.wallet_system.auth.service.PasswordResetService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
-import org.springframework.mock.web.MockHttpSession;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.side_project.wallet_system.config.SecurityConfig;
@@ -24,12 +32,18 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class AuthControllerIT {
 
     @Autowired MockMvc mockMvc;
-    @MockitoBean AuthService authService;
-    @MockitoBean PasswordResetService passwordResetService;
-    @MockitoBean OtpService otpService;
-    @MockitoBean MemberRepository memberRepository;
-    @MockitoBean CustomOAuth2UserService oauth2UserService;
-    @MockitoBean LoginSuccessHandler loginSuccessHandler;
+    @MockitoBean
+    AuthService authService;
+    @MockitoBean
+    PasswordResetService passwordResetService;
+    @MockitoBean
+    OtpService otpService;
+    @MockitoBean
+    MemberRepository memberRepository;
+    @MockitoBean
+    CustomOAuth2UserService oauth2UserService;
+    @MockitoBean
+    LoginSuccessHandler loginSuccessHandler;
 
     // ─── Login page ──────────────────────────────────────────────────────────────
 

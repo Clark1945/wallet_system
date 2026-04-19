@@ -1,7 +1,9 @@
-package org.side_project.wallet_system.auth;
+package org.side_project.wallet_system.auth.oauth;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.side_project.wallet_system.auth.objects.Member;
+import org.side_project.wallet_system.auth.service.AuthService;
 import org.springframework.security.oauth2.client.oidc.userinfo.OidcUserRequest;
 import org.springframework.security.oauth2.client.oidc.userinfo.OidcUserService;
 import org.springframework.security.oauth2.core.OAuth2AuthenticationException;

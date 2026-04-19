@@ -4,7 +4,7 @@ import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
-import org.side_project.wallet_system.auth.Member;
+import org.side_project.wallet_system.auth.objects.Member;
 
 import java.math.BigDecimal;
 import java.security.SecureRandom;

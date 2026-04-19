@@ -1,4 +1,4 @@
-package org.side_project.wallet_system.auth;
+package org.side_project.wallet_system.config;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;

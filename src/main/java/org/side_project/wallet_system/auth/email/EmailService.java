@@ -1,4 +1,4 @@
-package org.side_project.wallet_system.auth;
+package org.side_project.wallet_system.auth.email;
 
 public interface EmailService {
     void sendLoginOtp(String to, String otp);

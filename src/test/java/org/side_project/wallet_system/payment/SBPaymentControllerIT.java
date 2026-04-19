@@ -2,9 +2,9 @@ package org.side_project.wallet_system.payment;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.side_project.wallet_system.auth.CustomOAuth2UserService;
-import org.side_project.wallet_system.auth.LoginSuccessHandler;
-import org.side_project.wallet_system.auth.MemberRepository;
+import org.side_project.wallet_system.auth.oauth.CustomOAuth2UserService;
+import org.side_project.wallet_system.auth.oauth.LoginSuccessHandler;
+import org.side_project.wallet_system.auth.repository.MemberRepository;
 import org.side_project.wallet_system.config.SecurityConfig;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;

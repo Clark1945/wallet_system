@@ -1,9 +1,10 @@
-package org.side_project.wallet_system.auth;
+package org.side_project.wallet_system.auth.service;
 
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
+import org.side_project.wallet_system.auth.objects.OtpType;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;

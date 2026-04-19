@@ -1,4 +1,4 @@
-package org.side_project.wallet_system.auth;
+package org.side_project.wallet_system.auth.email;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

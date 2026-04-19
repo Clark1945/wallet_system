@@ -1,5 +1,7 @@
-package org.side_project.wallet_system.auth;
+package org.side_project.wallet_system.auth.oauth;
 
+import org.side_project.wallet_system.auth.objects.Member;
+import org.side_project.wallet_system.auth.objects.MemberStatus;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 

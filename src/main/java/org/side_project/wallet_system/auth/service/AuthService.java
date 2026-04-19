@@ -1,7 +1,13 @@
-package org.side_project.wallet_system.auth;
+package org.side_project.wallet_system.auth.service;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.side_project.wallet_system.auth.email.EmailService;
+import org.side_project.wallet_system.auth.objects.AuthProvider;
+import org.side_project.wallet_system.auth.objects.Member;
+import org.side_project.wallet_system.auth.objects.MemberStatus;
+import org.side_project.wallet_system.auth.objects.OtpType;
+import org.side_project.wallet_system.auth.repository.MemberRepository;
 import org.side_project.wallet_system.wallet.Wallet;
 import org.side_project.wallet_system.wallet.WalletRepository;
 import org.springframework.beans.factory.annotation.Value;
