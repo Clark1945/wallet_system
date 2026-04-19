@@ -10,6 +10,7 @@ import org.side_project.wallet_system.auth.objects.OtpType;
 import org.side_project.wallet_system.auth.repository.MemberRepository;
 import org.side_project.wallet_system.auth.service.AuthFlowService;
 import org.side_project.wallet_system.auth.service.AuthService;
+import org.side_project.wallet_system.auth.service.LoginAttemptService;
 import org.side_project.wallet_system.auth.service.OtpService;
 import org.side_project.wallet_system.auth.service.PasswordResetService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -45,6 +46,8 @@ class AuthControllerIT {
     CustomOAuth2UserService oauth2UserService;
     @MockitoBean
     LoginSuccessHandler loginSuccessHandler;
+    @MockitoBean
+    LoginAttemptService loginAttemptService;
 
     // ─── Login page ──────────────────────────────────────────────────────────────
 

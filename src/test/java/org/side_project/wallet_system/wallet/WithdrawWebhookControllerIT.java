@@ -4,6 +4,7 @@ import org.junit.jupiter.api.Test;
 import org.side_project.wallet_system.auth.oauth.CustomOAuth2UserService;
 import org.side_project.wallet_system.auth.oauth.LoginSuccessHandler;
 import org.side_project.wallet_system.auth.repository.MemberRepository;
+import org.side_project.wallet_system.auth.service.LoginAttemptService;
 import org.side_project.wallet_system.config.SecurityConfig;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
@@ -30,6 +31,7 @@ class WithdrawWebhookControllerIT {
     @MockitoBean MemberRepository memberRepository;
     @MockitoBean CustomOAuth2UserService oauth2UserService;
     @MockitoBean LoginSuccessHandler loginSuccessHandler;
+    @MockitoBean LoginAttemptService loginAttemptService;
 
     private String json(String transactionId, String result) {
         return String.format("{\"transactionId\":\"%s\",\"result\":\"%s\"}", transactionId, result);

@@ -7,6 +7,7 @@ import org.side_project.wallet_system.auth.oauth.CustomOAuth2UserService;
 import org.side_project.wallet_system.auth.oauth.LoginSuccessHandler;
 import org.side_project.wallet_system.auth.objects.Member;
 import org.side_project.wallet_system.auth.repository.MemberRepository;
+import org.side_project.wallet_system.auth.service.LoginAttemptService;
 import org.side_project.wallet_system.auth.service.ProfileService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
@@ -45,6 +46,8 @@ class ProfileControllerIT {
     CustomOAuth2UserService oauth2UserService;
     @MockitoBean
     LoginSuccessHandler loginSuccessHandler;
+    @MockitoBean
+    LoginAttemptService loginAttemptService;
 
     private MockHttpSession session;
     private UUID memberId;

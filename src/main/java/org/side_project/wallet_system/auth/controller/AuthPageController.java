@@ -24,9 +24,13 @@ public class AuthPageController {
 
     @GetMapping("/login")
     public String loginPage(@RequestParam(required = false) String error,
+                            @RequestParam(required = false) String locked,
                             Model model,
                             Locale locale) {
-        if (error != null) {
+        if (locked != null) {
+            model.addAttribute("error",
+                    messageSource.getMessage("error.account.locked", null, locale));
+        } else if (error != null) {
             model.addAttribute("error",
                     messageSource.getMessage("error.login.invalid", null, locale));
         }

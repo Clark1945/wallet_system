@@ -5,9 +5,11 @@ import org.side_project.wallet_system.auth.oauth.CustomOAuth2UserService;
 import org.side_project.wallet_system.auth.oauth.CustomUserDetails;
 import org.side_project.wallet_system.auth.oauth.LoginSuccessHandler;
 import org.side_project.wallet_system.auth.repository.MemberRepository;
+import org.side_project.wallet_system.auth.service.LoginAttemptService;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
+import org.springframework.security.authentication.LockedException;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
@@ -17,6 +19,7 @@ import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.AuthenticationFailureHandler;
 
 @Configuration
 @EnableWebSecurity
@@ -75,7 +78,8 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http,
                                            CustomOAuth2UserService oauth2UserService,
-                                           LoginSuccessHandler loginSuccessHandler) throws Exception {
+                                           LoginSuccessHandler loginSuccessHandler,
+                                           LoginAttemptService loginAttemptService) throws Exception {
         http
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/login", "/login/otp", "/login/otp/resend",
@@ -90,7 +94,7 @@ public class SecurityConfig {
             .formLogin(form -> form
                 .loginPage("/login")
                 .usernameParameter("email")
-                .failureUrl("/login?error")
+                .failureHandler(loginFailureHandler(loginAttemptService))
                 .successHandler(loginSuccessHandler)
                 .permitAll()
             )
@@ -105,17 +109,38 @@ public class SecurityConfig {
                 .logoutSuccessUrl("/login")
                 .invalidateHttpSession(true)
                 .deleteCookies("JSESSIONID")
-            );
+            )
+            .sessionManagement(s -> s.sessionFixation().migrateSession());
 
         return http.build();
     }
 
+    private AuthenticationFailureHandler loginFailureHandler(LoginAttemptService loginAttemptService) {
+        return (request, response, exception) -> {
+            if (exception instanceof LockedException) {
+                response.sendRedirect("/login?locked");
+                return;
+            }
+            String email = request.getParameter("email");
+            if (email != null && !email.isBlank()) {
+                loginAttemptService.recordFailure(email.strip().toLowerCase());
+            }
+            response.sendRedirect("/login?error");
+        };
+    }
+
     @Bean
-    public UserDetailsService userDetailsService(MemberRepository memberRepository) {
-        return email -> memberRepository.findByEmail(email)
-                .filter(m -> m.getAuthProvider() == AuthProvider.LOCAL)
-                .map(CustomUserDetails::new)
-                .orElseThrow(() -> new UsernameNotFoundException(email));
+    public UserDetailsService userDetailsService(MemberRepository memberRepository,
+                                                 LoginAttemptService loginAttemptService) {
+        return email -> {
+            if (loginAttemptService.isLocked(email)) {
+                throw new LockedException("error.account.locked");
+            }
+            return memberRepository.findByEmail(email)
+                    .filter(m -> m.getAuthProvider() == AuthProvider.LOCAL)
+                    .map(CustomUserDetails::new)
+                    .orElseThrow(() -> new UsernameNotFoundException(email));
+        };
     }
 
     @Bean

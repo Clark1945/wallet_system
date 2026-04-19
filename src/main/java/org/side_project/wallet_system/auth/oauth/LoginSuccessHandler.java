@@ -6,6 +6,7 @@ import jakarta.servlet.http.HttpSession;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.side_project.wallet_system.auth.email.EmailService;
+import org.side_project.wallet_system.auth.service.LoginAttemptService;
 import org.side_project.wallet_system.auth.service.OtpService;
 import org.side_project.wallet_system.auth.objects.OtpType;
 import org.side_project.wallet_system.auth.service.AuthService;
@@ -25,6 +26,7 @@ public class LoginSuccessHandler implements AuthenticationSuccessHandler {
     private final OtpService otpService;
     private final EmailService emailService;
     private final AuthService authService;
+    private final LoginAttemptService loginAttemptService;
 
     @Override
     public void onAuthenticationSuccess(HttpServletRequest request,
@@ -36,6 +38,7 @@ public class LoginSuccessHandler implements AuthenticationSuccessHandler {
             UUID memberId = ud.getMemberId();
             String email  = ud.getUsername();
             log.info("Login success (LOCAL): memberId={}", memberId);
+            loginAttemptService.clearFailures(email);
 
             try {
                 String otp      = otpService.generateAndStore(memberId, OtpType.LOGIN);
