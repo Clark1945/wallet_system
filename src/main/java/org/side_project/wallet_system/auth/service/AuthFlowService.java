@@ -103,14 +103,14 @@ public class AuthFlowService {
 
     // ─── Register ───────────────────────────────────────────────────────────────
 
-    public String register(String name, int age, String email, String password,
+    public String register(org.side_project.wallet_system.auth.objects.RegisterRequest req,
                            RedirectAttributes redirectAttributes, Locale locale) {
         try {
-            Member pending = authService.initiateRegistration(name, age, email, password);
-            authService.sendRegistrationOtp(pending.getId(), email);
-            String otpToken = otpService.generateOtpToken(pending.getId(),OtpType.REGISTER);
+            Member pending = authService.initiateRegistration(req.getName(), req.getAge(), req.getEmail(), req.getPassword());
+            authService.sendRegistrationOtp(pending.getId(), req.getEmail());
+            String otpToken = otpService.generateOtpToken(pending.getId(), OtpType.REGISTER);
             redirectAttributes.addFlashAttribute("info",
-                    messageSource.getMessage("flash.register.otp.sent", new Object[]{email}, locale));
+                    messageSource.getMessage("flash.register.otp.sent", new Object[]{req.getEmail()}, locale));
             return "redirect:/register/otp?token=" + otpToken;
         } catch (IllegalArgumentException e) {
             redirectAttributes.addFlashAttribute("error",

@@ -1,10 +1,15 @@
 package org.side_project.wallet_system.auth.controller;
 
 import jakarta.servlet.http.HttpSession;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.side_project.wallet_system.auth.objects.ForgotPasswordRequest;
+import org.side_project.wallet_system.auth.objects.RegisterRequest;
+import org.side_project.wallet_system.auth.objects.ResetPasswordRequest;
 import org.side_project.wallet_system.auth.service.AuthFlowService;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
+import org.springframework.validation.BindingResult;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
@@ -43,13 +48,16 @@ public class AuthController {
     // ─── Register ───────────────────────────────────────────────────────────────
 
     @PostMapping("/register")
-    public String register(@RequestParam String name,
-                           @RequestParam(defaultValue = "0") int age,
-                           @RequestParam String email,
-                           @RequestParam String password,
+    public String register(@Valid @ModelAttribute RegisterRequest req,
+                           BindingResult bindingResult,
                            RedirectAttributes redirectAttributes,
                            Locale locale) {
-        return authFlowService.register(name, age, email, password, redirectAttributes, locale);
+        if (bindingResult.hasErrors()) {
+            redirectAttributes.addFlashAttribute("error",
+                    bindingResult.getFieldErrors().get(0).getDefaultMessage());
+            return "redirect:/register";
+        }
+        return authFlowService.register(req, redirectAttributes, locale);
     }
 
     // ─── Register OTP ───────────────────────────────────────────────────────────
@@ -77,10 +85,16 @@ public class AuthController {
     // ─── Forgot Password ────────────────────────────────────────────────────────
 
     @PostMapping("/forgot-password")
-    public String sendPasswordReset(@RequestParam String email,
+    public String sendPasswordReset(@Valid @ModelAttribute ForgotPasswordRequest req,
+                                    BindingResult bindingResult,
                                     RedirectAttributes redirectAttributes,
                                     Locale locale) {
-        return authFlowService.sendPasswordReset(email, redirectAttributes, locale);
+        if (bindingResult.hasErrors()) {
+            redirectAttributes.addFlashAttribute("error",
+                    bindingResult.getFieldErrors().get(0).getDefaultMessage());
+            return "redirect:/forgot-password";
+        }
+        return authFlowService.sendPasswordReset(req.getEmail(), redirectAttributes, locale);
     }
 
     // ─── Reset Password ─────────────────────────────────────────────────────────
@@ -103,10 +117,16 @@ public class AuthController {
     }
 
     @PostMapping("/reset-password")
-    public String resetPassword(@RequestParam String password,
+    public String resetPassword(@Valid @ModelAttribute ResetPasswordRequest req,
+                                BindingResult bindingResult,
                                 HttpSession session,
                                 RedirectAttributes redirectAttributes,
                                 Locale locale) {
-        return authFlowService.resetPassword(password, session, redirectAttributes, locale);
+        if (bindingResult.hasErrors()) {
+            redirectAttributes.addFlashAttribute("error",
+                    bindingResult.getFieldErrors().get(0).getDefaultMessage());
+            return "redirect:/reset-password/form";
+        }
+        return authFlowService.resetPassword(req.getPassword(), session, redirectAttributes, locale);
     }
 }
