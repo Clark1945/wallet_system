@@ -1,6 +1,9 @@
 server:
   # Trust X-Forwarded-* headers from reverse proxies (ngrok, load balancers)
   forward-headers-strategy: framework
+  servlet:
+    session:
+      timeout: 30m
 
 spring:
   application:

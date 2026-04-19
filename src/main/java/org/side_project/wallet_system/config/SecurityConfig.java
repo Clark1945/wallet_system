@@ -80,7 +80,7 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/login", "/login/otp", "/login/otp/resend",
                                  "/register", "/register/otp", "/register/otp/resend",
-                                 "/forgot-password", "/reset-password",
+                                 "/forgot-password", "/reset-password", "/reset-password/form",
                                  "/error",
                                  "/uploads/**",
                                  "/openapi.yaml", "/swagger-ui/**", "/v3/api-docs/**",

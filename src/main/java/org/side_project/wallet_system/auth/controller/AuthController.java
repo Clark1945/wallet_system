@@ -88,18 +88,25 @@ public class AuthController {
     @GetMapping("/reset-password")
     public String resetPasswordPage(@RequestParam UUID mid,
                                     @RequestParam String token,
+                                    HttpSession session,
+                                    RedirectAttributes redirectAttributes,
+                                    Locale locale) {
+        return authFlowService.resetPasswordPage(mid, token, session, redirectAttributes, locale);
+    }
+
+    @GetMapping("/reset-password/form")
+    public String resetPasswordForm(HttpSession session,
                                     Model model,
                                     RedirectAttributes redirectAttributes,
                                     Locale locale) {
-        return authFlowService.resetPasswordPage(mid, token, model, redirectAttributes, locale);
+        return authFlowService.resetPasswordForm(session, model, redirectAttributes, locale);
     }
 
     @PostMapping("/reset-password")
-    public String resetPassword(@RequestParam UUID mid,
-                                @RequestParam String token,
-                                @RequestParam String password,
+    public String resetPassword(@RequestParam String password,
+                                HttpSession session,
                                 RedirectAttributes redirectAttributes,
                                 Locale locale) {
-        return authFlowService.resetPassword(mid, token, password, redirectAttributes, locale);
+        return authFlowService.resetPassword(password, session, redirectAttributes, locale);
     }
 }

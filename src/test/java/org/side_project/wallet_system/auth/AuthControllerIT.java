@@ -15,6 +15,7 @@ import org.side_project.wallet_system.auth.service.PasswordResetService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.mock.web.MockHttpSession;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.side_project.wallet_system.config.SecurityConfig;
@@ -127,6 +128,7 @@ class AuthControllerIT {
     void verifyRegistrationOtp_valid_redirectsToLogin() throws Exception {
         UUID memberId = UUID.randomUUID();
         given(otpService.resolveOtpToken("valid-token", OtpType.REGISTER)).willReturn(memberId);
+        given(otpService.consumeToken("valid-token")).willReturn(true);
         // verifyAndActivate is void — default mock does nothing (success path)
 
         mockMvc.perform(post("/register/otp").with(csrf())
@@ -141,6 +143,7 @@ class AuthControllerIT {
     void verifyRegistrationOtp_invalid_redirectsBackWithError() throws Exception {
         UUID memberId = UUID.randomUUID();
         given(otpService.resolveOtpToken("valid-token", OtpType.REGISTER)).willReturn(memberId);
+        given(otpService.consumeToken("valid-token")).willReturn(true);
         willThrow(new IllegalArgumentException("error.otp.invalid"))
                 .given(authService).verifyAndActivate(any(), any());
 
@@ -221,26 +224,56 @@ class AuthControllerIT {
     }
 
     @Test
-    void resetPasswordPage_validToken_returnsResetView() throws Exception {
+    void resetPasswordPage_validToken_redirectsToForm() throws Exception {
         given(passwordResetService.isValid(any(), any())).willReturn(true);
 
         mockMvc.perform(get("/reset-password")
                         .param("mid", UUID.randomUUID().toString())
                         .param("token", "valid-token"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/reset-password/form"));
+    }
+
+    @Test
+    void resetPasswordForm_withSession_returnsResetView() throws Exception {
+        MockHttpSession session = new MockHttpSession();
+        session.setAttribute("resetMid", UUID.randomUUID().toString());
+        session.setAttribute("resetToken", "valid-token");
+
+        mockMvc.perform(get("/reset-password/form").session(session))
                 .andExpect(status().isOk())
                 .andExpect(view().name("reset-password"));
     }
 
     @Test
-    void resetPassword_validToken_redirectsToLoginWithSuccess() throws Exception {
+    void resetPasswordForm_withoutSession_redirectsToLogin() throws Exception {
+        mockMvc.perform(get("/reset-password/form"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/login"))
+                .andExpect(flash().attributeExists("error"));
+    }
+
+    @Test
+    void resetPassword_validSession_redirectsToLoginWithSuccess() throws Exception {
         given(passwordResetService.verify(any(), any())).willReturn(true);
 
-        mockMvc.perform(post("/reset-password").with(csrf())
-                        .param("mid", UUID.randomUUID().toString())
-                        .param("token", "valid-token")
+        MockHttpSession session = new MockHttpSession();
+        session.setAttribute("resetMid", UUID.randomUUID().toString());
+        session.setAttribute("resetToken", "valid-token");
+
+        mockMvc.perform(post("/reset-password").with(csrf()).session(session)
                         .param("password", "newpassword"))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/login"))
                 .andExpect(flash().attributeExists("success"));
+    }
+
+    @Test
+    void resetPassword_withoutSession_redirectsToLogin() throws Exception {
+        mockMvc.perform(post("/reset-password").with(csrf())
+                        .param("password", "newpassword"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/login"))
+                .andExpect(flash().attributeExists("error"));
     }
 }

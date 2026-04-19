@@ -114,10 +114,18 @@ public class AuthFlowService {
 
     public String verifyRegistrationOtp(String otpToken, String code,
                                         RedirectAttributes redirectAttributes, Locale locale) {
-        String memberIdStr = otpService.resolveOtpToken(otpToken,OtpType.REGISTER).toString();
+
 
         try {
+            String memberIdStr = otpService.resolveOtpToken(otpToken,OtpType.REGISTER).toString();
+            // consume first, then verify
+            boolean consumed = otpService.consumeToken(otpToken);
+            if (!consumed) {
+                throw new IllegalArgumentException("error.otp.invalid");
+            }
+
             authService.verifyAndActivate(UUID.fromString(memberIdStr), code);
+
         } catch (IllegalArgumentException e) {
             redirectAttributes.addFlashAttribute("error",
                     messageSource.getMessage(e.getMessage(), null, e.getMessage(), locale));
@@ -154,25 +162,45 @@ public class AuthFlowService {
         return "redirect:/forgot-password";
     }
 
-    public String resetPasswordPage(UUID mid, String token, Model model,
+    public String resetPasswordPage(UUID mid, String token, HttpSession session,
                                     RedirectAttributes redirectAttributes, Locale locale) {
         if (!passwordResetService.isValid(mid, token)) {
             redirectAttributes.addFlashAttribute("error",
                     messageSource.getMessage("error.reset.invalid", null, locale));
             return "redirect:/login";
         }
-        model.addAttribute("mid", mid);
-        model.addAttribute("token", token);
+        session.setAttribute(SessionConstants.RESET_MID,   mid.toString());
+        session.setAttribute(SessionConstants.RESET_TOKEN, token);
+        return "redirect:/reset-password/form";
+    }
+
+    public String resetPasswordForm(HttpSession session, Model model,
+                                    RedirectAttributes redirectAttributes, Locale locale) {
+        if (session.getAttribute(SessionConstants.RESET_MID) == null) {
+            redirectAttributes.addFlashAttribute("error",
+                    messageSource.getMessage("error.reset.invalid", null, locale));
+            return "redirect:/login";
+        }
         return "reset-password";
     }
 
-    public String resetPassword(UUID mid, String token, String password,
+    public String resetPassword(String password, HttpSession session,
                                 RedirectAttributes redirectAttributes, Locale locale) {
+        String midStr = (String) session.getAttribute(SessionConstants.RESET_MID);
+        String token  = (String) session.getAttribute(SessionConstants.RESET_TOKEN);
+        if (midStr == null || token == null) {
+            redirectAttributes.addFlashAttribute("error",
+                    messageSource.getMessage("error.reset.invalid", null, locale));
+            return "redirect:/login";
+        }
+        UUID mid = UUID.fromString(midStr);
         if (!passwordResetService.verify(mid, token)) {
             redirectAttributes.addFlashAttribute("error",
                     messageSource.getMessage("error.reset.invalid", null, locale));
             return "redirect:/login";
         }
+        session.removeAttribute(SessionConstants.RESET_MID);
+        session.removeAttribute(SessionConstants.RESET_TOKEN);
         authService.resetPassword(mid, password);
         redirectAttributes.addFlashAttribute("success",
                 messageSource.getMessage("flash.reset.success", null, locale));

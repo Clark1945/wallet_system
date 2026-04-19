@@ -79,6 +79,12 @@ public class OtpService {
         return otpToken.getMemberId();
     }
 
+    public boolean consumeToken(String token) {
+        String redisKey = "otp_token:" + token;
+
+        return redisTemplate.delete(redisKey);
+    }
+
     @Setter
     @Getter
     static class OtpToken {
