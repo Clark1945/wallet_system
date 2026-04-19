@@ -3,7 +3,6 @@ package org.side_project.wallet_system.auth;
 import jakarta.servlet.http.HttpSession;
 import lombok.RequiredArgsConstructor;
 import org.side_project.wallet_system.config.SessionConstants;
-import org.side_project.wallet_system.config.SessionUtils;
 import org.springframework.context.MessageSource;
 import org.springframework.stereotype.Service;
 import org.springframework.ui.Model;
@@ -19,75 +18,91 @@ public class AuthFlowService {
     private final AuthService authService;
     private final PasswordResetService passwordResetService;
     private final MessageSource messageSource;
+    private final OtpService otpService;
 
     // ─── Login OTP ──────────────────────────────────────────────────────────────
 
-    public String loginOtpPage(HttpSession session, Model model) {
-        if (!Boolean.TRUE.equals(session.getAttribute(SessionConstants.PENDING_OTP))) {
+    public String loginOtpPage(String token, Model model) {
+        if (token == null) return "redirect:/login";
+        try {
+            UUID memberId = otpService.resolveOtpToken(token, OtpType.LOGIN);
+            String email  = authService.getEmailById(memberId);
+            model.addAttribute("email", email);
+            model.addAttribute("otpType", "LOGIN");
+            model.addAttribute("otpToken", token);
+            return "otp-verify";
+        } catch (IllegalArgumentException e) {
             return "redirect:/login";
         }
-        model.addAttribute("email", session.getAttribute(SessionConstants.OTP_EMAIL));
-        model.addAttribute("otpType", "LOGIN");
-        return "otp-verify";
     }
 
-    public String verifyLoginOtp(String code, HttpSession session, RedirectAttributes redirectAttributes, Locale locale) {
-        if (!Boolean.TRUE.equals(session.getAttribute(SessionConstants.PENDING_OTP))) {
+    public String verifyLoginOtp(String token, String code, HttpSession session,
+                                 RedirectAttributes redirectAttributes, Locale locale) {
+        if (token == null) return "redirect:/login";
+        UUID memberId;
+        try {
+            memberId = otpService.resolveOtpToken(token, OtpType.LOGIN);
+        } catch (IllegalArgumentException e) {
             return "redirect:/login";
         }
-        UUID memberId = SessionUtils.getMemberId(session);
-        if (memberId == null) return "redirect:/login";
 
         try {
             authService.verifyLoginOtpCode(memberId, code);
         } catch (IllegalArgumentException e) {
             redirectAttributes.addFlashAttribute("error",
                     messageSource.getMessage(e.getMessage(), null, e.getMessage(), locale));
-            return "redirect:/login/otp";
+            return "redirect:/login/otp?token=" + token;
         }
 
-        session.removeAttribute(SessionConstants.PENDING_OTP);
-        session.removeAttribute(SessionConstants.OTP_EMAIL);
+        String memberName = authService.getNameById(memberId);
+        session.setAttribute(SessionConstants.MEMBER_ID,   memberId.toString());
+        session.setAttribute(SessionConstants.MEMBER_NAME, memberName);
         authService.updateLastLogin(memberId);
         return "redirect:/dashboard";
     }
 
-    public String resendLoginOtps(HttpSession session, RedirectAttributes redirectAttributes, Locale locale) {
-        if (!Boolean.TRUE.equals(session.getAttribute(SessionConstants.PENDING_OTP))) {
+    public String resendLoginOtps(String token, RedirectAttributes redirectAttributes, Locale locale) {
+        if (token == null) return "redirect:/login";
+        try {
+            UUID memberId    = otpService.resolveOtpToken(token, OtpType.LOGIN);
+            String email     = authService.getEmailById(memberId);
+            authService.sendLoginOtp(memberId, email);
+            String newToken  = otpService.generateOtpToken(memberId, OtpType.LOGIN);
+            redirectAttributes.addFlashAttribute("info",
+                    messageSource.getMessage("flash.otp.resent", null, locale));
+            return "redirect:/login/otp?token=" + newToken;
+        } catch (IllegalArgumentException e) {
             return "redirect:/login";
         }
-        UUID memberId = SessionUtils.getMemberId(session);
-        String email  = (String) session.getAttribute(SessionConstants.OTP_EMAIL);
-        if (memberId == null || email == null) return "redirect:/login";
-
-        authService.sendLoginOtp(memberId, email);
-        redirectAttributes.addFlashAttribute("info",
-                messageSource.getMessage("flash.otp.resent", null, locale));
-        return "redirect:/login/otp";
     }
 
     // ─── Register OTP ───────────────────────────────────────────────────────────
 
-    public String registerOtp(HttpSession session, Model model) {
-        String email = (String) session.getAttribute(SessionConstants.OTP_EMAIL);
-        if (email == null) return "redirect:/register";
-        model.addAttribute("email", email);
-        model.addAttribute("otpType", "REGISTER");
-        return "otp-verify";
+    public String registerOtp(String token, Model model) {
+        if (token == null) return "redirect:/register";
+        try {
+            UUID memberId = otpService.resolveOtpToken(token, OtpType.REGISTER);
+            String email = authService.getEmailById(memberId);
+            model.addAttribute("email", email);
+            model.addAttribute("otpType", "REGISTER");
+            model.addAttribute("otpToken", token);
+            return "otp-verify";
+        } catch (IllegalArgumentException e) {
+            return "redirect:/register";
+        }
     }
 
     // ─── Register ───────────────────────────────────────────────────────────────
 
     public String register(String name, int age, String email, String password,
-                           HttpSession session, RedirectAttributes redirectAttributes, Locale locale) {
+                           RedirectAttributes redirectAttributes, Locale locale) {
         try {
             Member pending = authService.initiateRegistration(name, age, email, password);
             authService.sendRegistrationOtp(pending.getId(), email);
-            session.setAttribute(SessionConstants.OTP_EMAIL, email);
-            session.setAttribute(SessionConstants.OTP_MEMBER_ID, pending.getId().toString());
+            String otpToken = otpService.generateOtpToken(pending.getId(),OtpType.REGISTER);
             redirectAttributes.addFlashAttribute("info",
                     messageSource.getMessage("flash.register.otp.sent", new Object[]{email}, locale));
-            return "redirect:/register/otp";
+            return "redirect:/register/otp?token=" + otpToken;
         } catch (IllegalArgumentException e) {
             redirectAttributes.addFlashAttribute("error",
                     messageSource.getMessage(e.getMessage(), null, e.getMessage(), locale));
@@ -95,35 +110,36 @@ public class AuthFlowService {
         }
     }
 
-    public String verifyRegistrationOtp(String code, HttpSession session,
+    public String verifyRegistrationOtp(String otpToken, String code,
                                         RedirectAttributes redirectAttributes, Locale locale) {
-        String memberIdStr = (String) session.getAttribute(SessionConstants.OTP_MEMBER_ID);
-        if (memberIdStr == null) return "redirect:/register";
+        String memberIdStr = otpService.resolveOtpToken(otpToken,OtpType.REGISTER).toString();
 
         try {
             authService.verifyAndActivate(UUID.fromString(memberIdStr), code);
         } catch (IllegalArgumentException e) {
             redirectAttributes.addFlashAttribute("error",
                     messageSource.getMessage(e.getMessage(), null, e.getMessage(), locale));
-            return "redirect:/register/otp";
+            return "redirect:/register/otp?token=" + otpToken;
         }
 
-        session.removeAttribute(SessionConstants.OTP_EMAIL);
-        session.removeAttribute(SessionConstants.OTP_MEMBER_ID);
         redirectAttributes.addFlashAttribute("success",
                 messageSource.getMessage("flash.register.success", null, locale));
         return "redirect:/login";
     }
 
-    public String resendRegistrationOtp(HttpSession session, RedirectAttributes redirectAttributes, Locale locale) {
-        String email       = (String) session.getAttribute(SessionConstants.OTP_EMAIL);
-        String memberIdStr = (String) session.getAttribute(SessionConstants.OTP_MEMBER_ID);
-        if (email == null || memberIdStr == null) return "redirect:/register";
-
-        authService.sendRegistrationOtp(UUID.fromString(memberIdStr), email);
-        redirectAttributes.addFlashAttribute("info",
-                messageSource.getMessage("flash.otp.resent", null, locale));
-        return "redirect:/register/otp";
+    public String resendRegistrationOtp(String token, RedirectAttributes redirectAttributes, Locale locale) {
+        if (token == null) return "redirect:/register";
+        try {
+            UUID memberId   = otpService.resolveOtpToken(token, OtpType.REGISTER);
+            String email    = authService.getEmailById(memberId);
+            authService.sendRegistrationOtp(memberId, email);
+            String newToken = otpService.generateOtpToken(memberId, OtpType.REGISTER);
+            redirectAttributes.addFlashAttribute("info",
+                    messageSource.getMessage("flash.otp.resent", null, locale));
+            return "redirect:/register/otp?token=" + newToken;
+        } catch (IllegalArgumentException e) {
+            return "redirect:/register";
+        }
     }
 
     // ─── Forgot / Reset Password ─────────────────────────────────────────────────

@@ -123,6 +123,18 @@ public class AuthService {
         return memberRepository.findByEmail(email);
     }
 
+    public String getEmailById(UUID memberId) {
+        return memberRepository.findById(memberId)
+                .map(Member::getEmail)
+                .orElseThrow(() -> new IllegalArgumentException("error.member.not.found"));
+    }
+
+    public String getNameById(UUID memberId) {
+        return memberRepository.findById(memberId)
+                .map(Member::getName)
+                .orElseThrow(() -> new IllegalArgumentException("error.member.not.found"));
+    }
+
     public Optional<Member> login(String email, String password) {
         log.debug("Login attempt: email={}", email);
         return memberRepository.findByEmail(email)

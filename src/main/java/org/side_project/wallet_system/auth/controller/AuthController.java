@@ -1,7 +1,8 @@
-package org.side_project.wallet_system.auth;
+package org.side_project.wallet_system.auth.controller;
 
 import jakarta.servlet.http.HttpSession;
 import lombok.RequiredArgsConstructor;
+import org.side_project.wallet_system.auth.AuthFlowService;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
@@ -19,23 +20,24 @@ public class AuthController {
     // ─── Login OTP ──────────────────────────────────────────────────────────────
 
     @GetMapping("/login/otp")
-    public String loginOtpPage(HttpSession session, Model model) {
-        return authFlowService.loginOtpPage(session, model);
+    public String loginOtpPage(@RequestParam(required = false) String token, Model model) {
+        return authFlowService.loginOtpPage(token, model);
     }
 
     @PostMapping("/login/otp")
-    public String verifyLoginOtp(@RequestParam String code,
+    public String verifyLoginOtp(@RequestParam String token,
+                                 @RequestParam String code,
                                  HttpSession session,
                                  RedirectAttributes redirectAttributes,
                                  Locale locale) {
-        return authFlowService.verifyLoginOtp(code, session, redirectAttributes, locale);
+        return authFlowService.verifyLoginOtp(token, code, session, redirectAttributes, locale);
     }
 
     @PostMapping("/login/otp/resend")
-    public String resendLoginOtp(HttpSession session,
+    public String resendLoginOtp(@RequestParam String token,
                                  RedirectAttributes redirectAttributes,
                                  Locale locale) {
-        return authFlowService.resendLoginOtps(session, redirectAttributes, locale);
+        return authFlowService.resendLoginOtps(token, redirectAttributes, locale);
     }
 
     // ─── Register ───────────────────────────────────────────────────────────────
@@ -45,32 +47,31 @@ public class AuthController {
                            @RequestParam(defaultValue = "0") int age,
                            @RequestParam String email,
                            @RequestParam String password,
-                           HttpSession session,
                            RedirectAttributes redirectAttributes,
                            Locale locale) {
-        return authFlowService.register(name, age, email, password, session, redirectAttributes, locale);
+        return authFlowService.register(name, age, email, password, redirectAttributes, locale);
     }
 
     // ─── Register OTP ───────────────────────────────────────────────────────────
 
     @GetMapping("/register/otp")
-    public String registrationOtpPage(HttpSession session, Model model) {
-        return authFlowService.registerOtp(session, model);
+    public String registrationOtpPage(@RequestParam(required = false) String token, Model model) {
+        return authFlowService.registerOtp(token, model);
     }
 
     @PostMapping("/register/otp")
     public String verifyRegistrationOtp(@RequestParam String code,
-                                        HttpSession session,
+                                        @RequestParam(value = "token") String otpToken,
                                         RedirectAttributes redirectAttributes,
                                         Locale locale) {
-        return authFlowService.verifyRegistrationOtp(code, session, redirectAttributes, locale);
+        return authFlowService.verifyRegistrationOtp(otpToken, code, redirectAttributes, locale);
     }
 
     @PostMapping("/register/otp/resend")
-    public String resendRegistrationOtp(HttpSession session,
+    public String resendRegistrationOtp(@RequestParam String token,
                                         RedirectAttributes redirectAttributes,
                                         Locale locale) {
-        return authFlowService.resendRegistrationOtp(session, redirectAttributes, locale);
+        return authFlowService.resendRegistrationOtp(token, redirectAttributes, locale);
     }
 
     // ─── Forgot Password ────────────────────────────────────────────────────────

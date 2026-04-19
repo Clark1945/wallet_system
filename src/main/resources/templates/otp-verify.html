@@ -41,7 +41,7 @@
     <div th:if="${success}" class="alert alert-success" th:text="${success}"></div>
     <div th:if="${info}"    class="alert alert-info"    th:text="${info}"></div>
 
-    <form th:action="${otpType == 'REGISTER'} ? @{/register/otp} : @{/login/otp}" method="post">
+    <form th:action="${otpType == 'REGISTER'} ? @{/register/otp(token=${otpToken})} : @{/login/otp(token=${otpToken})}" method="post">
         <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
         <label for="code" th:text="#{otp.label.code}">Verification Code</label>
         <input type="text" id="code" name="code" class="otp-input"
@@ -51,7 +51,7 @@
     </form>
 
     <div class="resend-form">
-        <form th:action="${otpType == 'REGISTER'} ? @{/register/otp/resend} : @{/login/otp/resend}" method="post">
+        <form th:action="${otpType == 'REGISTER'} ? @{/register/otp/resend(token=${otpToken})} : @{/login/otp/resend(token=${otpToken})}" method="post">
             <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
             <button type="submit" class="resend-btn" th:text="#{otp.resend}">Resend Code</button>
         </form>

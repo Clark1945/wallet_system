@@ -29,24 +29,17 @@ public class LoginSuccessHandler implements AuthenticationSuccessHandler {
         Object principal = authentication.getPrincipal();
 
         if (principal instanceof CustomUserDetails ud) {
-            UUID memberId   = ud.getMemberId();
-            String memberName = ud.getMemberName();
-            String email    = ud.getUsername();
-            log.info("Login success (LOCAL): memberId={}, name={}", memberId, memberName);
-
-            HttpSession session = request.getSession(true);
-            session.setAttribute(SessionConstants.MEMBER_ID,   memberId.toString());
-            session.setAttribute(SessionConstants.MEMBER_NAME, memberName);
+            UUID memberId = ud.getMemberId();
+            String email  = ud.getUsername();
+            log.info("Login success (LOCAL): memberId={}", memberId);
 
             try {
-                String otp = otpService.generateAndStore(memberId, OtpType.LOGIN);
+                String otp      = otpService.generateAndStore(memberId, OtpType.LOGIN);
                 emailService.sendLoginOtp(email, otp);
-                session.setAttribute(SessionConstants.PENDING_OTP,  true);
-                session.setAttribute(SessionConstants.OTP_EMAIL,    email);
-                response.sendRedirect("/login/otp");
+                String otpToken = otpService.generateOtpToken(memberId, OtpType.LOGIN);
+                response.sendRedirect("/login/otp?token=" + otpToken);
             } catch (Exception e) {
                 log.error("Failed to send login OTP to {}: {}", email, e.getMessage(), e);
-                session.invalidate();
                 response.sendRedirect("/login?error");
             }
 

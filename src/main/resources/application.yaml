@@ -36,7 +36,7 @@ spring:
     redis:
       host: ${REDIS_HOST:localhost}
       port: ${REDIS_PORT:6379}
-      password: ${REDIS_PASSWORD:}
+      password: ${REDIS_PASSWORD:redis}
   sql:
     init:
       mode: always
@@ -91,7 +91,7 @@ sbpayment:
   service-id: "001"
   hash-key: "398a58952baf329cac5efbae97ea84ba17028d02"
   gateway-url: "https://stbfep.sps-system.com/Extra/BuyRequestAction.do"
-  base-url: "https://siltier-davon-untough.ngrok-free.dev"
+  base-url: "https://puzzle-mooing-compress.ngrok-free.dev"
 
 springdoc:
   swagger-ui:

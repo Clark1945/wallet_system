@@ -1,6 +1,8 @@
 package org.side_project.wallet_system.auth;
 
 import org.junit.jupiter.api.Test;
+import org.side_project.wallet_system.auth.controller.AuthController;
+import org.side_project.wallet_system.auth.controller.AuthPageController;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
@@ -8,7 +10,6 @@ import org.springframework.mock.web.MockHttpSession;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.side_project.wallet_system.config.SecurityConfig;
-import org.side_project.wallet_system.config.SessionConstants;
 
 import java.util.UUID;
 
@@ -25,6 +26,7 @@ class AuthControllerIT {
     @Autowired MockMvc mockMvc;
     @MockitoBean AuthService authService;
     @MockitoBean PasswordResetService passwordResetService;
+    @MockitoBean OtpService otpService;
     @MockitoBean MemberRepository memberRepository;
     @MockitoBean CustomOAuth2UserService oauth2UserService;
     @MockitoBean LoginSuccessHandler loginSuccessHandler;
@@ -60,6 +62,7 @@ class AuthControllerIT {
         Member member = new Member();
         member.setId(UUID.randomUUID());
         given(authService.initiateRegistration(any(), anyInt(), any(), any())).willReturn(member);
+        given(otpService.generateOtpToken(any(), any())).willReturn("test-token-123");
 
         mockMvc.perform(post("/register").with(csrf())
                         .param("name", "Bob")
@@ -67,7 +70,7 @@ class AuthControllerIT {
                         .param("email", "bob@test.com")
                         .param("password", "pass123"))
                 .andExpect(status().is3xxRedirection())
-                .andExpect(redirectedUrl("/register/otp"))
+                .andExpect(redirectedUrl("/register/otp?token=test-token-123"))
                 .andExpect(flash().attributeExists("info"));
     }
 
@@ -89,18 +92,18 @@ class AuthControllerIT {
     // ─── Register OTP ────────────────────────────────────────────────────────────
 
     @Test
-    void registrationOtpPage_withSession_returnsOtpView() throws Exception {
-        MockHttpSession session = new MockHttpSession();
-        session.setAttribute(SessionConstants.OTP_EMAIL, "bob@test.com");
-        session.setAttribute(SessionConstants.OTP_MEMBER_ID, UUID.randomUUID().toString());
+    void registrationOtpPage_withToken_returnsOtpView() throws Exception {
+        UUID memberId = UUID.randomUUID();
+        given(otpService.resolveOtpToken("valid-token", OtpType.REGISTER)).willReturn(memberId);
+        given(authService.getEmailById(memberId)).willReturn("bob@test.com");
 
-        mockMvc.perform(get("/register/otp").session(session))
+        mockMvc.perform(get("/register/otp").param("token", "valid-token"))
                 .andExpect(status().isOk())
                 .andExpect(view().name("otp-verify"));
     }
 
     @Test
-    void registrationOtpPage_withoutSession_redirectsToRegister() throws Exception {
+    void registrationOtpPage_withoutToken_redirectsToRegister() throws Exception {
         mockMvc.perform(get("/register/otp"))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/register"));
@@ -109,11 +112,11 @@ class AuthControllerIT {
     @Test
     void verifyRegistrationOtp_valid_redirectsToLogin() throws Exception {
         UUID memberId = UUID.randomUUID();
-        MockHttpSession session = new MockHttpSession();
-        session.setAttribute(SessionConstants.OTP_MEMBER_ID, memberId.toString());
+        given(otpService.resolveOtpToken("valid-token", OtpType.REGISTER)).willReturn(memberId);
         // verifyAndActivate is void — default mock does nothing (success path)
 
-        mockMvc.perform(post("/register/otp").with(csrf()).session(session)
+        mockMvc.perform(post("/register/otp").with(csrf())
+                        .param("token", "valid-token")
                         .param("code", "123456"))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/login"))
@@ -123,33 +126,33 @@ class AuthControllerIT {
     @Test
     void verifyRegistrationOtp_invalid_redirectsBackWithError() throws Exception {
         UUID memberId = UUID.randomUUID();
-        MockHttpSession session = new MockHttpSession();
-        session.setAttribute(SessionConstants.OTP_MEMBER_ID, memberId.toString());
+        given(otpService.resolveOtpToken("valid-token", OtpType.REGISTER)).willReturn(memberId);
         willThrow(new IllegalArgumentException("error.otp.invalid"))
                 .given(authService).verifyAndActivate(any(), any());
 
-        mockMvc.perform(post("/register/otp").with(csrf()).session(session)
+        mockMvc.perform(post("/register/otp").with(csrf())
+                        .param("token", "valid-token")
                         .param("code", "000000"))
                 .andExpect(status().is3xxRedirection())
-                .andExpect(redirectedUrl("/register/otp"))
+                .andExpect(redirectedUrl("/register/otp?token=valid-token"))
                 .andExpect(flash().attributeExists("error"));
     }
 
     // ─── Login OTP ───────────────────────────────────────────────────────────────
 
     @Test
-    void loginOtpPage_withPendingOtp_returnsOtpView() throws Exception {
-        MockHttpSession session = new MockHttpSession();
-        session.setAttribute(SessionConstants.PENDING_OTP, true);
-        session.setAttribute(SessionConstants.OTP_EMAIL, "user@test.com");
+    void loginOtpPage_withToken_returnsOtpView() throws Exception {
+        UUID memberId = UUID.randomUUID();
+        given(otpService.resolveOtpToken("login-token", OtpType.LOGIN)).willReturn(memberId);
+        given(authService.getEmailById(memberId)).willReturn("user@test.com");
 
-        mockMvc.perform(get("/login/otp").session(session))
+        mockMvc.perform(get("/login/otp").param("token", "login-token"))
                 .andExpect(status().isOk())
                 .andExpect(view().name("otp-verify"));
     }
 
     @Test
-    void loginOtpPage_withoutPendingOtp_redirectsToLogin() throws Exception {
+    void loginOtpPage_withoutToken_redirectsToLogin() throws Exception {
         mockMvc.perform(get("/login/otp"))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/login"));
@@ -158,13 +161,12 @@ class AuthControllerIT {
     @Test
     void verifyLoginOtp_valid_redirectsToDashboard() throws Exception {
         UUID memberId = UUID.randomUUID();
-        MockHttpSession session = new MockHttpSession();
-        session.setAttribute(SessionConstants.PENDING_OTP, true);
-        session.setAttribute(SessionConstants.MEMBER_ID, memberId.toString());
-        session.setAttribute(SessionConstants.OTP_EMAIL, "user@test.com");
+        given(otpService.resolveOtpToken("login-token", OtpType.LOGIN)).willReturn(memberId);
+        given(authService.getNameById(memberId)).willReturn("Bob");
         // verifyLoginOtpCode is void — default mock does nothing (success path)
 
-        mockMvc.perform(post("/login/otp").with(csrf()).session(session)
+        mockMvc.perform(post("/login/otp").with(csrf())
+                        .param("token", "login-token")
                         .param("code", "654321"))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/dashboard"));
