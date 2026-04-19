@@ -51,8 +51,15 @@ public class AuthFlowService {
         try {
             authService.verifyLoginOtpCode(memberId, code);
         } catch (IllegalArgumentException e) {
+            int remaining = otpService.recordFailedAttempt(token);
+            if (remaining == 0) {
+                redirectAttributes.addFlashAttribute("error",
+                        messageSource.getMessage("error.otp.locked", null, locale));
+                return "redirect:/login";
+            }
             redirectAttributes.addFlashAttribute("error",
-                    messageSource.getMessage(e.getMessage(), null, e.getMessage(), locale));
+                    messageSource.getMessage("error.otp.attempts.remaining",
+                            new Object[]{remaining}, locale));
             return "redirect:/login/otp?token=" + token;
         }
 
@@ -114,24 +121,31 @@ public class AuthFlowService {
 
     public String verifyRegistrationOtp(String otpToken, String code,
                                         RedirectAttributes redirectAttributes, Locale locale) {
-
-
+        UUID memberId;
         try {
-            String memberIdStr = otpService.resolveOtpToken(otpToken,OtpType.REGISTER).toString();
-            // consume first, then verify
-            boolean consumed = otpService.consumeToken(otpToken);
-            if (!consumed) {
-                throw new IllegalArgumentException("error.otp.invalid");
-            }
-
-            authService.verifyAndActivate(UUID.fromString(memberIdStr), code);
-
+            memberId = otpService.resolveOtpToken(otpToken, OtpType.REGISTER);
         } catch (IllegalArgumentException e) {
             redirectAttributes.addFlashAttribute("error",
                     messageSource.getMessage(e.getMessage(), null, e.getMessage(), locale));
+            return "redirect:/register";
+        }
+
+        try {
+            authService.verifyAndActivate(memberId, code);
+        } catch (IllegalArgumentException e) {
+            int remaining = otpService.recordFailedAttempt(otpToken);
+            if (remaining == 0) {
+                redirectAttributes.addFlashAttribute("error",
+                        messageSource.getMessage("error.otp.locked", null, locale));
+                return "redirect:/register";
+            }
+            redirectAttributes.addFlashAttribute("error",
+                    messageSource.getMessage("error.otp.attempts.remaining",
+                            new Object[]{remaining}, locale));
             return "redirect:/register/otp?token=" + otpToken;
         }
 
+        otpService.consumeToken(otpToken);
         redirectAttributes.addFlashAttribute("success",
                 messageSource.getMessage("flash.register.success", null, locale));
         return "redirect:/login";

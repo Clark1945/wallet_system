@@ -24,6 +24,7 @@ public class OtpService {
     private final RedisTemplate<String,Object> redisTemplate;
     private static final SecureRandom RANDOM = new SecureRandom();
     private static final Duration OTP_TTL = Duration.ofMinutes(10);
+    public  static final int MAX_OTP_ATTEMPTS = 5;
 
     public String generateAndStore(UUID memberId, OtpType type) {
         String otp = String.format("%06d", RANDOM.nextInt(1_000_000));
@@ -81,8 +82,30 @@ public class OtpService {
 
     public boolean consumeToken(String token) {
         String redisKey = "otp_token:" + token;
+        return Boolean.TRUE.equals(redisTemplate.delete(redisKey));
+    }
 
-        return redisTemplate.delete(redisKey);
+    /**
+     * Records a failed OTP attempt for the given flow token.
+     * @return remaining attempts; 0 means the token has been locked and invalidated
+     */
+    public int recordFailedAttempt(String token) {
+        String attemptsKey = "otp_attempts:" + token;
+        Long count = stringRedisTemplate.opsForValue().increment(attemptsKey);
+        if (count == null) count = (long) MAX_OTP_ATTEMPTS;
+
+        if (count == 1) {
+            stringRedisTemplate.expire(attemptsKey, OTP_TTL);
+        }
+        if (count >= MAX_OTP_ATTEMPTS) {
+            consumeToken(token);
+            stringRedisTemplate.delete(attemptsKey);
+            log.warn("OTP token locked after {} failed attempts: token={}", MAX_OTP_ATTEMPTS, token);
+            return 0;
+        }
+        int remaining = MAX_OTP_ATTEMPTS - count.intValue();
+        log.debug("OTP failed attempt recorded: remaining={}, token={}", remaining, token);
+        return remaining;
     }
 
     @Setter

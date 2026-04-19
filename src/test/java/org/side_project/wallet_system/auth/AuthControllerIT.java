@@ -143,7 +143,7 @@ class AuthControllerIT {
     void verifyRegistrationOtp_invalid_redirectsBackWithError() throws Exception {
         UUID memberId = UUID.randomUUID();
         given(otpService.resolveOtpToken("valid-token", OtpType.REGISTER)).willReturn(memberId);
-        given(otpService.consumeToken("valid-token")).willReturn(true);
+        given(otpService.recordFailedAttempt("valid-token")).willReturn(4); // 4 remaining
         willThrow(new IllegalArgumentException("error.otp.invalid"))
                 .given(authService).verifyAndActivate(any(), any());
 
@@ -152,6 +152,22 @@ class AuthControllerIT {
                         .param("code", "000000"))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/register/otp?token=valid-token"))
+                .andExpect(flash().attributeExists("error"));
+    }
+
+    @Test
+    void verifyRegistrationOtp_locked_redirectsToRegister() throws Exception {
+        UUID memberId = UUID.randomUUID();
+        given(otpService.resolveOtpToken("valid-token", OtpType.REGISTER)).willReturn(memberId);
+        given(otpService.recordFailedAttempt("valid-token")).willReturn(0); // locked
+        willThrow(new IllegalArgumentException("error.otp.invalid"))
+                .given(authService).verifyAndActivate(any(), any());
+
+        mockMvc.perform(post("/register/otp").with(csrf())
+                        .param("token", "valid-token")
+                        .param("code", "000000"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/register"))
                 .andExpect(flash().attributeExists("error"));
     }
 
@@ -187,6 +203,38 @@ class AuthControllerIT {
                         .param("code", "654321"))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/dashboard"));
+    }
+
+    @Test
+    void verifyLoginOtp_invalid_redirectsBackWithError() throws Exception {
+        UUID memberId = UUID.randomUUID();
+        given(otpService.resolveOtpToken("login-token", OtpType.LOGIN)).willReturn(memberId);
+        given(otpService.recordFailedAttempt("login-token")).willReturn(3);
+        willThrow(new IllegalArgumentException("error.otp.invalid"))
+                .given(authService).verifyLoginOtpCode(any(), any());
+
+        mockMvc.perform(post("/login/otp").with(csrf())
+                        .param("token", "login-token")
+                        .param("code", "000000"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/login/otp?token=login-token"))
+                .andExpect(flash().attributeExists("error"));
+    }
+
+    @Test
+    void verifyLoginOtp_locked_redirectsToLogin() throws Exception {
+        UUID memberId = UUID.randomUUID();
+        given(otpService.resolveOtpToken("login-token", OtpType.LOGIN)).willReturn(memberId);
+        given(otpService.recordFailedAttempt("login-token")).willReturn(0);
+        willThrow(new IllegalArgumentException("error.otp.invalid"))
+                .given(authService).verifyLoginOtpCode(any(), any());
+
+        mockMvc.perform(post("/login/otp").with(csrf())
+                        .param("token", "login-token")
+                        .param("code", "000000"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/login"))
+                .andExpect(flash().attributeExists("error"));
     }
 
     // ─── Forgot Password ─────────────────────────────────────────────────────────
