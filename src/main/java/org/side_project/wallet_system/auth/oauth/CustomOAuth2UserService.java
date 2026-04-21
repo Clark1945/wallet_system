@@ -26,7 +26,11 @@ public class CustomOAuth2UserService extends OidcUserService {
         String name     = oidcUser.getAttribute("name");
 
         log.debug("OIDC user loaded from Google: email={}", email);
-        Member member = authService.findOrCreateGoogleMember(googleId, email, name);
-        return new CustomOAuth2User(oidcUser, member.getId(), member.getName());
+        try {
+            Member member = authService.findOrCreateGoogleMember(googleId, email, name);
+            return new CustomOAuth2User(oidcUser, member.getId(), member.getName());
+        } catch (IllegalArgumentException e) {
+            throw new OAuth2AuthenticationException(e.getMessage());
+        }
     }
 }

@@ -102,7 +102,13 @@ public class SecurityConfig {
                 .loginPage("/login")
                 .userInfoEndpoint(ui -> ui.oidcUserService(oauth2UserService))
                 .successHandler(loginSuccessHandler)
-                .failureUrl("/login?error")
+                .failureHandler((request, response, exception) -> {
+                    if ("error.email.duplicate".equals(exception.getMessage())) {
+                        response.sendRedirect("/login?oauth_conflict");
+                    } else {
+                        response.sendRedirect("/login?error");
+                    }
+                })
             )
             .logout(logout -> logout
                 .logoutUrl("/logout")
