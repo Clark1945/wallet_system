@@ -22,6 +22,12 @@ services:
       timeout: 5s
       retries: 5
 
+  mock-bank:
+    build:
+      context: ../mock-bank
+    ports:
+      - "8081:8081"
+
   app:
     build: .
     ports:
@@ -33,6 +39,10 @@ services:
       SPRING_DATA_REDIS_HOST: redis
       SPRING_DATA_REDIS_PORT: 6379
       SPRING_DATA_REDIS_PASSWORD: redis
+      # mock-bank.url → wallet app calls this to initiate withdrawals
+      MOCK_BANK_URL: http://mock-bank:8081
+      # app.base-url → embedded in the callbackUrl sent to mock-bank
+      APP_BASE_URL: http://app:8080
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
       STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY}
@@ -42,7 +52,6 @@ services:
       MAIL_PORT: ${MAIL_PORT:-587}
       MAIL_USERNAME: ${MAIL_USERNAME:-}
       MAIL_PASSWORD: ${MAIL_PASSWORD:-}
-      APP_BASE_URL: ${APP_BASE_URL:-http://localhost:8080}
     volumes:
       - uploads:/app/uploads
     depends_on:
@@ -50,6 +59,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      mock-bank:
+        condition: service_started
 
 volumes:
   postgres_data:
