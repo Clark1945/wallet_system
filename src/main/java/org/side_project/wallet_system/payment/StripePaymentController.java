@@ -44,7 +44,8 @@ public class StripePaymentController {
      * so Stripe.js can confirm the payment client-side (with 3DS if needed).
      */
     @GetMapping("/checkout")
-    public String checkout(HttpSession session, Model model) {
+    public String checkout(HttpSession session, Model model,
+                           RedirectAttributes redirectAttributes, Locale locale) {
         BigDecimal amount = (BigDecimal) session.getAttribute(SessionConstants.STRIPE_PENDING_AMOUNT);
         if (amount == null) {
             log.warn("No pending Stripe amount in session — redirecting to deposit");
@@ -60,11 +61,15 @@ public class StripePaymentController {
             model.addAttribute("amount", amount);
             model.addAttribute(SessionConstants.MEMBER_NAME, SessionUtils.getMemberName(session));
             return "stripe-checkout";
-        } catch (StripeException e) {
-            log.error("Stripe API error creating PaymentIntent: {}", e.getMessage(), e);
-            return "redirect:/deposit";
         } catch (IllegalArgumentException e) {
             log.warn("Invalid deposit request: {}", e.getMessage());
+            redirectAttributes.addFlashAttribute("error",
+                    messageSource.getMessage(e.getMessage(), null, e.getMessage(), locale));
+            return "redirect:/deposit";
+        } catch (StripeException e) {
+            log.error("Stripe API error creating PaymentIntent: {}", e.getMessage(), e);
+            redirectAttributes.addFlashAttribute("error",
+                    messageSource.getMessage("error.stripe.unavailable", null, e.getMessage(), locale));
             return "redirect:/deposit";
         }
     }

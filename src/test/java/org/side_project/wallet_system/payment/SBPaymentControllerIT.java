@@ -6,6 +6,8 @@ import org.side_project.wallet_system.auth.oauth.CustomOAuth2UserService;
 import org.side_project.wallet_system.auth.oauth.LoginSuccessHandler;
 import org.side_project.wallet_system.auth.repository.MemberRepository;
 import org.side_project.wallet_system.auth.service.LoginAttemptService;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
 import org.side_project.wallet_system.config.SecurityConfig;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
@@ -15,6 +17,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.math.BigDecimal;
+import java.util.Locale;
 import java.util.UUID;
 
 import org.springframework.http.MediaType;
@@ -30,6 +33,19 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @WebMvcTest(SBPaymentController.class)
 @Import(SecurityConfig.class)
 class SBPaymentControllerIT {
+
+    private static Locale originalLocale;
+
+    @BeforeAll
+    static void setTestLocale() {
+        originalLocale = Locale.getDefault();
+        Locale.setDefault(Locale.ENGLISH);
+    }
+
+    @AfterAll
+    static void restoreLocale() {
+        Locale.setDefault(originalLocale);
+    }
 
     @Autowired MockMvc mockMvc;
     @MockitoBean SBPaymentService sbPaymentService;

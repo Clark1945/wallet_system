@@ -32,7 +32,12 @@ public class StripePaymentService {
     // Create PaymentIntent — also creates a PENDING deposit transaction
     // ─────────────────────────────────────────────────────────────────────────
 
+    private static final BigDecimal STRIPE_JPY_MIN = BigDecimal.valueOf(50);
+
     public String createPaymentIntent(UUID memberId, BigDecimal amount) throws StripeException {
+        if (amount.compareTo(STRIPE_JPY_MIN) < 0) {
+            throw new IllegalArgumentException("error.stripe.amount.min");
+        }
         UUID transactionId = walletService.initiateDeposit(memberId, amount);
 
         PaymentIntentCreateParams params = PaymentIntentCreateParams.builder()

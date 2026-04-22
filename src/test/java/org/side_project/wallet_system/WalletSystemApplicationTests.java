@@ -9,6 +9,7 @@ import com.stripe.model.Product;
 import com.stripe.param.PaymentIntentCreateParams;
 import com.stripe.param.PriceCreateParams;
 import com.stripe.param.ProductCreateParams;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
@@ -22,6 +23,7 @@ class WalletSystemApplicationTests {
     }
 
     @Test
+    @Disabled("Requires real Stripe credentials — exploratory code only")
     void stripe_function_test() throws StripeException {
         // Don't embed any keys in production code. This is an example.
         // See https://docs.stripe.com/keys-best-practices.
@@ -52,6 +54,7 @@ class WalletSystemApplicationTests {
     }
 
     @Test
+    @Disabled("Requires real Stripe credentials — exploratory code only")
     void stripe_paymentMethod_test() throws StripeException {
         // Don't put any keys in code. See https://docs.stripe.com/keys-best-practices.
 // Find your keys at https://dashboard.stripe.com/apikeys.
@@ -68,6 +71,7 @@ class WalletSystemApplicationTests {
     }
 
     @Test
+    @Disabled("Requires real Stripe credentials — exploratory code only")
     void stripe_paymentIntent_test() throws StripeException {
         // Don't put any keys in code. See https://docs.stripe.com/keys-best-practices.
 // Find your keys at https://dashboard.stripe.com/apikeys.

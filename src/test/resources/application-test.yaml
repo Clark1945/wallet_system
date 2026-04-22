@@ -30,6 +30,8 @@ stripe:
 
 app:
   base-url: "http://localhost:8080"
+  upload:
+    dir: uploads
 
 mock-bank:
   url: "http://localhost:8081"

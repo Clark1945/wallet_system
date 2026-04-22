@@ -1,5 +1,7 @@
 package org.side_project.wallet_system.auth;
 
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.side_project.wallet_system.auth.controller.ProfileController;
@@ -18,6 +20,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.side_project.wallet_system.config.SecurityConfig;
 
+import java.util.Locale;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -35,8 +38,20 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @Import(SecurityConfig.class)
 class ProfileControllerIT {
 
-    @Autowired
-    MockMvc mockMvc;
+    private static Locale originalLocale;
+
+    @BeforeAll
+    static void setTestLocale() {
+        originalLocale = Locale.getDefault();
+        Locale.setDefault(Locale.ENGLISH);
+    }
+
+    @AfterAll
+    static void restoreLocale() {
+        Locale.setDefault(originalLocale);
+    }
+
+    @Autowired MockMvc mockMvc;
 
     @MockitoBean
     ProfileService profileService;
