@@ -27,6 +27,11 @@ stripe:
   publishable-key: pk_test_dummy
   webhook-secret: whsec_dummy
 
+sbpayment:
+  merchant-id: test_merchant
+  service-id: test_service
+  hash-key: test_hash_key
+
 app:
   base-url: "http://localhost:8080"
   upload:
