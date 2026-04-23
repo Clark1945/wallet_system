@@ -58,12 +58,15 @@ This is a **server-rendered MVC app**, not a REST API. All controllers are `@Con
 
 ### Authentication & Session
 
-Spring Security handles all authentication via `SecurityConfig`. Two login methods are supported:
+Spring Security handles all authentication via `SecurityConfig`. Five login methods are supported:
 
 - **Form login:** email + password; `BCryptPasswordEncoder` compares credentials; principal is `CustomUserDetails`
 - **Google OAuth2/OIDC:** `CustomOAuth2UserService` calls `AuthService.findOrCreateGoogleMember()` and wraps the result in `CustomOAuth2User`
+- **Email OTP:** `OtpService` generates a 6-digit code stored in Redis (5-minute TTL) and sends it via `EmailService`. `OtpController` verifies and completes login.
+- **Password reset:** `PasswordResetService` generates a UUID token stored in Redis (15-minute TTL), emails a reset link. Token is single-use.
+- **Account lockout:** `LoginAttemptService` tracks failed attempts in Redis (key `login_attempts:{email}`); after 5 failures, account locks for 15 minutes.
 
-`LoginSuccessHandler` fires after both flows — it extracts `memberId` (UUID) and `memberName` from the principal and stores them in `HttpSession` as plain strings, then redirects to `/dashboard`. Controllers pull `memberId`/`memberName` directly from `HttpSession` attributes (no `@SessionAttribute`).
+`LoginSuccessHandler` fires after both form/OAuth2 flows — it extracts `memberId` (UUID) and `memberName` from the principal and stores them in `HttpSession` as plain strings, then redirects to `/dashboard`. Controllers pull `memberId`/`memberName` directly from `HttpSession` attributes (no `@SessionAttribute`).
 
 Public URLs (login, register, OpenAPI, actuator) are permitted in `SecurityConfig`. All others require authentication. Logout at `/logout` invalidates the session and deletes `JSESSIONID`.
 
@@ -80,6 +83,14 @@ Public URLs (login, register, OpenAPI, actuator) are permitted in `SecurityConfi
 - `WalletService` methods (`deposit`, `withdraw`, `transfer`) are `@Transactional`. They throw `IllegalArgumentException` with i18n message keys on invalid input (negative amounts, insufficient balance, self-transfer, unknown wallet code).
 - `Transaction` records every operation, with nullable `fromWalletId`/`toWalletId` depending on `TransactionType` (DEPOSIT / WITHDRAW / TRANSFER).
 - Transaction history supports filtering by `TransactionType` and date range via `TransactionSpec` (JPA Criteria API), plus server-side pagination.
+
+**Async withdrawal flow:**
+1. `WalletService.withdraw()` deducts balance and creates a `Transaction` with status `REQUEST_COMPLETED`, then fires `HttpClient.sendAsync()` to `POST mock-bank:8081/api/withdraw`.
+2. mock-bank responds `200 OK` immediately, then calls back `POST /withdraw/webhook` after a 3–8 second delay.
+3. `WithdrawWebhookController` processes `{"transactionId":"...", "result":"SUCCESS"/"FAIL"}`: SUCCESS → `COMPLETED`; FAIL → `FAILED` + balance refunded.
+4. `TransactionTimeoutJob` (`@Scheduled(fixedDelay = 60_000)`) runs every 60 seconds; any `PENDING` or `REQUEST_COMPLETED` transaction older than 5 minutes is set to `FAILED` and balance is refunded.
+
+Transaction status lifecycle: `PENDING` → `REQUEST_COMPLETED` → `COMPLETED` (or `FAILED` on webhook FAIL / timeout).
 
 ### Payment Gateway Integrations
 
@@ -123,9 +134,9 @@ The fallback (third arg) returns the raw key if no translation exists. This patt
 ### Database
 
 - **Runtime:** PostgreSQL (`localhost:5432/wallet_db`, user: `postgres`)
-- **Tests:** H2 in-memory with `ddl-auto: create-drop`; SQL init is disabled for tests (Hibernate recreates schema from entities)
-- **DDL:** `src/main/resources/schema.sql` runs on startup (`spring.sql.init.mode: always`). `ddl-auto: none` — schema is managed manually. The file uses `CREATE TABLE IF NOT EXISTS` and includes idempotent `ALTER TABLE ... ADD COLUMN IF NOT EXISTS` migration statements at the bottom for additive schema changes.
-- `script.sql` at the repo root is a standalone PostgreSQL DDL script for manual setup.
+- **Tests:** H2 in-memory with `ddl-auto: create-drop`; Flyway is disabled for tests (`spring.flyway.enabled: false` in `application-test.yaml`) — Hibernate recreates the schema from entities.
+- **DDL:** Managed by Flyway. Migrations live in `src/main/resources/db/migration/` and run automatically on startup. `ddl-auto: none`. Current baseline: `V1__init_schema.sql` (creates `members`, `wallets`, `transactions` tables with indexes).
+- To add a schema change, create a new `V{n}__description.sql` file; never edit existing migrations.
 
 ### OpenAPI / Swagger
 

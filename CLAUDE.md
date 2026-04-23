@@ -61,11 +61,11 @@ Three login methods beyond form login and Google OAuth2:
 
 ### Security Filter Chains
 
-`SecurityConfig` configures **4 separate filter chains** (Spring Security `@Order`):
-1. **Main chain** — form login + OAuth2 + session management; all app routes
-2. **Stripe webhook chain** — STATELESS, CSRF disabled, signature verified in service
-3. **SBPS webhook chain** — STATELESS, CSRF disabled, `res_sps_hashcode` verified in service
-4. **Withdrawal webhook chain** — STATELESS, CSRF disabled, no auth
+`SecurityConfig` configures **4 separate filter chains** (Spring Security `@Order`, lower number = higher priority):
+1. **Stripe webhook chain** (`@Order(1)`) — STATELESS, CSRF disabled, signature verified in service; matches `/payment/stripe/webhook`
+2. **SBPS webhook chain** (`@Order(2)`) — STATELESS, CSRF disabled, `res_sps_hashcode` verified in service; matches `/payment/sbpayment/result`
+3. **Withdrawal webhook chain** (`@Order(3)`) — STATELESS, CSRF disabled, no auth; matches `/withdraw/webhook`
+4. **Main chain** (default order) — form login + OAuth2 + session management; all other app routes
 
 ### Transaction Filtering & Pagination
 
