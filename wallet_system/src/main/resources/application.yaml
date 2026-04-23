@@ -22,9 +22,9 @@ spring:
             client-secret: ${GOOGLE_CLIENT_SECRET}
             scope: openid, email, profile
   datasource:
-    url: jdbc:postgresql://localhost:5432/wallet_db
-    username: postgres
-    password: postgres
+    url: ${DB_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
     driver-class-name: org.postgresql.Driver
   messages:
     basename: messages
@@ -92,9 +92,9 @@ stripe:
   webhook-secret: ${STRIPE_WEBHOOK_SECRET}
 
 sbpayment:
-  merchant-id: "19788"
-  service-id: "001"
-  hash-key: "398a58952baf329cac5efbae97ea84ba17028d02"
+  merchant-id: ${PAYMENT_MERCHANT_ID}
+  service-id: ${PAYMENT_SERVICE_ID}
+  hash-key: ${PAYMENT_HASH_KEY}
   gateway-url: "https://stbfep.sps-system.com/Extra/BuyRequestAction.do"
   base-url: "https://puzzle-mooing-compress.ngrok-free.dev"
 
