@@ -27,6 +27,8 @@ services:
       context: ../mock-bank
     ports:
       - "8081:8081"
+    volumes:
+      - mock_bank_logs:/app/logs
 
   app:
     build: .
@@ -54,6 +56,7 @@ services:
       MAIL_PASSWORD: ${MAIL_PASSWORD:-}
     volumes:
       - uploads:/app/uploads
+      - app_logs:/app/logs
     depends_on:
       db:
         condition: service_healthy
@@ -62,6 +65,44 @@ services:
       mock-bank:
         condition: service_started
 
+  loki:
+    image: grafana/loki:3.0.0
+    ports:
+      - "3100:3100"
+    command: -config.file=/etc/loki/config.yaml
+    volumes:
+      - ./observability/loki-config.yaml:/etc/loki/config.yaml:ro
+      - loki_data:/loki
+
+  promtail:
+    image: grafana/promtail:3.0.0
+    command: -config.file=/etc/promtail/config.yaml
+    volumes:
+      - ./observability/promtail-config.yaml:/etc/promtail/config.yaml:ro
+      - app_logs:/logs/wallet-system:ro
+      - mock_bank_logs:/logs/mock-bank:ro
+    depends_on:
+      - loki
+      - app
+      - mock-bank
+
+  grafana:
+    image: grafana/grafana:11.0.0
+    ports:
+      - "3000:3000"
+    environment:
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Admin
+    volumes:
+      - ./observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - grafana_data:/var/lib/grafana
+    depends_on:
+      - loki
+
 volumes:
   postgres_data:
   uploads:
+  app_logs:
+  mock_bank_logs:
+  loki_data:
+  grafana_data:
