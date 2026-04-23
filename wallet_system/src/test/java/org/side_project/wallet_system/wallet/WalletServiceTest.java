@@ -13,6 +13,7 @@ import org.side_project.wallet_system.transaction.TransactionType;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -38,7 +39,10 @@ class WalletServiceTest {
         wallet.setId(UUID.randomUUID());
         wallet.setBalance(new BigDecimal("1000.00"));
         wallet.setWalletCode("MyCode000001");
+        // findByMemberId — used in transfer() early validation (unlocked)
         lenient().when(walletRepository.findByMemberId(memberId)).thenReturn(Optional.of(wallet));
+        // findByMemberIdForUpdate — used in deposit/withdraw/initiateWithdrawal
+        lenient().when(walletRepository.findByMemberIdForUpdate(memberId)).thenReturn(Optional.of(wallet));
         ReflectionTestUtils.setField(walletService, "mockBankUrl", "http://localhost:8081");
         ReflectionTestUtils.setField(walletService, "appBaseUrl",  "http://localhost:8080");
     }
@@ -110,6 +114,7 @@ class WalletServiceTest {
         toWallet.setBalance(BigDecimal.ZERO);
         toWallet.setWalletCode("ToCode000001");
         given(walletRepository.findByWalletCode("ToCode000001")).willReturn(Optional.of(toWallet));
+        given(walletRepository.findByIdsForUpdate(any())).willReturn(List.of(wallet, toWallet));
 
         walletService.transfer(memberId, "ToCode000001", new BigDecimal("200.00"));
 
@@ -179,6 +184,7 @@ class WalletServiceTest {
         toWallet.setBalance(BigDecimal.ZERO);
         toWallet.setWalletCode("ToCode000001");
         given(walletRepository.findByWalletCode("ToCode000001")).willReturn(Optional.of(toWallet));
+        given(walletRepository.findByIdsForUpdate(any())).willReturn(List.of(wallet, toWallet));
         given(transactionRepository.save(any())).willAnswer(inv -> inv.getArgument(0));
 
         walletService.transfer(memberId, "ToCode000001", new BigDecimal("100.00"));
@@ -223,7 +229,7 @@ class WalletServiceTest {
         tx.setAmount(new BigDecimal("200.00"));
         tx.setStatus(TransactionStatus.PENDING);
         given(transactionRepository.findById(txId)).willReturn(Optional.of(tx));
-        given(walletRepository.findById(wallet.getId())).willReturn(Optional.of(wallet));
+        given(walletRepository.findByIdForUpdate(wallet.getId())).willReturn(Optional.of(wallet));
 
         walletService.completeDeposit(txId);
 

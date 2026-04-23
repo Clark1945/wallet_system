@@ -17,6 +17,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import org.slf4j.MDC;
 import org.springframework.transaction.annotation.Transactional;
@@ -80,7 +81,8 @@ public class WalletService {
             log.warn("Deposit rejected - non-positive amount: memberId={}, amount={}", memberId, amount);
             throw new IllegalArgumentException("error.amount.positive");
         }
-        Wallet wallet = getWallet(memberId);
+        Wallet wallet = walletRepository.findByMemberIdForUpdate(memberId)
+                .orElseThrow(() -> new WalletNotFoundException(memberId));
         wallet.setBalance(wallet.getBalance().add(amount));
         walletRepository.save(wallet);
 
@@ -119,7 +121,7 @@ public class WalletService {
     public void completeDeposit(UUID transactionId) {
         transactionRepository.findById(transactionId).ifPresent(tx -> {
             if (tx.getStatus() == TransactionStatus.PENDING) {
-                walletRepository.findById(tx.getToWalletId()).ifPresent(wallet -> {
+                walletRepository.findByIdForUpdate(tx.getToWalletId()).ifPresent(wallet -> {
                     wallet.setBalance(wallet.getBalance().add(tx.getAmount()));
                     walletRepository.save(wallet);
                 });
@@ -170,7 +172,8 @@ public class WalletService {
             log.warn("Withdrawal rejected - non-positive amount: memberId={}, amount={}", memberId, amount);
             throw new IllegalArgumentException("error.amount.positive");
         }
-        Wallet wallet = getWallet(memberId);
+        Wallet wallet = walletRepository.findByMemberIdForUpdate(memberId)
+                .orElseThrow(() -> new WalletNotFoundException(memberId));
         if (wallet.getBalance().compareTo(amount) < 0) {
             log.warn("Withdrawal rejected - insufficient balance: memberId={}, amount={}, balance={}", memberId, amount, wallet.getBalance());
             throw new IllegalArgumentException("error.insufficient.balance");
@@ -196,7 +199,8 @@ public class WalletService {
             log.warn("Withdrawal rejected - non-positive amount: memberId={}, amount={}", memberId, amount);
             throw new IllegalArgumentException("error.amount.positive");
         }
-        Wallet wallet = getWallet(memberId);
+        Wallet wallet = walletRepository.findByMemberIdForUpdate(memberId)
+                .orElseThrow(() -> new WalletNotFoundException(memberId));
         if (wallet.getBalance().compareTo(amount) < 0) {
             log.warn("Withdrawal rejected - insufficient balance: memberId={}, amount={}, balance={}", memberId, amount, wallet.getBalance());
             throw new IllegalArgumentException("error.insufficient.balance");
@@ -261,7 +265,7 @@ public class WalletService {
                 transactionRepository.save(tx);
 
                 if (tx.getFromWalletId() != null) {
-                    walletRepository.findById(tx.getFromWalletId()).ifPresent(wallet -> {
+                    walletRepository.findByIdForUpdate(tx.getFromWalletId()).ifPresent(wallet -> {
                         wallet.setBalance(wallet.getBalance().add(tx.getAmount()));
                         walletRepository.save(wallet);
                         log.info("Withdrawal failed - balance refunded: transactionId={}, walletId={}, amount={}",
@@ -283,7 +287,9 @@ public class WalletService {
             log.warn("Transfer rejected - non-positive amount: fromMemberId={}, amount={}", fromMemberId, amount);
             throw new IllegalArgumentException("error.amount.positive");
         }
-        Wallet fromWallet = getWallet(fromMemberId);
+        // Unlocked reads for early validation (self-transfer, existence, quick balance check)
+        Wallet fromWallet = walletRepository.findByMemberId(fromMemberId)
+                .orElseThrow(() -> new WalletNotFoundException(fromMemberId));
         if (fromWallet.getWalletCode().equals(toWalletCode)) {
             log.warn("Transfer rejected - self-transfer: memberId={}", fromMemberId);
             throw new IllegalArgumentException("error.self.transfer");
@@ -292,21 +298,34 @@ public class WalletService {
             log.warn("Transfer rejected - insufficient balance: fromMemberId={}, amount={}, balance={}", fromMemberId, amount, fromWallet.getBalance());
             throw new IllegalArgumentException("error.insufficient.balance");
         }
-
         Wallet toWallet = walletRepository.findByWalletCode(toWalletCode)
                 .orElseThrow(() -> {
                     log.warn("Transfer rejected - wallet not found: toWalletCode={}", toWalletCode);
                     return new IllegalArgumentException("error.wallet.not.found");
                 });
 
-        fromWallet.setBalance(fromWallet.getBalance().subtract(amount));
-        toWallet.setBalance(toWallet.getBalance().add(amount));
-        walletRepository.save(fromWallet);
-        walletRepository.save(toWallet);
+        // Lock both wallets in ascending ID order to prevent deadlocks under concurrent transfers
+        List<Wallet> locked = walletRepository.findByIdsForUpdate(
+                List.of(fromWallet.getId(), toWallet.getId()));
+        Wallet lockedFrom = locked.stream().filter(w -> w.getId().equals(fromWallet.getId())).findFirst()
+                .orElseThrow(() -> new WalletNotFoundException(fromMemberId));
+        Wallet lockedTo = locked.stream().filter(w -> w.getId().equals(toWallet.getId())).findFirst()
+                .orElseThrow(() -> new IllegalArgumentException("error.wallet.not.found"));
+
+        // Re-check balance with the freshly locked values
+        if (lockedFrom.getBalance().compareTo(amount) < 0) {
+            log.warn("Transfer rejected - insufficient balance after lock: fromMemberId={}, amount={}, balance={}", fromMemberId, amount, lockedFrom.getBalance());
+            throw new IllegalArgumentException("error.insufficient.balance");
+        }
+
+        lockedFrom.setBalance(lockedFrom.getBalance().subtract(amount));
+        lockedTo.setBalance(lockedTo.getBalance().add(amount));
+        walletRepository.save(lockedFrom);
+        walletRepository.save(lockedTo);
 
         Transaction tx = new Transaction();
-        tx.setFromWalletId(fromWallet.getId());
-        tx.setToWalletId(toWallet.getId());
+        tx.setFromWalletId(lockedFrom.getId());
+        tx.setToWalletId(lockedTo.getId());
         tx.setType(TransactionType.TRANSFER);
         tx.setAmount(amount);
         tx.setDescription(String.format(DESC_TRANSFER_TO, toWalletCode));
