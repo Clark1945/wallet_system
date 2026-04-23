@@ -32,6 +32,9 @@ sbpayment:
   service-id: test_service
   hash-key: test_hash_key
 
+withdraw:
+  webhook-secret: test-webhook-secret
+
 app:
   base-url: "http://localhost:8080"
   upload:

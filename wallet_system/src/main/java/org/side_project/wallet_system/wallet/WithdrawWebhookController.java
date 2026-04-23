@@ -1,12 +1,23 @@
 package org.side_project.wallet_system.wallet;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RestController;
 
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
+import java.nio.charset.StandardCharsets;
+import java.security.GeneralSecurityException;
+import java.security.MessageDigest;
+import java.util.HexFormat;
 import java.util.Map;
 import java.util.UUID;
 
@@ -15,10 +26,31 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class WithdrawWebhookController {
 
+    private static final ObjectMapper MAPPER = new ObjectMapper();
+
     private final WalletService walletService;
 
+    @Value("${withdraw.webhook-secret}")
+    private String webhookSecret;
+
     @PostMapping("/withdraw/webhook")
-    public ResponseEntity<Void> handleWebhook(@RequestBody Map<String, String> payload) {
+    public ResponseEntity<Void> handleWebhook(
+            @RequestBody byte[] rawBody,
+            @RequestHeader(value = "X-Webhook-Signature", required = false) String signature) {
+
+        if (!isValidSignature(rawBody, signature)) {
+            log.warn("Withdraw webhook rejected: invalid or missing signature");
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+
+        Map<String, String> payload;
+        try {
+            payload = MAPPER.readValue(rawBody, new TypeReference<>() {});
+        } catch (Exception e) {
+            log.warn("Withdraw webhook rejected: invalid JSON body");
+            return ResponseEntity.badRequest().build();
+        }
+
         log.info("Withdraw webhook received: payload={}", payload);
 
         String transactionId = payload.get("transactionId");
@@ -58,6 +90,26 @@ public class WithdrawWebhookController {
                 log.error("Withdraw webhook: failed to mark transactionId={} as FAILED", transactionId, e);
                 return ResponseEntity.internalServerError().build();
             }
+        }
+    }
+
+    private boolean isValidSignature(byte[] body, String signature) {
+        if (signature == null || signature.isBlank()) {
+            return false;
+        }
+        String expected = computeHmacSha256(body);
+        return MessageDigest.isEqual(
+                expected.getBytes(StandardCharsets.UTF_8),
+                signature.getBytes(StandardCharsets.UTF_8));
+    }
+
+    private String computeHmacSha256(byte[] body) {
+        try {
+            Mac mac = Mac.getInstance("HmacSHA256");
+            mac.init(new SecretKeySpec(webhookSecret.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
+            return "sha256=" + HexFormat.of().formatHex(mac.doFinal(body));
+        } catch (GeneralSecurityException e) {
+            throw new IllegalStateException("HMAC computation failed", e);
         }
     }
 }

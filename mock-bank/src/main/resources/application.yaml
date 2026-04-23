@@ -9,3 +9,6 @@ mock-bank:
   fail-rate: 0.10        # probability of sending FAIL callback
   no-callback-rate: 0.10 # probability of sending no callback at all
 
+withdraw:
+  webhook-secret: ${WITHDRAW_WEBHOOK_SECRET:dev-secret}
+

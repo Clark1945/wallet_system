@@ -8,10 +8,15 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
+import java.security.GeneralSecurityException;
+import java.util.HexFormat;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ThreadLocalRandom;
 
@@ -27,13 +32,15 @@ public class WithdrawController {
     @Value("${mock-bank.no-callback-rate:0.10}")
     private double noCallbackRate;
 
+    @Value("${withdraw.webhook-secret}")
+    private String webhookSecret;
+
     @PostMapping("/api/withdraw")
     public ResponseEntity<Void> receiveWithdrawal(@RequestBody WithdrawRequest req) {
         log.info("Mock bank received withdrawal: transactionId={}, amount={}, bankCode={}, bankAccount={}",
                 req.transactionId(), req.amount(), req.bankCode(), req.bankAccount());
 
-        int delaySeconds = ThreadLocalRandom.current().nextInt(3, 9); // 3 to 8 inclusive
-        // Capture trace ID before entering async thread (MDC is thread-local)
+        int delaySeconds = ThreadLocalRandom.current().nextInt(3, 9);
         String traceId = MDC.get("traceId");
 
         CompletableFuture.runAsync(() -> {
@@ -56,9 +63,12 @@ public class WithdrawController {
                         "{\"transactionId\":\"%s\",\"result\":\"%s\"}",
                         req.transactionId(), result);
 
+                String signature = computeHmacSha256(body);
+
                 HttpRequest.Builder callbackBuilder = HttpRequest.newBuilder()
                         .uri(URI.create(req.callbackUrl()))
                         .header("Content-Type", "application/json")
+                        .header("X-Webhook-Signature", signature)
                         .POST(HttpRequest.BodyPublishers.ofString(body));
                 if (traceId != null) callbackBuilder.header("X-Trace-Id", traceId);
 
@@ -75,5 +85,16 @@ public class WithdrawController {
         });
 
         return ResponseEntity.ok().build();
+    }
+
+    private String computeHmacSha256(String body) {
+        try {
+            Mac mac = Mac.getInstance("HmacSHA256");
+            mac.init(new SecretKeySpec(webhookSecret.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
+            return "sha256=" + HexFormat.of().formatHex(
+                    mac.doFinal(body.getBytes(StandardCharsets.UTF_8)));
+        } catch (GeneralSecurityException e) {
+            throw new IllegalStateException("HMAC computation failed", e);
+        }
     }
 }

@@ -27,6 +27,8 @@ services:
       context: ../mock-bank
     ports:
       - "8081:8081"
+    environment:
+      WITHDRAW_WEBHOOK_SECRET: ${WITHDRAW_WEBHOOK_SECRET}
     volumes:
       - mock_bank_logs:/app/logs
 
@@ -53,6 +55,7 @@ services:
       PAYMENT_MERCHANT_ID: ${PAYMENT_MERCHANT_ID}
       PAYMENT_SERVICE_ID: ${PAYMENT_SERVICE_ID}
       PAYMENT_HASH_KEY: ${PAYMENT_HASH_KEY}
+      WITHDRAW_WEBHOOK_SECRET: ${WITHDRAW_WEBHOOK_SECRET}
       MAIL_HOST: ${MAIL_HOST:-smtp.gmail.com}
       MAIL_PORT: ${MAIL_PORT:-587}
       MAIL_USERNAME: ${MAIL_USERNAME:-}

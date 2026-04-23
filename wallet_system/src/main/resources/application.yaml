@@ -91,6 +91,9 @@ stripe:
   publishable-key: ${STRIPE_PUBLISHABLE_KEY}
   webhook-secret: ${STRIPE_WEBHOOK_SECRET}
 
+withdraw:
+  webhook-secret: ${WITHDRAW_WEBHOOK_SECRET}
+
 sbpayment:
   merchant-id: ${PAYMENT_MERCHANT_ID}
   service-id: ${PAYMENT_SERVICE_ID}
