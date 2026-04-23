@@ -18,6 +18,7 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.LocalDate;
 import java.util.concurrent.CompletableFuture;
+import org.slf4j.MDC;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
@@ -217,17 +218,21 @@ public class WalletService {
             "{\"transactionId\":\"%s\",\"amount\":\"%s\",\"bankCode\":\"%s\",\"bankAccount\":\"%s\",\"callbackUrl\":\"%s\"}",
             transactionId, amount.toPlainString(), bankCode, bankAccount, callbackUrl);
 
+        String traceId = MDC.get("traceId");
         CompletableFuture.runAsync(() -> {
+            if (traceId != null) MDC.put("traceId", traceId);
             try {
-                HttpRequest request = HttpRequest.newBuilder()
+                HttpRequest.Builder requestBuilder = HttpRequest.newBuilder()
                     .uri(URI.create(mockBankUrl + "/api/withdraw"))
                     .header("Content-Type", "application/json")
-                    .POST(HttpRequest.BodyPublishers.ofString(body))
-                    .build();
-                httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+                    .POST(HttpRequest.BodyPublishers.ofString(body));
+                if (traceId != null) requestBuilder.header("X-Trace-Id", traceId);
+                httpClient.send(requestBuilder.build(), HttpResponse.BodyHandlers.ofString());
                 log.info("Withdrawal request sent to mock bank: transactionId={}", transactionId);
             } catch (Exception e) {
                 log.error("Failed to send withdrawal to mock bank: transactionId={}", transactionId, e);
+            } finally {
+                MDC.remove("traceId");
             }
         });
 
