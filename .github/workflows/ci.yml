@@ -53,3 +53,29 @@ jobs:
 
       - name: Run tests
         run: mvn test
+
+  sonarcloud:
+    name: SonarCloud analysis
+    needs: test-wallet-system
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: wallet_system
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # full history required for blame / new-code detection
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: temurin
+          cache: maven
+
+      - name: Build, test and analyze
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: ./mvnw verify org.sonarsource.scanner.maven:sonar-maven-plugin:sonar
