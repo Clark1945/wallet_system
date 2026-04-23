@@ -78,4 +78,8 @@ jobs:
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: ./mvnw verify org.sonarsource.scanner.maven:sonar-maven-plugin:sonar
+        run: |
+          ./mvnw verify org.sonarsource.scanner.maven:sonar-maven-plugin:sonar \
+            -Dsonar.projectKey=Clark1945_wallet_system \
+            -Dsonar.organization=clark1945 \
+            -Dsonar.token=$SONAR_TOKEN
