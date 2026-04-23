@@ -169,6 +169,38 @@ class WalletControllerIT {
                 .andExpect(flash().attribute("error", "Amount must be greater than 0"));
     }
 
+    @Test
+    void deposit_unknownPaymentMethod_redirectsToDepositWithError() throws Exception {
+        mockMvc.perform(post("/deposit").with(csrf()).with(user("test@example.com"))
+                        .param("amount", "100.00")
+                        .param("paymentMethod", "paypal")
+                        .session(session))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/deposit"))
+                .andExpect(flash().attribute("error", "Unknown payment method"));
+
+        then(walletService).should(never()).deposit(any(), any());
+    }
+
+    // ── GET /withdraw ─────────────────────────────────────────
+
+    @Test
+    void withdrawPage_withoutSession_redirectsToLogin() throws Exception {
+        mockMvc.perform(get("/withdraw"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/login"));
+    }
+
+    @Test
+    void withdrawPage_withSession_returnsWithdrawView() throws Exception {
+        mockMvc.perform(get("/withdraw")
+                        .with(user("test@example.com"))
+                        .session(session))
+                .andExpect(status().isOk())
+                .andExpect(view().name("withdraw"))
+                .andExpect(model().attribute("wallet", wallet));
+    }
+
     // ── withdraw ──────────────────────────────────────────────
 
     @Test
@@ -204,6 +236,23 @@ class WalletControllerIT {
                 .andExpect(flash().attribute("error", "Insufficient balance"));
     }
 
+    @Test
+    void withdraw_noMemberIdInSession_redirectsToLogin() throws Exception {
+        MockHttpSession noIdSession = new MockHttpSession();
+        noIdSession.setAttribute("memberName", "Test User");
+
+        mockMvc.perform(post("/withdraw").with(csrf()).with(user("test@example.com"))
+                        .param("amount", "100.00")
+                        .param("bankCode", "012")
+                        .param("bankAccount", "1234567890")
+                        .param("notifyEmail", "test@example.com")
+                        .session(noIdSession))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/login"));
+
+        then(walletService).should(never()).initiateWithdrawal(any(), any(), any(), any());
+    }
+
     // ── GET /transfer ─────────────────────────────────────────
 
     @Test
@@ -224,6 +273,21 @@ class WalletControllerIT {
     }
 
     // ── POST /transfer ────────────────────────────────────────
+
+    @Test
+    void transfer_noMemberIdInSession_redirectsToLogin() throws Exception {
+        MockHttpSession noIdSession = new MockHttpSession();
+        noIdSession.setAttribute("memberName", "Test User");
+
+        mockMvc.perform(post("/transfer").with(csrf()).with(user("test@example.com"))
+                        .param("toWalletCode", "OtherCode0001")
+                        .param("amount", "50.00")
+                        .session(noIdSession))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/login"));
+
+        then(walletService).should(never()).transfer(any(), any(), any());
+    }
 
     @Test
     void transfer_validRequest_redirectsToDashboardWithSuccess() throws Exception {
@@ -265,5 +329,51 @@ class WalletControllerIT {
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/transfer"))
                 .andExpect(flash().attribute("error", "Cannot transfer to yourself"));
+    }
+
+    @Test
+    void transfer_insufficientBalance_redirectsWithError() throws Exception {
+        willThrow(new IllegalArgumentException("error.insufficient.balance"))
+                .given(walletService).transfer(any(), any(), any());
+
+        mockMvc.perform(post("/transfer").with(csrf()).with(user("test@example.com"))
+                        .param("toWalletCode", "OtherCode0001")
+                        .param("amount", "9999.00")
+                        .session(session))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/transfer"))
+                .andExpect(flash().attribute("error", "Insufficient balance"));
+    }
+
+    // ── dashboard filter params ───────────────────────────────
+
+    @Test
+    void dashboard_withTypeFilter_setsFilterAttributesOnModel() throws Exception {
+        given(walletService.getTransactions(eq(memberId), eq(org.side_project.wallet_system.transaction.TransactionType.DEPOSIT), any(), any(), eq(0), eq(10)))
+                .willReturn(new PageImpl<>(List.of()));
+
+        mockMvc.perform(get("/dashboard")
+                        .with(user("test@example.com"))
+                        .param("type", "DEPOSIT")
+                        .session(session))
+                .andExpect(status().isOk())
+                .andExpect(view().name("dashboard"))
+                .andExpect(model().attribute("filterType", "DEPOSIT"));
+    }
+
+    @Test
+    void dashboard_withDateFilter_setsFilterAttributesOnModel() throws Exception {
+        given(walletService.getTransactions(eq(memberId), any(), any(), any(), eq(0), eq(10)))
+                .willReturn(new PageImpl<>(List.of()));
+
+        mockMvc.perform(get("/dashboard")
+                        .with(user("test@example.com"))
+                        .param("startDate", "2024-01-01")
+                        .param("endDate", "2024-12-31")
+                        .session(session))
+                .andExpect(status().isOk())
+                .andExpect(view().name("dashboard"))
+                .andExpect(model().attribute("filterStart", java.time.LocalDate.of(2024, 1, 1)))
+                .andExpect(model().attribute("filterEnd", java.time.LocalDate.of(2024, 12, 31)));
     }
 }
