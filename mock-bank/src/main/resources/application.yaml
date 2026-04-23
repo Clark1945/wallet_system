@@ -5,3 +5,7 @@ spring:
   application:
     name: mock-bank
 
+mock-bank:
+  fail-rate: 0.10        # probability of sending FAIL callback
+  no-callback-rate: 0.10 # probability of sending no callback at all
+
