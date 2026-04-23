@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+
+    <property name="LOG_PATTERN"
+              value="%d{yyyy-MM-dd HH:mm:ss.SSS} [%X{traceId:-no-trace}] %-5level [%thread] %logger{36} - %msg%n"/>
+
+    <!-- Console appender (all profiles) -->
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>${LOG_PATTERN}</pattern>
+        </encoder>
+    </appender>
+
+    <!-- File appender (non-test profiles only) -->
+    <springProfile name="!test">
+        <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+            <file>logs/mock-bank.log</file>
+            <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+                <fileNamePattern>logs/mock-bank.%d{yyyy-MM-dd}.log</fileNamePattern>
+                <maxHistory>30</maxHistory>
+            </rollingPolicy>
+            <encoder>
+                <pattern>${LOG_PATTERN}</pattern>
+            </encoder>
+        </appender>
+    </springProfile>
+
+    <!-- Root logger -->
+    <springProfile name="!test">
+        <root level="INFO">
+            <appender-ref ref="CONSOLE"/>
+            <appender-ref ref="FILE"/>
+        </root>
+    </springProfile>
+    <springProfile name="test">
+        <root level="INFO">
+            <appender-ref ref="CONSOLE"/>
+        </root>
+    </springProfile>
+
+    <!-- App package: DEBUG level (overrides root INFO) -->
+    <logger name="mockbank" level="DEBUG" additivity="false">
+        <springProfile name="!test">
+            <appender-ref ref="CONSOLE"/>
+            <appender-ref ref="FILE"/>
+        </springProfile>
+        <springProfile name="test">
+            <appender-ref ref="CONSOLE"/>
+        </springProfile>
+    </logger>
+
+</configuration>

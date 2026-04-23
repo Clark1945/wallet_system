@@ -5,6 +5,3 @@ spring:
   application:
     name: mock-bank
 
-logging:
-  level:
-    mockbank: DEBUG
