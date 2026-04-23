@@ -173,6 +173,16 @@ class ProfileServiceTest {
     }
 
     @Test
+    void updateAvatar_disallowedExtension_throws() {
+        MockMultipartFile file = new MockMultipartFile(
+                "avatar", "exploit.php", "image/jpeg", new byte[100]);
+
+        assertThatThrownBy(() -> profileService.updateAvatar(memberId, file))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("error.avatar.type");
+    }
+
+    @Test
     void updateAvatar_fileTooLarge_throws() {
         byte[] bigContent = new byte[2 * 1024 * 1024 + 1];
         MockMultipartFile file = new MockMultipartFile(

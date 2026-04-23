@@ -17,6 +17,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.LocalDate;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Stream;
 
@@ -26,6 +27,7 @@ import java.util.stream.Stream;
 public class ProfileService {
 
     private static final long MAX_AVATAR_SIZE_BYTES = 2L * 1024 * 1024;
+    private static final Set<String> ALLOWED_EXTENSIONS = Set.of("jpg", "jpeg", "png", "gif", "webp");
 
     private final MemberRepository memberRepository;
 
@@ -70,12 +72,13 @@ public class ProfileService {
         String originalFilename = StringUtils.cleanPath(
                 Objects.requireNonNull(file.getOriginalFilename(), "Filename must not be null"));
         String ext = StringUtils.getFilenameExtension(originalFilename);
-        if (ext == null || ext.isBlank()) {
+        if (ext == null || !ALLOWED_EXTENSIONS.contains(ext.toLowerCase())) {
             throw new IllegalArgumentException("error.avatar.type");
         }
 
-        String filename = memberId.toString() + "." + ext.toLowerCase();
-        Path uploadPath = Paths.get(uploadDir).toAbsolutePath().resolve("avatars");
+        String safeExt = ext.toLowerCase();
+        String filename = memberId.toString() + "." + safeExt;
+        Path uploadPath = Paths.get(uploadDir).toAbsolutePath().normalize().resolve("avatars");
         Files.createDirectories(uploadPath);
 
         // Delete any previous avatar file for this member (handles extension changes)
@@ -89,6 +92,9 @@ public class ProfileService {
         }
 
         Path dest = uploadPath.resolve(filename);
+        if (!dest.normalize().startsWith(uploadPath)) {
+            throw new IllegalArgumentException("error.avatar.type");
+        }
         file.transferTo(dest);
 
         Member member = memberRepository.findById(memberId)
