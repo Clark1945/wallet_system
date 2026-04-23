@@ -7,8 +7,10 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.side_project.wallet_system.auth.objects.Member;
 import org.side_project.wallet_system.auth.objects.MemberStatus;
+import org.side_project.wallet_system.auth.objects.OtpType;
 import org.side_project.wallet_system.auth.repository.MemberRepository;
 import org.side_project.wallet_system.auth.service.AuthService;
+import org.side_project.wallet_system.auth.service.OtpService;
 import org.side_project.wallet_system.wallet.Wallet;
 import org.side_project.wallet_system.wallet.WalletRepository;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -26,6 +28,7 @@ class AuthServiceTest {
     @Mock private MemberRepository memberRepository;
     @Mock private WalletRepository walletRepository;
     @Mock private PasswordEncoder passwordEncoder;
+    @Mock private OtpService otpService;
     @InjectMocks private AuthService authService;
 
     // ─── initiateRegistration ────────────────────────────────────────────────────
@@ -72,6 +75,37 @@ class AuthServiceTest {
 
         assertThat(result).isEqualTo(saved);
         then(memberRepository).should().delete(pending);
+    }
+
+    // ─── verifyAndActivate ───────────────────────────────────────────────────────
+
+    @Test
+    void verifyAndActivate_validOtp_activatesMember() {
+        UUID memberId = UUID.randomUUID();
+        Member pending = new Member();
+        pending.setId(memberId);
+        pending.setStatus(MemberStatus.PENDING);
+        given(otpService.verify(memberId, OtpType.REGISTER, "123456")).willReturn(true);
+        given(memberRepository.findById(memberId)).willReturn(Optional.of(pending));
+
+        authService.verifyAndActivate(memberId, "123456");
+
+        assertThat(pending.getStatus()).isEqualTo(MemberStatus.ACTIVE);
+        then(memberRepository).should().save(pending);
+        then(walletRepository).should().save(any(Wallet.class));
+    }
+
+    @Test
+    void verifyAndActivate_invalidOtp_throws() {
+        UUID memberId = UUID.randomUUID();
+        given(otpService.verify(memberId, OtpType.REGISTER, "wrong")).willReturn(false);
+
+        assertThatThrownBy(() -> authService.verifyAndActivate(memberId, "wrong"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("error.otp.invalid");
+
+        then(memberRepository).should(never()).save(any());
+        then(walletRepository).should(never()).save(any());
     }
 
     // ─── activateRegistration ────────────────────────────────────────────────────

@@ -65,6 +65,7 @@ public class AuthService {
         emailService.sendRegistrationOtp(email, otp);
     }
 
+    @Transactional
     public void verifyAndActivate(UUID memberId, String code) {
         if (!otpService.verify(memberId, OtpType.REGISTER, code)) {
             throw new IllegalArgumentException("error.otp.invalid");
