@@ -29,8 +29,8 @@
     <properties>
         <java.version>17</java.version>
         <!-- SonarCloud — replace these two values with your project's settings -->
-        <sonar.projectKey>REPLACE_WITH_YOUR_PROJECT_KEY</sonar.projectKey>
-        <sonar.organization>REPLACE_WITH_YOUR_ORGANIZATION</sonar.organization>
+        <sonar.projectKey>Clark1945_wallet_system</sonar.projectKey>
+        <sonar.organization>Clark1945</sonar.organization>
         <sonar.host.url>https://sonarcloud.io</sonar.host.url>
         <sonar.coverage.jacoco.xmlReportPaths>${project.build.directory}/site/jacoco/jacoco.xml</sonar.coverage.jacoco.xmlReportPaths>
         <sonar.java.source>17</sonar.java.source>
