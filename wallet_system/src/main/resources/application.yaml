@@ -45,9 +45,6 @@ spring:
       host: ${REDIS_HOST:localhost}
       port: ${REDIS_PORT:6379}
       password: ${REDIS_PASSWORD:redis}
-  sql:
-    init:
-      mode: always
   servlet:
     multipart:
       enabled: true
@@ -57,7 +54,7 @@ spring:
     open-in-view: false
     hibernate:
       ddl-auto: none
-    defer-datasource-initialization: true
+    defer-datasource-initialization: false
     show-sql: false
     properties:
       hibernate:
