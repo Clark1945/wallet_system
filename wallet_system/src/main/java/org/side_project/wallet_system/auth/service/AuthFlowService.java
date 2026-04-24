@@ -119,16 +119,6 @@ public class AuthFlowService {
         }
     }
 
-    public String initiateTestMode(RedirectAttributes redirectAttributes, Locale locale) {
-        Member pending = authService.resetOrCreateTestMember();
-        otpService.storeFixedCode(pending.getId(), OtpType.REGISTER, "123456");
-        String otpToken = otpService.generateOtpToken(pending.getId(), OtpType.REGISTER);
-        redirectAttributes.addFlashAttribute("info",
-                messageSource.getMessage("flash.register.otp.sent",
-                        new Object[]{pending.getEmail()}, locale));
-        return "redirect:/register/otp?token=" + otpToken;
-    }
-
     public String verifyRegistrationOtp(String otpToken, String code,
                                         RedirectAttributes redirectAttributes, Locale locale) {
         UUID memberId;

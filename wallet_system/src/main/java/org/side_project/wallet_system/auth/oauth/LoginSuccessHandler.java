@@ -5,7 +5,6 @@ import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.side_project.wallet_system.auth.email.EmailService;
 import org.side_project.wallet_system.auth.service.LoginAttemptService;
 import org.side_project.wallet_system.auth.service.OtpService;
 import org.side_project.wallet_system.auth.objects.OtpType;
@@ -24,7 +23,6 @@ import java.util.UUID;
 public class LoginSuccessHandler implements AuthenticationSuccessHandler {
 
     private final OtpService otpService;
-    private final EmailService emailService;
     private final AuthService authService;
     private final LoginAttemptService loginAttemptService;
 
@@ -41,8 +39,7 @@ public class LoginSuccessHandler implements AuthenticationSuccessHandler {
             loginAttemptService.clearFailures(email);
 
             try {
-                String otp      = otpService.generateAndStore(memberId, OtpType.LOGIN);
-                emailService.sendLoginOtp(email, otp);
+                authService.sendLoginOtp(memberId, email);
                 String otpToken = otpService.generateOtpToken(memberId, OtpType.LOGIN);
                 response.sendRedirect("/login/otp?token=" + otpToken);
             } catch (Exception e) {

@@ -27,6 +27,12 @@
         .google-btn:hover { background: #f5f5f5; }
         p { text-align: center; margin-top: 1rem; font-size: .9rem; }
         a { color: #4f46e5; text-decoration: none; }
+        .demo-tip { background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 6px; padding: .8rem 1rem; margin-bottom: 1.25rem; font-size: .85rem; color: #1e40af; }
+        .demo-tip-title { font-weight: 700; margin-bottom: .3rem; }
+        .demo-tip-body { color: #3b5a9a; margin-bottom: .5rem; }
+        .demo-tip-cred { display: flex; flex-direction: column; gap: .25rem; }
+        .demo-tip-cred span { display: flex; align-items: center; gap: .4rem; }
+        .demo-tip-cred code { background: #dbeafe; padding: .15rem .45rem; border-radius: 4px; font-size: .82rem; font-family: monospace; letter-spacing: .01em; }
     </style>
 </head>
 <body>
@@ -35,6 +41,16 @@
 
     <div th:if="${error}" class="alert alert-error" th:text="${error}"></div>
     <div th:if="${success}" class="alert alert-success" th:text="${success}"></div>
+
+    <div class="demo-tip">
+        <div class="demo-tip-title" th:text="#{login.demo.title}">Demo Account</div>
+        <div class="demo-tip-body" th:text="#{login.demo.body}">Try the app without signing up:</div>
+        <div class="demo-tip-cred">
+            <span>Email: <code>test1234@gmail.com</code></span>
+            <span>Password: <code>test1234</code></span>
+            <span>OTP: <code>123456</code></span>
+        </div>
+    </div>
 
     <form method="post" th:action="@{/login}">
         <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>

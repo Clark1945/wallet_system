@@ -60,25 +60,30 @@ public class AuthService {
         return member;
     }
 
+    public static final String TEST_EMAIL = "test1234@gmail.com";
+    private static final String TEST_FIXED_OTP = "123456";
+
     @Transactional
-    public Member resetOrCreateTestMember() {
-        String testEmail = "test1234@gmail.com";
-        memberRepository.findByEmail(testEmail).ifPresent(existing -> {
-            if (existing.getStatus() == MemberStatus.ACTIVE) {
-                walletRepository.findByMemberId(existing.getId())
-                        .ifPresent(walletRepository::delete);
-                walletRepository.flush();
-            }
-            memberRepository.delete(existing);
+    public void ensureTestMemberActive() {
+        Optional<Member> existing = memberRepository.findByEmail(TEST_EMAIL);
+        if (existing.isPresent() && existing.get().getStatus() == MemberStatus.ACTIVE) {
+            return;
+        }
+        existing.ifPresent(m -> {
+            walletRepository.findByMemberId(m.getId()).ifPresent(walletRepository::delete);
+            walletRepository.flush();
+            memberRepository.delete(m);
             memberRepository.flush();
         });
         Member member = new Member();
         member.setName("Test User");
-        member.setEmail(testEmail);
+        member.setEmail(TEST_EMAIL);
         member.setPassword(passwordEncoder.encode("test1234"));
         member.setAuthProvider(AuthProvider.LOCAL);
-        member.setStatus(MemberStatus.PENDING);
-        return memberRepository.save(member);
+        member.setStatus(MemberStatus.ACTIVE);
+        member = memberRepository.save(member);
+        createWalletFor(member);
+        log.info("Test member seeded: id={}", member.getId());
     }
 
     public void sendRegistrationOtp(UUID memberId, String email) {
@@ -95,8 +100,12 @@ public class AuthService {
     }
 
     public void sendLoginOtp(UUID memberId, String email) {
-        String otp = otpService.generateAndStore(memberId, OtpType.LOGIN);
-        emailService.sendLoginOtp(email, otp);
+        if (TEST_EMAIL.equals(email)) {
+            otpService.storeFixedCode(memberId, OtpType.LOGIN, TEST_FIXED_OTP);
+        } else {
+            String otp = otpService.generateAndStore(memberId, OtpType.LOGIN);
+            emailService.sendLoginOtp(email, otp);
+        }
     }
 
     public void verifyLoginOtpCode(UUID memberId, String code) {

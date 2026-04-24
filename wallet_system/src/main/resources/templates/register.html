@@ -20,15 +20,6 @@
         button:hover { background: #4338ca; }
         p { text-align: center; margin-top: 1rem; font-size: .9rem; }
         a { color: #4f46e5; text-decoration: none; }
-        .guest-tip { background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 6px; padding: .8rem 1rem; margin-bottom: 1.25rem; font-size: .85rem; color: #1e40af; }
-        .guest-tip-title { font-weight: 700; margin-bottom: .3rem; }
-        .guest-tip-body { color: #3b5a9a; margin-bottom: .5rem; }
-        .guest-tip-cred { display: flex; flex-direction: column; gap: .25rem; }
-        .guest-tip-cred span { display: flex; align-items: center; gap: .4rem; }
-        .guest-tip-cred code { background: #dbeafe; padding: .15rem .45rem; border-radius: 4px; font-size: .82rem; font-family: monospace; letter-spacing: .01em; }
-        .btn-testmode { width: 100%; padding: .5rem; background: #1e40af; color: #fff;
-            border: none; border-radius: 4px; font-size: .85rem; cursor: pointer; margin-top: .6rem; }
-        .btn-testmode:hover { background: #1d4ed8; }
     </style>
 </head>
 <body>
@@ -36,20 +27,6 @@
     <h1 th:text="#{register.title}">Create Account</h1>
 
     <div th:if="${error}" class="alert alert-error" th:text="${error}"></div>
-
-    <div class="guest-tip">
-        <div class="guest-tip-title" th:text="#{register.guest.title}">Just browsing?</div>
-        <div class="guest-tip-body" th:text="#{register.guest.body}">No commitment needed. Try the app with our demo account:</div>
-        <div class="guest-tip-cred">
-            <span>Email: <code>test1234@gmail.com</code></span>
-            <span>Password: <code>test1234</code></span>
-            <span>OTP: <code>123456</code></span>
-        </div>
-        <form method="post" th:action="@{/register/test}">
-            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
-            <button type="submit" class="btn-testmode" th:text="#{register.testmode.button}">Try Test Mode</button>
-        </form>
-    </div>
 
     <form method="post" th:action="@{/register}">
         <label for="name" th:text="#{register.name}">Name</label>
