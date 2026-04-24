@@ -32,7 +32,7 @@ sbpayment:
   service-id: test_service
   hash-key: test_hash_key
   gateway-url: "https://google.com"
-  base-url: ${SP_PAYMENT_REDIRECT_URL}
+  base-url: "http://localhost:8080"
 
 withdraw:
   webhook-secret: test-webhook-secret
