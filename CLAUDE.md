@@ -61,7 +61,7 @@ See `wallet_system/CLAUDE.md` for complete details. Highlights not covered there
 ### Authentication Flows
 
 Three login methods beyond form login and Google OAuth2:
-- **Email OTP:** `OtpService` generates a 6-digit code, stores it in Redis (5-minute TTL), sends via `EmailService`. `OtpController` verifies and completes login.
+- **Email OTP:** `OtpService` generates a 6-digit code, stores it in Redis (10-minute TTL), sends via `EmailService`. `OtpController` verifies and completes login.
 - **Password reset:** `PasswordResetService` generates a UUID token stored in Redis (15-minute TTL), emails a reset link. Token is one-time-use.
 - **Account lockout:** `LoginAttemptService` tracks failed attempts in Redis; after threshold, locks the account for a configurable window. Redis key: `login_attempts:{email}`.
 

@@ -138,11 +138,11 @@ Fields beyond basics: `nickname`, `phone`, `bio`, `birthday` (LocalDate), `avata
 
 **Stripe** (`payment/StripePaymentService`, `payment/StripePaymentController`):
 - Creates a PaymentIntent (JPY, no sub-unit conversion). Returns `clientSecret` to `stripe-checkout.html`.
-- Webhook at `/payment/stripe/webhook` verifies `Stripe-Signature` then calls `deposit()` on `payment_intent.succeeded`. In-memory `processedIntents` set guards duplicate delivery.
+- Webhook at `/payment/stripe/webhook` verifies `Stripe-Signature` then calls `completeDeposit()` on `payment_intent.succeeded`. Idempotency is enforced by `completeDeposit()`'s status check — it only acts if the transaction is `PENDING`; duplicate deliveries are silently skipped.
 
 **SBPS / SoftBank Payment Service** (`payment/SBPaymentService`, `payment/SBPaymentController`):
 - Link-type integration: builds an `SBPaymentRequest` with a SHA-1 hashcode (fields concatenated + `hashKey`), posts a form to SBPS gateway. `request_date` must be in JST.
-- Result CGI callback at `/payment/sbpayment/result` verifies `res_result=OK`, looks up in-memory `pendingOrders` by `order_id`, then calls `deposit()`.
+- Result CGI callback at `/payment/sbpayment/result` verifies `res_result=OK`, then calls `completeDepositByExternalId(orderId)`, which looks up the transaction by `payment_external_id` (unique DB constraint) and chains to `completeDeposit()`. Idempotency is enforced by the same `PENDING` status check.
 
 ### Error Handling
 
