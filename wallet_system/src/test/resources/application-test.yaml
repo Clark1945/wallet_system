@@ -31,6 +31,8 @@ sbpayment:
   merchant-id: test_merchant
   service-id: test_service
   hash-key: test_hash_key
+  gateway-url: "https://google.com"
+  base-url: ${SP_PAYMENT_REDIRECT_URL}
 
 withdraw:
   webhook-secret: test-webhook-secret
