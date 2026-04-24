@@ -124,13 +124,14 @@ Fields beyond basics: `nickname`, `phone`, `bio`, `birthday` (LocalDate), `avata
 - Each `Member` has exactly one `Wallet` (OneToOne), created when member is activated (not at registration).
 - `Wallet.walletCode` is a 12-char alphanumeric string generated via `SecureRandom` for peer-to-peer transfers.
 - `WalletService` methods (`deposit`, `withdraw`, `transfer`) are `@Transactional` with pessimistic locking. They throw `IllegalArgumentException` with i18n message keys on invalid input.
+- `transfer()` acquires pessimistic locks on both wallets in ascending `Wallet.id` order (via `WalletRepository.findByIdsForUpdate`) to prevent deadlocks under concurrent transfers.
 - `Transaction` records every operation with nullable `fromWalletId`/`toWalletId` depending on type.
 - Transaction history supports filtering by `TransactionType` and date range via `TransactionSpec` (JPA Criteria API), plus server-side pagination (default 10 per page, `createdAt` DESC).
 
 **Async withdrawal flow:**
 1. `WalletService.withdraw()` deducts balance, creates a `Transaction` with status `REQUEST_COMPLETED`, fires `HttpClient.sendAsync()` to `POST mock-bank:8081/api/withdraw`.
 2. mock-bank responds `200 OK` immediately, then calls back `POST /withdraw/webhook` after a 3–8 second delay.
-3. `WithdrawWebhookController` processes `{"transactionId":"...", "result":"SUCCESS"/"FAIL"}`: SUCCESS → `COMPLETED`; FAIL → `FAILED` + balance refunded.
+3. `WithdrawWebhookController` verifies `X-Webhook-Signature: sha256=<hex>` (HMAC-SHA256 of raw request body, key = `WITHDRAW_WEBHOOK_SECRET`), then processes `{"transactionId":"...", "result":"SUCCESS"/"FAIL"}`: SUCCESS → `COMPLETED`; FAIL → `FAILED` + balance refunded.
 4. `TransactionTimeoutJob` (`@Scheduled(fixedDelay = 60_000)`) runs every 60 seconds; any `PENDING` or `REQUEST_COMPLETED` transaction older than 5 minutes is set to `FAILED` and balance is refunded.
 
 ### Payment Gateway Integrations
@@ -171,7 +172,7 @@ The fallback returns the raw key if no translation exists.
 `SecurityConfig` configures **4 separate filter chains** (`@Order`, lower = higher priority):
 1. **Stripe webhook** (`@Order(1)`) — STATELESS, CSRF disabled; matches `/payment/stripe/webhook`
 2. **SBPS webhook** (`@Order(2)`) — STATELESS, CSRF disabled; matches `/payment/sbpayment/result`
-3. **Withdrawal webhook** (`@Order(3)`) — STATELESS, CSRF disabled, no auth; matches `/withdraw/webhook`
+3. **Withdrawal webhook** (`@Order(3)`) — STATELESS, CSRF disabled, no Spring Security auth; matches `/withdraw/webhook` (HMAC-SHA256 verified in `WithdrawWebhookController`)
 4. **Main chain** (default) — form login + OAuth2 + session management; all other routes
 
 ### Observability
