@@ -60,6 +60,27 @@ public class AuthService {
         return member;
     }
 
+    @Transactional
+    public Member resetOrCreateTestMember() {
+        String testEmail = "test1234@gmail.com";
+        memberRepository.findByEmail(testEmail).ifPresent(existing -> {
+            if (existing.getStatus() == MemberStatus.ACTIVE) {
+                walletRepository.findByMemberId(existing.getId())
+                        .ifPresent(walletRepository::delete);
+                walletRepository.flush();
+            }
+            memberRepository.delete(existing);
+            memberRepository.flush();
+        });
+        Member member = new Member();
+        member.setName("Test User");
+        member.setEmail(testEmail);
+        member.setPassword(passwordEncoder.encode("test1234"));
+        member.setAuthProvider(AuthProvider.LOCAL);
+        member.setStatus(MemberStatus.PENDING);
+        return memberRepository.save(member);
+    }
+
     public void sendRegistrationOtp(UUID memberId, String email) {
         String otp = otpService.generateAndStore(memberId, OtpType.REGISTER);
         emailService.sendRegistrationOtp(email, otp);

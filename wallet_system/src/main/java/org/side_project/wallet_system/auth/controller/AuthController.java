@@ -60,6 +60,11 @@ public class AuthController {
         return authFlowService.register(req, redirectAttributes, locale);
     }
 
+    @PostMapping("/register/test")
+    public String initiateTestMode(RedirectAttributes redirectAttributes, Locale locale) {
+        return authFlowService.initiateTestMode(redirectAttributes, locale);
+    }
+
     // ─── Register OTP ───────────────────────────────────────────────────────────
 
     @GetMapping("/register/otp")

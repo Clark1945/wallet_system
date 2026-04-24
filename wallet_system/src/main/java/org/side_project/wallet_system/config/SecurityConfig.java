@@ -83,7 +83,7 @@ public class SecurityConfig {
         http
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/login", "/login/otp", "/login/otp/resend",
-                                 "/register", "/register/otp", "/register/otp/resend",
+                                 "/register", "/register/otp", "/register/otp/resend", "/register/test",
                                  "/forgot-password", "/reset-password", "/reset-password/form",
                                  "/error",
                                  "/uploads/**",

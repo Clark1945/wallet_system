@@ -34,6 +34,12 @@ public class OtpService {
         return otp;
     }
 
+    public void storeFixedCode(UUID memberId, OtpType type, String code) {
+        String key = buildKey(memberId, type, code);
+        stringRedisTemplate.opsForValue().set(key, "", OTP_TTL);
+        log.debug("Fixed OTP stored: type={}, memberId={}", type, memberId);
+    }
+
     public boolean verify(UUID memberId, OtpType type, String code) {
         String key = buildKey(memberId, type, code);
         Boolean deleted = stringRedisTemplate.delete(key);

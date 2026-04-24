@@ -32,15 +32,16 @@ public class RateLimitFilter extends OncePerRequestFilter {
 
     private record RateConfig(int maxRequests, int windowSeconds, String redirectTo) {}
 
-    private static final Map<String, RateConfig> CONFIGS = Map.of(
-        "/login",               new RateConfig(10, 60, "/login"),
-        "/register",            new RateConfig(5,  60, "/register"),
-        "/forgot-password",     new RateConfig(5,  60, "/forgot-password"),
-        "/reset-password",      new RateConfig(5,  60, "/reset-password/form"),
-        "/login/otp",           new RateConfig(10, 60, "/login"),
-        "/login/otp/resend",    new RateConfig(3,  60, "/login"),
-        "/register/otp",        new RateConfig(10, 60, "/register"),
-        "/register/otp/resend", new RateConfig(3,  60, "/register")
+    private static final Map<String, RateConfig> CONFIGS = Map.ofEntries(
+        Map.entry("/login",               new RateConfig(10, 60, "/login")),
+        Map.entry("/register",            new RateConfig(5,  60, "/register")),
+        Map.entry("/forgot-password",     new RateConfig(5,  60, "/forgot-password")),
+        Map.entry("/reset-password",      new RateConfig(5,  60, "/reset-password/form")),
+        Map.entry("/login/otp",           new RateConfig(10, 60, "/login")),
+        Map.entry("/login/otp/resend",    new RateConfig(3,  60, "/login")),
+        Map.entry("/register/otp",        new RateConfig(10, 60, "/register")),
+        Map.entry("/register/otp/resend", new RateConfig(3,  60, "/register")),
+        Map.entry("/register/test",       new RateConfig(3,  60, "/register"))
     );
 
     @Override
