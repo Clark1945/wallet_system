@@ -1,5 +1,6 @@
 package org.side_project.wallet_system.auth;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.side_project.wallet_system.auth.controller.AuthController;
 import org.side_project.wallet_system.auth.controller.AuthPageController;
@@ -13,6 +14,7 @@ import org.side_project.wallet_system.auth.service.AuthService;
 import org.side_project.wallet_system.auth.service.LoginAttemptService;
 import org.side_project.wallet_system.auth.service.OtpService;
 import org.side_project.wallet_system.auth.service.PasswordResetService;
+import org.side_project.wallet_system.config.RateLimiterService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
@@ -48,6 +50,13 @@ class AuthControllerIT {
     LoginSuccessHandler loginSuccessHandler;
     @MockitoBean
     LoginAttemptService loginAttemptService;
+    @MockitoBean
+    RateLimiterService rateLimiterService;
+
+    @BeforeEach
+    void setUp() {
+        given(rateLimiterService.isAllowed(anyString(), anyInt(), any())).willReturn(true);
+    }
 
     // ─── Login page ──────────────────────────────────────────────────────────────
 

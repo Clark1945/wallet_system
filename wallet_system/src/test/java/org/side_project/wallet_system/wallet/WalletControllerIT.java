@@ -6,6 +6,7 @@ import org.side_project.wallet_system.auth.oauth.CustomOAuth2UserService;
 import org.side_project.wallet_system.auth.oauth.LoginSuccessHandler;
 import org.side_project.wallet_system.auth.repository.MemberRepository;
 import org.side_project.wallet_system.auth.service.LoginAttemptService;
+import org.side_project.wallet_system.config.RateLimiterService;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.side_project.wallet_system.config.SecurityConfig;
@@ -50,6 +51,7 @@ class WalletControllerIT {
 
     @Autowired MockMvc mockMvc;
     @MockitoBean WalletService walletService;
+    @MockitoBean RateLimiterService rateLimiterService;
     @MockitoBean MemberRepository memberRepository;
     @MockitoBean CustomOAuth2UserService oauth2UserService;
     @MockitoBean LoginSuccessHandler loginSuccessHandler;
@@ -72,6 +74,7 @@ class WalletControllerIT {
         session.setAttribute("memberId", memberId.toString());
         session.setAttribute("memberName", "Test User");
 
+        given(rateLimiterService.isAllowed(anyString(), anyInt(), any())).willReturn(true);
         given(walletService.getWallet(memberId)).willReturn(wallet);
         given(walletService.getTransactions(eq(memberId), any(), any(), any(), eq(0), eq(10)))
             .willReturn(new PageImpl<>(List.of()));

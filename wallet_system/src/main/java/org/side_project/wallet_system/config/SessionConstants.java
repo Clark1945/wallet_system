@@ -10,4 +10,5 @@ public final class SessionConstants {
     public static final String SBPAYMENT_PENDING_AMOUNT  = "sbpaymentPendingAmount";
     public static final String RESET_MID                 = "resetMid";
     public static final String RESET_TOKEN               = "resetToken";
+    public static final String RATE_LIMIT_ERROR          = "rateLimitError";
 }

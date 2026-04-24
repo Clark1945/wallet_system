@@ -6,6 +6,7 @@ import org.side_project.wallet_system.auth.oauth.CustomOAuth2UserService;
 import org.side_project.wallet_system.auth.oauth.LoginSuccessHandler;
 import org.side_project.wallet_system.auth.repository.MemberRepository;
 import org.side_project.wallet_system.auth.service.LoginAttemptService;
+import org.side_project.wallet_system.config.RateLimiterService;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.side_project.wallet_system.config.SecurityConfig;
@@ -49,6 +50,7 @@ class SBPaymentControllerIT {
 
     @Autowired MockMvc mockMvc;
     @MockitoBean SBPaymentService sbPaymentService;
+    @MockitoBean RateLimiterService rateLimiterService;
     @MockitoBean MemberRepository memberRepository;
     @MockitoBean CustomOAuth2UserService oauth2UserService;
     @MockitoBean LoginSuccessHandler loginSuccessHandler;

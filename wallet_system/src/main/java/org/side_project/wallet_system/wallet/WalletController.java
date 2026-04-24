@@ -2,6 +2,7 @@ package org.side_project.wallet_system.wallet;
 
 import jakarta.servlet.http.HttpSession;
 import lombok.RequiredArgsConstructor;
+import org.side_project.wallet_system.config.RateLimiterService;
 import org.side_project.wallet_system.config.SessionConstants;
 import org.side_project.wallet_system.config.SessionUtils;
 import org.side_project.wallet_system.transaction.Transaction;
@@ -15,6 +16,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import java.math.BigDecimal;
+import java.time.Duration;
 import java.time.LocalDate;
 import java.util.Locale;
 import java.util.UUID;
@@ -25,6 +27,7 @@ public class WalletController {
 
     private final WalletService walletService;
     private final MessageSource messageSource;
+    private final RateLimiterService rateLimiterService;
 
     @GetMapping("/dashboard")
     public String dashboard(
@@ -66,6 +69,15 @@ public class WalletController {
                           HttpSession session,
                           RedirectAttributes redirectAttributes,
                           Locale locale) {
+        UUID memberId = SessionUtils.getMemberId(session);
+        if (memberId == null) return "redirect:/login";
+
+        if (!rateLimiterService.isAllowed("deposit:" + memberId, 10, Duration.ofMinutes(1))) {
+            redirectAttributes.addFlashAttribute("error",
+                    messageSource.getMessage("error.rate.limit", null, locale));
+            return "redirect:/deposit";
+        }
+
         if (amount.compareTo(BigDecimal.ZERO) <= 0) {
             redirectAttributes.addFlashAttribute("error",
                     messageSource.getMessage("error.amount.positive", null, locale));
@@ -105,6 +117,12 @@ public class WalletController {
         UUID memberId = SessionUtils.getMemberId(session);
         if (memberId == null) return "redirect:/login";
 
+        if (!rateLimiterService.isAllowed("withdraw:" + memberId, 5, Duration.ofMinutes(1))) {
+            redirectAttributes.addFlashAttribute("error",
+                    messageSource.getMessage("error.rate.limit", null, locale));
+            return "redirect:/withdraw";
+        }
+
         try {
             walletService.initiateWithdrawal(memberId, amount, bankCode, bankAccount);
             redirectAttributes.addFlashAttribute("success",
@@ -134,6 +152,12 @@ public class WalletController {
                            Locale locale) {
         UUID memberId = SessionUtils.getMemberId(session);
         if (memberId == null) return "redirect:/login";
+
+        if (!rateLimiterService.isAllowed("transfer:" + memberId, 10, Duration.ofMinutes(1))) {
+            redirectAttributes.addFlashAttribute("error",
+                    messageSource.getMessage("error.rate.limit", null, locale));
+            return "redirect:/transfer";
+        }
 
         try {
             walletService.transfer(memberId, toWalletCode, amount);

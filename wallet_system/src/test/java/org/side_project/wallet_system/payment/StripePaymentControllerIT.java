@@ -7,6 +7,7 @@ import org.side_project.wallet_system.auth.oauth.CustomOAuth2UserService;
 import org.side_project.wallet_system.auth.oauth.LoginSuccessHandler;
 import org.side_project.wallet_system.auth.repository.MemberRepository;
 import org.side_project.wallet_system.auth.service.LoginAttemptService;
+import org.side_project.wallet_system.config.RateLimiterService;
 import org.side_project.wallet_system.config.SecurityConfig;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
@@ -34,6 +35,7 @@ class StripePaymentControllerIT {
 
     @Autowired MockMvc mockMvc;
     @MockitoBean StripePaymentService stripePaymentService;
+    @MockitoBean RateLimiterService rateLimiterService;
     @MockitoBean MemberRepository memberRepository;
     @MockitoBean CustomOAuth2UserService oauth2UserService;
     @MockitoBean LoginSuccessHandler loginSuccessHandler;

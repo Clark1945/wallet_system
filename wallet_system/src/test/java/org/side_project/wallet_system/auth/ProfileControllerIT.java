@@ -11,6 +11,7 @@ import org.side_project.wallet_system.auth.objects.Member;
 import org.side_project.wallet_system.auth.repository.MemberRepository;
 import org.side_project.wallet_system.auth.service.LoginAttemptService;
 import org.side_project.wallet_system.auth.service.ProfileService;
+import org.side_project.wallet_system.config.RateLimiterService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
@@ -63,6 +64,8 @@ class ProfileControllerIT {
     LoginSuccessHandler loginSuccessHandler;
     @MockitoBean
     LoginAttemptService loginAttemptService;
+    @MockitoBean
+    RateLimiterService rateLimiterService;
 
     private MockHttpSession session;
     private UUID memberId;
