@@ -1,8 +1,6 @@
 services:
   db:
     image: postgres:14-alpine
-    ports:
-      - "5433:5432"
     environment:
       POSTGRES_DB: wallet_db
       POSTGRES_USER: postgres
@@ -17,8 +15,6 @@ services:
 
   redis:
     image: redis:7-alpine
-    ports:
-      - "6379:6379"
     command: redis-server --requirepass redis
     healthcheck:
       test: ["CMD", "redis-cli", "-a", "redis", "ping"]
@@ -29,7 +25,8 @@ services:
   mock-bank:
     build:
       context: ../mock-bank
-    network_mode: host
+    ports:
+      - "8081:8081"
     environment:
       WITHDRAW_WEBHOOK_SECRET: ${WITHDRAW_WEBHOOK_SECRET}
     volumes:
@@ -37,22 +34,19 @@ services:
 
   app:
     build: .
-    network_mode: host
+    ports:
+      - "8080:8080"
     environment:
-      DB_URL: jdbc:postgresql://localhost:5433/wallet_db
-      DB_USERNAME: postgres
-      DB_PASSWORD: postgres
-      SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5433/wallet_db
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/wallet_db
       SPRING_DATASOURCE_USERNAME: postgres
       SPRING_DATASOURCE_PASSWORD: postgres
-      REDIS_HOST: localhost
-      REDIS_PORT: 6379
-      REDIS_PASSWORD: redis
-      SPRING_DATA_REDIS_HOST: localhost
+      SPRING_DATA_REDIS_HOST: redis
       SPRING_DATA_REDIS_PORT: 6379
       SPRING_DATA_REDIS_PASSWORD: redis
-      MOCK_BANK_URL: http://localhost:8081
-      APP_BASE_URL: http://localhost:8080
+      # mock-bank.url → wallet app calls this to initiate withdrawals
+      MOCK_BANK_URL: http://mock-bank:8081
+      # app.base-url → embedded in the callbackUrl sent to mock-bank
+      APP_BASE_URL: http://app:8080
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
       STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY}
