@@ -170,8 +170,8 @@ The fallback returns the raw key if no translation exists.
 ### Security Filter Chains
 
 `SecurityConfig` configures **4 separate filter chains** (`@Order`, lower = higher priority):
-1. **Stripe webhook** (`@Order(1)`) — STATELESS, CSRF disabled; matches `/payment/stripe/webhook`
-2. **SBPS webhook** (`@Order(2)`) — STATELESS, CSRF disabled; matches `/payment/sbpayment/result`
+1. **SBPS webhook** (`@Order(1)`) — STATELESS, CSRF disabled; matches `/payment/sbpayment/result`
+2. **Stripe webhook** (`@Order(2)`) — STATELESS, CSRF disabled; matches `/payment/stripe/webhook`
 3. **Withdrawal webhook** (`@Order(3)`) — STATELESS, CSRF disabled, no Spring Security auth; matches `/withdraw/webhook` (HMAC-SHA256 verified in `WithdrawWebhookController`)
 4. **Main chain** (default) — form login + OAuth2 + session management; all other routes
 
@@ -186,6 +186,20 @@ The fallback returns the raw key if no translation exists.
 - **Runtime:** PostgreSQL; connection via `DB_URL` / `DB_USERNAME` / `DB_PASSWORD` env vars.
 - **Tests:** H2 in-memory with `ddl-auto: create-drop`; Flyway disabled (`spring.flyway.enabled: false` in `application-test.yaml`).
 - **DDL:** Flyway manages migrations in `src/main/resources/db/migration/`. Never edit existing migrations — add a new `V{n}__description.sql`.
+
+### Test/Demo Mode
+
+`TestModeInitializer` (`@Profile("!prod")`) runs on `ApplicationReadyEvent` and calls `AuthService.ensureTestMemberActive()`, which idempotently creates an ACTIVE member with a wallet. Credentials:
+- Email: `test1234@gmail.com` · Password: `test1234` · Login OTP: `123456` (fixed, never sent by email)
+
+`TestModeModelAdvice` (`@ControllerAdvice`) sets `isTestMode=true` in the model whenever this account is authenticated, used by templates to show a demo watermark. Active on all non-prod profiles.
+
+### Rate Limiting
+
+`RateLimiterService` is a Redis-backed fixed-window limiter (fails open on Redis error). Applied per-member in `WalletController`:
+- `/deposit` — 10 requests / minute
+- `/transfer` — 10 requests / minute
+- `/withdraw` — 5 requests / minute
 
 ### OpenAPI / Swagger
 

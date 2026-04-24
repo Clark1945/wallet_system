@@ -60,6 +60,7 @@ services:
       MAIL_PORT: ${MAIL_PORT:-587}
       MAIL_USERNAME: ${MAIL_USERNAME:-}
       MAIL_PASSWORD: ${MAIL_PASSWORD:-}
+      SP_PAYMENT_REDIRECT_URL: ${SP_PAYMENT_REDIRECT_URL}
     volumes:
       - uploads:/app/uploads
       - app_logs:/app/logs

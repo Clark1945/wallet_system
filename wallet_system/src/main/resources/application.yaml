@@ -102,7 +102,7 @@ sbpayment:
   service-id: ${PAYMENT_SERVICE_ID}
   hash-key: ${PAYMENT_HASH_KEY}
   gateway-url: "https://stbfep.sps-system.com/Extra/BuyRequestAction.do"
-  base-url: "https://caregiver-gracious-overfill.ngrok-free.dev"
+  base-url: ${SP_PAYMENT_REDIRECT_URL}
 
 springdoc:
   swagger-ui:
