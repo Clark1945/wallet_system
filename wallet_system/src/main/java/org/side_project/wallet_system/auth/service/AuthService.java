@@ -34,6 +34,12 @@ public class AuthService {
 
     @Value("${app.base-url}")
     private String appBaseUrl;
+    @Value("${app.test-email}")
+    private String testEmail;
+    @Value("${app.test-fixed-otp}")
+    private String testFixedOtp;
+    @Value("${app.test-password}")
+    private String testPassword;
 
     @Transactional
     public Member initiateRegistration(String name, int age, String email, String password) {
@@ -60,13 +66,9 @@ public class AuthService {
         return member;
     }
 
-    public static final String TEST_EMAIL = "test1234@gmail.com";
-    private static final String TEST_FIXED_OTP = "123456";
-    private static final String TEST_PASSWORD = "test1234";
-
     @Transactional
     public void ensureTestMemberActive() {
-        Optional<Member> existing = memberRepository.findByEmail(TEST_EMAIL);
+        Optional<Member> existing = memberRepository.findByEmail(testEmail);
         if (existing.isPresent() && existing.get().getStatus() == MemberStatus.ACTIVE) {
             return;
         }
@@ -78,8 +80,8 @@ public class AuthService {
         });
         Member member = new Member();
         member.setName("Test User");
-        member.setEmail(TEST_EMAIL);
-        member.setPassword(passwordEncoder.encode(TEST_PASSWORD));
+        member.setEmail(testEmail);
+        member.setPassword(passwordEncoder.encode(testPassword));
         member.setAuthProvider(AuthProvider.LOCAL);
         member.setStatus(MemberStatus.ACTIVE);
         member = memberRepository.save(member);
@@ -101,8 +103,8 @@ public class AuthService {
     }
 
     public void sendLoginOtp(UUID memberId, String email) {
-        if (TEST_EMAIL.equals(email)) {
-            otpService.storeFixedCode(memberId, OtpType.LOGIN, TEST_FIXED_OTP);
+        if (testEmail.equals(email)) {
+            otpService.storeFixedCode(memberId, OtpType.LOGIN, testFixedOtp);
         } else {
             String otp = otpService.generateAndStore(memberId, OtpType.LOGIN);
             emailPublisher.sendLoginOtp(email, otp);

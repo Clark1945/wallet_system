@@ -30,6 +30,9 @@ withdraw:
 
 app:
   base-url: "http://localhost:8080"
+  test-email: "test1234@gmail.com"
+  test-fixed-otp: "123456"
+  test-password: "test1234"
   upload:
     dir: uploads
 

@@ -79,6 +79,10 @@ app:
   upload:
     dir: uploads
   base-url: "http://localhost:8080"
+  test-email: "test1234@gmail.com"
+  test-fixed-otp: "123456"
+  test-password: "test1234"
+
 
 mock-bank:
   url: "http://localhost:8081"
