@@ -9,6 +9,15 @@ spring:
     basename: messages
     encoding: UTF-8
 
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, prometheus
+  metrics:
+    tags:
+      application: ${spring.application.name}
+
 logging:
   level:
     org.side_project.payment_service: INFO

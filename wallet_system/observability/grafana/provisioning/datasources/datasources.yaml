@@ -11,4 +11,4 @@ datasources:
     uid: wallet-prometheus
     type: prometheus
     access: proxy
-    url: http://app:8080/actuator/prometheus
+    url: http://prometheus:9090

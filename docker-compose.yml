@@ -112,6 +112,21 @@ services:
       redis:
         condition: service_healthy
 
+  prometheus:
+    image: prom/prometheus:v2.53.0
+    ports:
+      - "9090:9090"
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.retention.time=7d
+    volumes:
+      - ./wallet_system/observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    depends_on:
+      - app
+      - payment-service
+      - email-service
+
   loki:
     image: grafana/loki:3.0.0
     ports:
@@ -162,6 +177,7 @@ services:
       - grafana_data:/var/lib/grafana
     depends_on:
       - loki
+      - prometheus
 
 volumes:
   postgres_data:
@@ -170,3 +186,4 @@ volumes:
   mock_bank_logs:
   loki_data:
   grafana_data:
+  prometheus_data:

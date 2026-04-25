@@ -1,38 +1,345 @@
 {
-  "title": "Wallet System",
+  "title": "Wallet System — All Services",
   "uid": "wallet-system-overview",
-  "description": "JVM heap, CPU, memory, threads, and application logs",
-  "tags": ["wallet", "jvm", "spring-boot"],
+  "description": "Multi-service monitoring: wallet-system, payment-service, email-service",
+  "tags": ["wallet", "jvm", "spring-boot", "microservices"],
   "timezone": "browser",
   "schemaVersion": 39,
-  "version": 1,
-  "refresh": "10s",
+  "version": 2,
+  "refresh": "15s",
   "time": { "from": "now-1h", "to": "now" },
   "timepicker": {},
   "graphTooltip": 1,
   "editable": true,
   "annotations": { "list": [] },
   "links": [],
+
+  "templating": {
+    "list": [
+      {
+        "name": "application",
+        "label": "Service",
+        "type": "query",
+        "datasource": { "type": "prometheus", "uid": "wallet-prometheus" },
+        "query": { "query": "label_values(process_cpu_usage, application)", "refId": "A" },
+        "refresh": 2,
+        "includeAll": true,
+        "allValue": ".*",
+        "multi": false,
+        "sort": 1,
+        "current": {}
+      }
+    ]
+  },
+
   "panels": [
 
     {
       "id": 1,
-      "title": "CPU Usage",
-      "type": "timeseries",
-      "gridPos": { "x": 0, "y": 0, "w": 8, "h": 8 },
+      "type": "row",
+      "title": "Service Health",
+      "gridPos": { "x": 0, "y": 0, "w": 24, "h": 1 },
+      "collapsed": false
+    },
+
+    {
+      "id": 2,
+      "title": "wallet-system",
+      "type": "stat",
+      "gridPos": { "x": 0, "y": 1, "w": 8, "h": 4 },
       "datasource": { "type": "prometheus", "uid": "wallet-prometheus" },
       "targets": [
         {
           "refId": "A",
-          "datasource": { "type": "prometheus", "uid": "wallet-prometheus" },
-          "expr": "process_cpu_usage * 100",
-          "legendFormat": "Process CPU"
+          "expr": "up{job=\"wallet-system\"}",
+          "instant": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "mappings": [
+            { "type": "value", "options": { "0": { "text": "DOWN", "color": "red" }, "1": { "text": "UP", "color": "green" } } }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{ "color": "red", "value": null }, { "color": "green", "value": 1 }]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "orientation": "auto",
+        "textMode": "value",
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "text": { "titleSize": 14, "valueSize": 32 }
+      }
+    },
+
+    {
+      "id": 3,
+      "title": "payment-service",
+      "type": "stat",
+      "gridPos": { "x": 8, "y": 1, "w": 8, "h": 4 },
+      "datasource": { "type": "prometheus", "uid": "wallet-prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "up{job=\"payment-service\"}",
+          "instant": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "mappings": [
+            { "type": "value", "options": { "0": { "text": "DOWN", "color": "red" }, "1": { "text": "UP", "color": "green" } } }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{ "color": "red", "value": null }, { "color": "green", "value": 1 }]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "orientation": "auto",
+        "textMode": "value",
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "text": { "titleSize": 14, "valueSize": 32 }
+      }
+    },
+
+    {
+      "id": 4,
+      "title": "email-service",
+      "type": "stat",
+      "gridPos": { "x": 16, "y": 1, "w": 8, "h": 4 },
+      "datasource": { "type": "prometheus", "uid": "wallet-prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "up{job=\"email-service\"}",
+          "instant": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "mappings": [
+            { "type": "value", "options": { "0": { "text": "DOWN", "color": "red" }, "1": { "text": "UP", "color": "green" } } }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{ "color": "red", "value": null }, { "color": "green", "value": 1 }]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "orientation": "auto",
+        "textMode": "value",
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "text": { "titleSize": 14, "valueSize": 32 }
+      }
+    },
+
+    {
+      "id": 10,
+      "type": "row",
+      "title": "JVM — $application",
+      "gridPos": { "x": 0, "y": 5, "w": 24, "h": 1 },
+      "collapsed": false,
+      "repeat": null
+    },
+
+    {
+      "id": 11,
+      "title": "Heap Memory",
+      "type": "timeseries",
+      "gridPos": { "x": 0, "y": 6, "w": 16, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "wallet-prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (application) (jvm_memory_used_bytes{area=\"heap\", application=~\"$application\"})",
+          "legendFormat": "{{application}} Used"
         },
         {
           "refId": "B",
-          "datasource": { "type": "prometheus", "uid": "wallet-prometheus" },
-          "expr": "system_cpu_usage * 100",
-          "legendFormat": "System CPU"
+          "expr": "sum by (application) (jvm_memory_max_bytes{area=\"heap\", application=~\"$application\"})",
+          "legendFormat": "{{application}} Max"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "min": 0,
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "spanNulls": false,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "tooltip": { "mode": "multi", "sort": "none" },
+        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max"] }
+      }
+    },
+
+    {
+      "id": 12,
+      "title": "Heap Usage %",
+      "type": "gauge",
+      "gridPos": { "x": 16, "y": 6, "w": 8, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "wallet-prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (application) (jvm_memory_used_bytes{area=\"heap\", application=~\"$application\"}) / sum by (application) (jvm_memory_max_bytes{area=\"heap\", application=~\"$application\"}) * 100",
+          "legendFormat": "{{application}}",
+          "instant": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "max": 100,
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 70 },
+              { "color": "red", "value": 85 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "orientation": "auto",
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true,
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }
+      }
+    },
+
+    {
+      "id": 13,
+      "title": "Non-Heap Memory",
+      "type": "timeseries",
+      "gridPos": { "x": 0, "y": 14, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "wallet-prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (application) (jvm_memory_used_bytes{area=\"nonheap\", application=~\"$application\"})",
+          "legendFormat": "{{application}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "min": 0,
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "spanNulls": false,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "tooltip": { "mode": "multi", "sort": "none" },
+        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max"] }
+      }
+    },
+
+    {
+      "id": 14,
+      "title": "JVM Threads",
+      "type": "timeseries",
+      "gridPos": { "x": 12, "y": 14, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "wallet-prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "jvm_threads_live_threads{application=~\"$application\"}",
+          "legendFormat": "{{application}} Live"
+        },
+        {
+          "refId": "B",
+          "expr": "jvm_threads_daemon_threads{application=~\"$application\"}",
+          "legendFormat": "{{application}} Daemon"
+        },
+        {
+          "refId": "C",
+          "expr": "jvm_threads_peak_threads{application=~\"$application\"}",
+          "legendFormat": "{{application}} Peak"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0,
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "fillOpacity": 5,
+            "spanNulls": false,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "tooltip": { "mode": "multi", "sort": "none" },
+        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max"] }
+      }
+    },
+
+    {
+      "id": 20,
+      "type": "row",
+      "title": "CPU & System — $application",
+      "gridPos": { "x": 0, "y": 22, "w": 24, "h": 1 },
+      "collapsed": false
+    },
+
+    {
+      "id": 21,
+      "title": "Process CPU Usage",
+      "type": "timeseries",
+      "gridPos": { "x": 0, "y": 23, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "wallet-prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "process_cpu_usage{application=~\"$application\"} * 100",
+          "legendFormat": "{{application}}"
         }
       ],
       "fieldConfig": {
@@ -46,11 +353,8 @@
             "lineInterpolation": "smooth",
             "lineWidth": 2,
             "fillOpacity": 10,
-            "gradientMode": "none",
-            "showPoints": "never",
             "spanNulls": false,
-            "stacking": { "mode": "none", "group": "A" },
-            "thresholdsStyle": { "mode": "off" }
+            "showPoints": "never"
           },
           "thresholds": {
             "mode": "absolute",
@@ -70,67 +374,16 @@
     },
 
     {
-      "id": 2,
-      "title": "JVM Heap Memory",
+      "id": 22,
+      "title": "System CPU Usage",
       "type": "timeseries",
-      "gridPos": { "x": 8, "y": 0, "w": 8, "h": 8 },
+      "gridPos": { "x": 12, "y": 23, "w": 12, "h": 8 },
       "datasource": { "type": "prometheus", "uid": "wallet-prometheus" },
       "targets": [
         {
           "refId": "A",
-          "datasource": { "type": "prometheus", "uid": "wallet-prometheus" },
-          "expr": "sum(jvm_memory_used_bytes{area=\"heap\"})",
-          "legendFormat": "Heap Used"
-        },
-        {
-          "refId": "B",
-          "datasource": { "type": "prometheus", "uid": "wallet-prometheus" },
-          "expr": "sum(jvm_memory_max_bytes{area=\"heap\"})",
-          "legendFormat": "Heap Max"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "bytes",
-          "min": 0,
-          "color": { "mode": "palette-classic" },
-          "custom": {
-            "drawStyle": "line",
-            "lineInterpolation": "smooth",
-            "lineWidth": 2,
-            "fillOpacity": 15,
-            "gradientMode": "opacity",
-            "showPoints": "never",
-            "spanNulls": false,
-            "stacking": { "mode": "none", "group": "A" },
-            "thresholdsStyle": { "mode": "off" }
-          },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [{ "color": "green", "value": null }]
-          }
-        },
-        "overrides": []
-      },
-      "options": {
-        "tooltip": { "mode": "multi", "sort": "none" },
-        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max"] }
-      }
-    },
-
-    {
-      "id": 3,
-      "title": "JVM Heap Usage",
-      "type": "gauge",
-      "gridPos": { "x": 16, "y": 0, "w": 8, "h": 8 },
-      "datasource": { "type": "prometheus", "uid": "wallet-prometheus" },
-      "targets": [
-        {
-          "refId": "A",
-          "datasource": { "type": "prometheus", "uid": "wallet-prometheus" },
-          "expr": "sum(jvm_memory_used_bytes{area=\"heap\"}) / sum(jvm_memory_max_bytes{area=\"heap\"}) * 100",
-          "legendFormat": "Heap Usage %",
-          "instant": true
+          "expr": "system_cpu_usage{application=~\"$application\"} * 100",
+          "legendFormat": "{{application}}"
         }
       ],
       "fieldConfig": {
@@ -138,60 +391,48 @@
           "unit": "percent",
           "min": 0,
           "max": 100,
-          "color": { "mode": "thresholds" },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              { "color": "green", "value": null },
-              { "color": "yellow", "value": 70 },
-              { "color": "red", "value": 85 }
-            ]
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "spanNulls": false,
+            "showPoints": "never"
           }
         },
         "overrides": []
       },
       "options": {
-        "orientation": "auto",
-        "showThresholdLabels": false,
-        "showThresholdMarkers": true,
-        "reduceOptions": {
-          "calcs": ["lastNotNull"],
-          "fields": "",
-          "values": false
-        }
+        "tooltip": { "mode": "multi", "sort": "none" },
+        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max"] }
       }
     },
 
     {
-      "id": 4,
-      "title": "JVM Thread Count",
+      "id": 30,
+      "type": "row",
+      "title": "HTTP — $application",
+      "gridPos": { "x": 0, "y": 31, "w": 24, "h": 1 },
+      "collapsed": false
+    },
+
+    {
+      "id": 31,
+      "title": "Request Rate (req/s)",
       "type": "timeseries",
-      "gridPos": { "x": 0, "y": 8, "w": 12, "h": 8 },
+      "gridPos": { "x": 0, "y": 32, "w": 12, "h": 8 },
       "datasource": { "type": "prometheus", "uid": "wallet-prometheus" },
       "targets": [
         {
           "refId": "A",
-          "datasource": { "type": "prometheus", "uid": "wallet-prometheus" },
-          "expr": "jvm_threads_live_threads",
-          "legendFormat": "Live"
-        },
-        {
-          "refId": "B",
-          "datasource": { "type": "prometheus", "uid": "wallet-prometheus" },
-          "expr": "jvm_threads_daemon_threads",
-          "legendFormat": "Daemon"
-        },
-        {
-          "refId": "C",
-          "datasource": { "type": "prometheus", "uid": "wallet-prometheus" },
-          "expr": "jvm_threads_peak_threads",
-          "legendFormat": "Peak"
+          "expr": "sum by (application) (rate(http_server_requests_seconds_count{application=~\"$application\"}[1m]))",
+          "legendFormat": "{{application}}"
         }
       ],
       "fieldConfig": {
         "defaults": {
-          "unit": "short",
+          "unit": "reqps",
           "min": 0,
           "color": { "mode": "palette-classic" },
           "custom": {
@@ -199,15 +440,8 @@
             "lineInterpolation": "smooth",
             "lineWidth": 2,
             "fillOpacity": 10,
-            "gradientMode": "none",
-            "showPoints": "never",
             "spanNulls": false,
-            "stacking": { "mode": "none", "group": "A" },
-            "thresholdsStyle": { "mode": "off" }
-          },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [{ "color": "green", "value": null }]
+            "showPoints": "never"
           }
         },
         "overrides": []
@@ -219,65 +453,94 @@
     },
 
     {
-      "id": 5,
-      "title": "JVM Memory (Heap vs Non-Heap)",
+      "id": 32,
+      "title": "5xx Error Rate (req/s)",
       "type": "timeseries",
-      "gridPos": { "x": 12, "y": 8, "w": 12, "h": 8 },
+      "gridPos": { "x": 12, "y": 32, "w": 12, "h": 8 },
       "datasource": { "type": "prometheus", "uid": "wallet-prometheus" },
       "targets": [
         {
           "refId": "A",
-          "datasource": { "type": "prometheus", "uid": "wallet-prometheus" },
-          "expr": "sum(jvm_memory_used_bytes{area=\"heap\"})",
-          "legendFormat": "Heap"
-        },
-        {
-          "refId": "B",
-          "datasource": { "type": "prometheus", "uid": "wallet-prometheus" },
-          "expr": "sum(jvm_memory_used_bytes{area=\"nonheap\"})",
-          "legendFormat": "Non-Heap"
+          "expr": "sum by (application) (rate(http_server_requests_seconds_count{application=~\"$application\", status=~\"5..\"}[1m]))",
+          "legendFormat": "{{application}} 5xx"
         }
       ],
       "fieldConfig": {
         "defaults": {
-          "unit": "bytes",
+          "unit": "reqps",
+          "min": 0,
+          "color": { "mode": "fixed", "fixedColor": "red" },
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "fillOpacity": 20,
+            "spanNulls": false,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "tooltip": { "mode": "multi", "sort": "none" },
+        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max"] }
+      }
+    },
+
+    {
+      "id": 33,
+      "title": "Average Response Time",
+      "type": "timeseries",
+      "gridPos": { "x": 0, "y": 40, "w": 24, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "wallet-prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (application, uri) (rate(http_server_requests_seconds_sum{application=~\"$application\", uri!~\"/actuator.*\"}[1m])) / sum by (application, uri) (rate(http_server_requests_seconds_count{application=~\"$application\", uri!~\"/actuator.*\"}[1m]))",
+          "legendFormat": "{{application}} {{uri}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
           "min": 0,
           "color": { "mode": "palette-classic" },
           "custom": {
             "drawStyle": "line",
             "lineInterpolation": "smooth",
-            "lineWidth": 2,
-            "fillOpacity": 15,
-            "gradientMode": "opacity",
-            "showPoints": "never",
+            "lineWidth": 1,
+            "fillOpacity": 5,
             "spanNulls": false,
-            "stacking": { "mode": "none", "group": "A" },
-            "thresholdsStyle": { "mode": "off" }
-          },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [{ "color": "green", "value": null }]
+            "showPoints": "never"
           }
         },
         "overrides": []
       },
       "options": {
-        "tooltip": { "mode": "multi", "sort": "none" },
+        "tooltip": { "mode": "multi", "sort": "desc" },
         "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max"] }
       }
     },
 
     {
-      "id": 6,
+      "id": 40,
+      "type": "row",
+      "title": "Logs — wallet-system",
+      "gridPos": { "x": 0, "y": 48, "w": 24, "h": 1 },
+      "collapsed": false
+    },
+
+    {
+      "id": 41,
       "title": "Server Logs",
       "type": "logs",
-      "gridPos": { "x": 0, "y": 16, "w": 24, "h": 10 },
+      "gridPos": { "x": 0, "y": 49, "w": 24, "h": 10 },
       "datasource": { "type": "loki", "uid": "wallet-loki" },
       "targets": [
         {
           "refId": "A",
           "datasource": { "type": "loki", "uid": "wallet-loki" },
-          "expr": "{app=\"wallet_system\"}",
+          "expr": "{app=~\"wallet_system|mock_bank\"}",
           "legendFormat": ""
         }
       ],

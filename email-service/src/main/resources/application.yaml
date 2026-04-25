@@ -38,6 +38,15 @@ rabbitmq:
   dead-letter-queue: email.notifications.dlq
   dead-letter-routing-key: email.notification.dead
 
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, prometheus
+  metrics:
+    tags:
+      application: ${spring.application.name}
+
 logging:
   level:
     org.side_project.email_service: INFO

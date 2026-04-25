@@ -1,0 +1,20 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+
+  - job_name: wallet-system
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ['app:8080']
+
+  - job_name: payment-service
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ['payment-service:8082']
+
+  - job_name: email-service
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ['email-service:8083']
