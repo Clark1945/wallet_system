@@ -89,20 +89,16 @@ app:
 mock-bank:
   url: "http://localhost:8081"
 
-stripe:
-  secret-key: ${STRIPE_SECRET_KEY}
-  publishable-key: ${STRIPE_PUBLISHABLE_KEY}
-  webhook-secret: ${STRIPE_WEBHOOK_SECRET}
-
 withdraw:
   webhook-secret: ${WITHDRAW_WEBHOOK_SECRET}
 
-sbpayment:
-  merchant-id: ${PAYMENT_MERCHANT_ID}
-  service-id: ${PAYMENT_SERVICE_ID}
-  hash-key: ${PAYMENT_HASH_KEY}
-  gateway-url: "https://stbfep.sps-system.com/Extra/BuyRequestAction.do"
-  base-url: ${SP_PAYMENT_REDIRECT_URL}
+payment:
+  service:
+    base-url: ${PAYMENT_SERVICE_BASE_URL:http://localhost:8082}
+
+internal:
+  service:
+    secret: ${INTERNAL_SERVICE_SECRET}
 
 springdoc:
   swagger-ui:

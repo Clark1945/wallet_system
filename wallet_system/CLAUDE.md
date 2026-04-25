@@ -45,24 +45,20 @@ REDIS_PASSWORD=...
 GOOGLE_CLIENT_ID=...
 GOOGLE_CLIENT_SECRET=...
 
-# Stripe
-STRIPE_SECRET_KEY=...
-STRIPE_PUBLISHABLE_KEY=...
-STRIPE_WEBHOOK_SECRET=...
-
 # Mail (defaults to smtp.gmail.com:587)
 MAIL_HOST=...
 MAIL_PORT=...
 MAIL_USERNAME=...
 MAIL_PASSWORD=...
 
-# Withdrawal webhook HMAC
+# Withdrawal webhook HMAC (shared with mock-bank)
 WITHDRAW_WEBHOOK_SECRET=...
 
-# SBPS payment gateway
-PAYMENT_MERCHANT_ID=...
-PAYMENT_SERVICE_ID=...
-PAYMENT_HASH_KEY=...
+# Internal service secret (shared with payment-service)
+INTERNAL_SERVICE_SECRET=...
+
+# payment-service base URL (browser-visible; payment-service redirects browser here after payment)
+PAYMENT_SERVICE_BASE_URL=http://localhost:8082
 ```
 
 ## Architecture Overview
@@ -80,8 +76,8 @@ PAYMENT_HASH_KEY=...
 - `auth/service/` — `AuthFlowService` (orchestrates all auth flows), `AuthService`, `OtpService`, `PasswordResetService`, `LoginAttemptService`, `ProfileService`
 - `wallet/` — `WalletController`, `WalletService`, `Wallet` (JPA entity), `WalletRepository`, `WalletNotFoundException`, `WithdrawWebhookController`
 - `transaction/` — `Transaction` (JPA entity), `TransactionRepository`, `TransactionType` (enum: `DEPOSIT`/`WITHDRAW`/`TRANSFER`), `TransactionStatus` (enum: `PENDING`/`REQUEST_COMPLETED`/`COMPLETED`/`FAILED`), `TransactionSpec` (JPA Criteria filtering), `TransactionTimeoutJob`
-- `payment/` — `StripePaymentController`, `StripePaymentService`, `SBPaymentController`, `SBPaymentService`, `SBPaymentRequest`
-- `config/` — `SecurityConfig`, `AppConfig` (`@EnableAsync`, `HttpClient` and `StripeClient` beans), `WebConfig` (`AcceptHeaderLocaleResolver` + `/uploads/**` resource handler), `RedisConfig`, `TraceIdFilter`, `GlobalExceptionHandler` (`@ControllerAdvice`), `SessionConstants` (session key constants), `SessionUtils` (helper to extract `UUID` memberId from session)
+- `internal/` — `DepositInternalController` (`@RestController`, `/internal/**`; called only by payment-service), `PaymentTokenService` (creates/consumes one-time tokens in Redis with key `payment_token:{uuid}`, 15-min TTL); `dto/` — shared record types for the internal API
+- `config/` — `SecurityConfig`, `AppConfig` (`@EnableAsync`, `HttpClient` bean), `WebConfig` (`AcceptHeaderLocaleResolver` + `/uploads/**` resource handler), `RedisConfig`, `TraceIdFilter`, `GlobalExceptionHandler` (`@ControllerAdvice`), `SessionConstants` (session key constants), `SessionUtils` (helper to extract `UUID` memberId from session)
 
 This is a **server-rendered MVC app**, not a REST API. All controllers are `@Controller` and return Thymeleaf view names. Flash attributes carry success/error messages between redirects.
 
@@ -128,21 +124,28 @@ Fields beyond basics: `nickname`, `phone`, `bio`, `birthday` (LocalDate), `avata
 - `Transaction` records every operation with nullable `fromWalletId`/`toWalletId` depending on type.
 - Transaction history supports filtering by `TransactionType` and date range via `TransactionSpec` (JPA Criteria API), plus server-side pagination (default 10 per page, `createdAt` DESC).
 
+**Deposit flow (via payment-service):**
+1. `WalletController.deposit()` calls `PaymentTokenService.createToken(memberId, amount, method)` → stores data in Redis (15-min TTL), redirects browser to `payment-service:8082/payment/{stripe|sbpayment}/checkout?token={uuid}`.
+2. payment-service validates the token via `GET /internal/token/{token}` (one-time use, consumed on read), then initiates a `PENDING` deposit transaction via `POST /internal/deposit/initiate`.
+3. On payment success, payment-service calls `POST /internal/deposit/complete` or `POST /internal/deposit/complete-by-external`. All `/internal/**` calls require `X-Internal-Secret` header.
+
 **Async withdrawal flow:**
 1. `WalletService.withdraw()` deducts balance, creates a `Transaction` with status `REQUEST_COMPLETED`, fires `HttpClient.sendAsync()` to `POST mock-bank:8081/api/withdraw`.
 2. mock-bank responds `200 OK` immediately, then calls back `POST /withdraw/webhook` after a 3–8 second delay.
 3. `WithdrawWebhookController` verifies `X-Webhook-Signature: sha256=<hex>` (HMAC-SHA256 of raw request body, key = `WITHDRAW_WEBHOOK_SECRET`), then processes `{"transactionId":"...", "result":"SUCCESS"/"FAIL"}`: SUCCESS → `COMPLETED`; FAIL → `FAILED` + balance refunded.
 4. `TransactionTimeoutJob` (`@Scheduled(fixedDelay = 60_000)`) runs every 60 seconds; any `PENDING` or `REQUEST_COMPLETED` transaction older than 5 minutes is set to `FAILED` and balance is refunded.
 
-### Payment Gateway Integrations
+### Internal Deposit API (`/internal/**`)
 
-**Stripe** (`payment/StripePaymentService`, `payment/StripePaymentController`):
-- Creates a PaymentIntent (JPY, no sub-unit conversion). Returns `clientSecret` to `stripe-checkout.html`.
-- Webhook at `/payment/stripe/webhook` verifies `Stripe-Signature` then calls `completeDeposit()` on `payment_intent.succeeded`. Idempotency is enforced by `completeDeposit()`'s status check — it only acts if the transaction is `PENDING`; duplicate deliveries are silently skipped.
+Exposed exclusively for payment-service. Protected by `X-Internal-Secret` header (401 if wrong/missing).
 
-**SBPS / SoftBank Payment Service** (`payment/SBPaymentService`, `payment/SBPaymentController`):
-- Link-type integration: builds an `SBPaymentRequest` with a SHA-1 hashcode (fields concatenated + `hashKey`), posts a form to SBPS gateway. `request_date` must be in JST.
-- Result CGI callback at `/payment/sbpayment/result` verifies `res_result=OK`, then calls `completeDepositByExternalId(orderId)`, which looks up the transaction by `payment_external_id` (unique DB constraint) and chains to `completeDeposit()`. Idempotency is enforced by the same `PENDING` status check.
+- `GET /internal/token/{token}` — validates and consumes a one-time payment token from Redis; returns `{memberId, amount, method}`
+- `POST /internal/deposit/initiate` — creates a `PENDING` deposit `Transaction`, returns `transactionId`
+- `POST /internal/deposit/link-external` — sets `transaction.paymentExternalId` (used by SBPS for idempotent lookup)
+- `POST /internal/deposit/complete` — marks transaction `COMPLETED`, credits wallet
+- `POST /internal/deposit/complete-by-external` — looks up transaction by `paymentExternalId`, then completes; returns `404` if not found
+
+Idempotency: `completeDeposit()` checks the transaction is still `PENDING` before acting; duplicate calls are silently skipped.
 
 ### Error Handling
 
@@ -169,11 +172,10 @@ The fallback returns the raw key if no translation exists.
 
 ### Security Filter Chains
 
-`SecurityConfig` configures **4 separate filter chains** (`@Order`, lower = higher priority):
-1. **SBPS webhook** (`@Order(1)`) — STATELESS, CSRF disabled; matches `/payment/sbpayment/result`
-2. **Stripe webhook** (`@Order(2)`) — STATELESS, CSRF disabled; matches `/payment/stripe/webhook`
-3. **Withdrawal webhook** (`@Order(3)`) — STATELESS, CSRF disabled, no Spring Security auth; matches `/withdraw/webhook` (HMAC-SHA256 verified in `WithdrawWebhookController`)
-4. **Main chain** (default) — form login + OAuth2 + session management; all other routes
+`SecurityConfig` configures **3 filter chains** (`@Order`, lower = higher priority):
+1. **Internal API chain** (`@Order(1)`) — STATELESS, CSRF disabled; validates `X-Internal-Secret` header (sends 401 if absent/wrong); matches `/internal/**`
+2. **Withdrawal webhook chain** (`@Order(2)`) — STATELESS, CSRF disabled, no Spring Security auth; matches `/withdraw/webhook` (HMAC-SHA256 verified in `WithdrawWebhookController`)
+3. **Main chain** (default) — form login + OAuth2 + session management; all other routes
 
 ### Observability
 

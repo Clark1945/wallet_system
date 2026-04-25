@@ -40,6 +40,9 @@ public class Transaction {
     @Column(unique = true)
     private String paymentExternalId;
 
+    @Column(name = "notify_email")
+    private String notifyEmail;
+
     @Column(nullable = false)
     private LocalDateTime createdAt;
 

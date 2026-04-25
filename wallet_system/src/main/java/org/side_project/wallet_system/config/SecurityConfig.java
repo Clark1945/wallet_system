@@ -1,11 +1,16 @@
 package org.side_project.wallet_system.config;
 
+import jakarta.servlet.FilterChain;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import org.side_project.wallet_system.auth.objects.AuthProvider;
 import org.side_project.wallet_system.auth.oauth.CustomOAuth2UserService;
 import org.side_project.wallet_system.auth.oauth.CustomUserDetails;
 import org.side_project.wallet_system.auth.oauth.LoginSuccessHandler;
 import org.side_project.wallet_system.auth.repository.MemberRepository;
 import org.side_project.wallet_system.auth.service.LoginAttemptService;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
@@ -20,44 +25,48 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.AuthenticationFailureHandler;
+import org.springframework.security.web.authentication.www.BasicAuthenticationFilter;
+import org.springframework.web.filter.OncePerRequestFilter;
+
+import java.io.IOException;
 
 @Configuration
 @EnableWebSecurity
 public class SecurityConfig {
 
+    @Value("${internal.service.secret}")
+    private String internalServiceSecret;
+
     /**
-     * Dedicated filter chain for SBPS result CGI callback.
-     * Must be stateless — SBPS calls server-to-server with no cookies/session.
-     * SessionCreationPolicy.STATELESS prevents the session-management redirect (302)
-     * that would otherwise occur when Spring Security creates a session for a
-     * request arriving without a JSESSIONID cookie.
+     * Dedicated filter chain for internal service-to-service API.
+     * Validates X-Internal-Secret header; rejects with 401 if absent or wrong.
+     * payment-service is the only authorized caller.
      */
     @Bean
     @Order(1)
-    public SecurityFilterChain sbpaymentCallbackFilterChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain internalApiFilterChain(HttpSecurity http) throws Exception {
         http
-            .securityMatcher("/payment/sbpayment/result")
+            .securityMatcher("/internal/**")
             .csrf(AbstractHttpConfigurer::disable)
             .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+            .addFilterBefore(internalSecretFilter(), BasicAuthenticationFilter.class)
             .authorizeHttpRequests(a -> a.anyRequest().permitAll());
         return http.build();
     }
 
-    /**
-     * Dedicated filter chain for Stripe webhook.
-     * Same rationale as the SBPS chain — Stripe calls server-to-server
-     * with no session cookie. Signature verification happens inside
-     * StripePaymentService via Webhook.constructEvent().
-     */
-    @Bean
-    @Order(2)
-    public SecurityFilterChain stripeWebhookFilterChain(HttpSecurity http) throws Exception {
-        http
-            .securityMatcher("/payment/stripe/webhook")
-            .csrf(AbstractHttpConfigurer::disable)
-            .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-            .authorizeHttpRequests(a -> a.anyRequest().permitAll());
-        return http.build();
+    private OncePerRequestFilter internalSecretFilter() {
+        return new OncePerRequestFilter() {
+            @Override
+            protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
+                                            FilterChain chain) throws ServletException, IOException {
+                String header = request.getHeader("X-Internal-Secret");
+                if (!internalServiceSecret.equals(header)) {
+                    response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Unauthorized");
+                    return;
+                }
+                chain.doFilter(request, response);
+            }
+        };
     }
 
     /**
@@ -65,7 +74,7 @@ public class SecurityConfig {
      * Called server-to-server by the mock bank — no session cookie present.
      */
     @Bean
-    @Order(3)
+    @Order(2)
     public SecurityFilterChain withdrawWebhookFilterChain(HttpSecurity http) throws Exception {
         http
             .securityMatcher("/withdraw/webhook")

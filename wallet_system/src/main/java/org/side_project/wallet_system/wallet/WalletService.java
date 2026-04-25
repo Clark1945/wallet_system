@@ -2,6 +2,7 @@ package org.side_project.wallet_system.wallet;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.side_project.wallet_system.auth.email.EmailService;
 import org.side_project.wallet_system.transaction.Transaction;
 import org.side_project.wallet_system.transaction.TransactionRepository;
 import org.side_project.wallet_system.transaction.TransactionSpec;
@@ -39,6 +40,7 @@ public class WalletService {
     private final WalletRepository walletRepository;
     private final TransactionRepository transactionRepository;
     private final HttpClient httpClient;
+    private final EmailService emailService;
 
     @Value("${mock-bank.url}")
     private String mockBankUrl;
@@ -99,7 +101,7 @@ public class WalletService {
     // ── 非同步儲值（PENDING → COMPLETED / FAILED）────────────────────────────
 
     @Transactional
-    public UUID initiateDeposit(UUID memberId, BigDecimal amount) {
+    public UUID initiateDeposit(UUID memberId, BigDecimal amount, String notifyEmail) {
         if (amount.compareTo(BigDecimal.ZERO) <= 0) {
             log.warn("Deposit rejected - non-positive amount: memberId={}, amount={}", memberId, amount);
             throw new IllegalArgumentException("error.amount.positive");
@@ -112,6 +114,7 @@ public class WalletService {
         tx.setAmount(amount);
         tx.setDescription(DESC_DEPOSIT);
         tx.setStatus(TransactionStatus.PENDING);
+        tx.setNotifyEmail(notifyEmail);
         tx = transactionRepository.save(tx);
         log.info("Deposit initiated: memberId={}, amount={}, transactionId={}", memberId, amount, tx.getId());
         return tx.getId();
@@ -128,6 +131,9 @@ public class WalletService {
                 tx.setStatus(TransactionStatus.COMPLETED);
                 transactionRepository.save(tx);
                 log.info("Deposit completed: transactionId={}, amount={}", transactionId, tx.getAmount());
+                if (tx.getNotifyEmail() != null && !tx.getNotifyEmail().isBlank()) {
+                    emailService.sendDepositSuccess(tx.getNotifyEmail(), tx.getAmount());
+                }
             } else {
                 log.warn("completeDeposit on non-PENDING: transactionId={}, currentStatus={}",
                         transactionId, tx.getStatus());
@@ -194,7 +200,7 @@ public class WalletService {
     // ── 非同步提款（REQUEST_COMPLETED → COMPLETED / FAILED）─────────────────
 
     @Transactional
-    public void initiateWithdrawal(UUID memberId, BigDecimal amount, String bankCode, String bankAccount) {
+    public void initiateWithdrawal(UUID memberId, BigDecimal amount, String bankCode, String bankAccount, String notifyEmail) {
         if (amount.compareTo(BigDecimal.ZERO) <= 0) {
             log.warn("Withdrawal rejected - non-positive amount: memberId={}, amount={}", memberId, amount);
             throw new IllegalArgumentException("error.amount.positive");
@@ -214,6 +220,7 @@ public class WalletService {
         tx.setAmount(amount);
         tx.setDescription(String.format(DESC_WITHDRAWAL_TO_BANK, bankCode, bankAccount));
         tx.setStatus(TransactionStatus.REQUEST_COMPLETED);
+        tx.setNotifyEmail(notifyEmail);
         Transaction saved = transactionRepository.save(tx);
 
         String transactionId = saved.getId().toString();
@@ -250,6 +257,9 @@ public class WalletService {
                 tx.setStatus(TransactionStatus.COMPLETED);
                 transactionRepository.save(tx);
                 log.info("Withdrawal completed: transactionId={}, amount={}", transactionId, tx.getAmount());
+                if (tx.getNotifyEmail() != null && !tx.getNotifyEmail().isBlank()) {
+                    emailService.sendWithdrawalSuccess(tx.getNotifyEmail(), tx.getAmount());
+                }
             } else {
                 log.warn("completeWithdrawal on non-REQUEST_COMPLETED: transactionId={}, currentStatus={}",
                         transactionId, tx.getStatus());

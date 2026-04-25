@@ -6,6 +6,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.side_project.wallet_system.auth.email.EmailService;
 import org.side_project.wallet_system.transaction.Transaction;
 import org.side_project.wallet_system.transaction.TransactionRepository;
 import org.side_project.wallet_system.transaction.TransactionStatus;
@@ -27,6 +28,7 @@ class WalletServiceTest {
 
     @Mock private WalletRepository walletRepository;
     @Mock private TransactionRepository transactionRepository;
+    @Mock private EmailService emailService;
     @InjectMocks private WalletService walletService;
 
     private UUID memberId;
@@ -201,7 +203,7 @@ class WalletServiceTest {
         saved.setId(UUID.randomUUID());
         given(transactionRepository.save(any())).willReturn(saved);
 
-        UUID txId = walletService.initiateDeposit(memberId, new BigDecimal("500.00"));
+        UUID txId = walletService.initiateDeposit(memberId, new BigDecimal("500.00"), null);
 
         assertThat(txId).isEqualTo(saved.getId());
         assertThat(wallet.getBalance()).isEqualByComparingTo("1000.00"); // balance unchanged
@@ -213,7 +215,7 @@ class WalletServiceTest {
 
     @Test
     void initiateDeposit_zero_throws() {
-        assertThatThrownBy(() -> walletService.initiateDeposit(memberId, BigDecimal.ZERO))
+        assertThatThrownBy(() -> walletService.initiateDeposit(memberId, BigDecimal.ZERO, null))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("error.amount.positive");
     }
@@ -277,11 +279,75 @@ class WalletServiceTest {
         saved.setId(UUID.randomUUID());
         given(transactionRepository.save(any())).willReturn(saved);
 
-        walletService.initiateWithdrawal(memberId, new BigDecimal("400.00"), "012", "1234567890");
+        walletService.initiateWithdrawal(memberId, new BigDecimal("400.00"), "012", "1234567890", null);
 
         assertThat(wallet.getBalance()).isEqualByComparingTo("600.00");
         then(transactionRepository).should().save(argThat(tx ->
                 tx.getStatus() == TransactionStatus.REQUEST_COMPLETED
                 && tx.getType() == TransactionType.WITHDRAW));
+    }
+
+    // ── email notification ────────────────────────────────────
+
+    @Test
+    void completeDeposit_withNotifyEmail_sendsEmail() {
+        UUID txId = UUID.randomUUID();
+        Transaction tx = new Transaction();
+        tx.setId(txId);
+        tx.setToWalletId(wallet.getId());
+        tx.setAmount(new BigDecimal("200.00"));
+        tx.setStatus(TransactionStatus.PENDING);
+        tx.setNotifyEmail("user@example.com");
+        given(transactionRepository.findById(txId)).willReturn(Optional.of(tx));
+        given(walletRepository.findByIdForUpdate(wallet.getId())).willReturn(Optional.of(wallet));
+
+        walletService.completeDeposit(txId);
+
+        then(emailService).should().sendDepositSuccess("user@example.com", new BigDecimal("200.00"));
+    }
+
+    @Test
+    void completeDeposit_withoutNotifyEmail_doesNotSendEmail() {
+        UUID txId = UUID.randomUUID();
+        Transaction tx = new Transaction();
+        tx.setId(txId);
+        tx.setToWalletId(wallet.getId());
+        tx.setAmount(new BigDecimal("200.00"));
+        tx.setStatus(TransactionStatus.PENDING);
+        given(transactionRepository.findById(txId)).willReturn(Optional.of(tx));
+        given(walletRepository.findByIdForUpdate(wallet.getId())).willReturn(Optional.of(wallet));
+
+        walletService.completeDeposit(txId);
+
+        then(emailService).shouldHaveNoInteractions();
+    }
+
+    @Test
+    void completeWithdrawal_withNotifyEmail_sendsEmail() {
+        UUID txId = UUID.randomUUID();
+        Transaction tx = new Transaction();
+        tx.setId(txId);
+        tx.setAmount(new BigDecimal("150.00"));
+        tx.setStatus(TransactionStatus.REQUEST_COMPLETED);
+        tx.setNotifyEmail("user@example.com");
+        given(transactionRepository.findById(txId)).willReturn(Optional.of(tx));
+
+        walletService.completeWithdrawal(txId);
+
+        then(emailService).should().sendWithdrawalSuccess("user@example.com", new BigDecimal("150.00"));
+    }
+
+    @Test
+    void completeWithdrawal_withoutNotifyEmail_doesNotSendEmail() {
+        UUID txId = UUID.randomUUID();
+        Transaction tx = new Transaction();
+        tx.setId(txId);
+        tx.setAmount(new BigDecimal("150.00"));
+        tx.setStatus(TransactionStatus.REQUEST_COMPLETED);
+        given(transactionRepository.findById(txId)).willReturn(Optional.of(tx));
+
+        walletService.completeWithdrawal(txId);
+
+        then(emailService).shouldHaveNoInteractions();
     }
 }

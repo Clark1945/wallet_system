@@ -1,4 +1,4 @@
-package org.side_project.wallet_system.payment;
+package org.side_project.payment_service.payment;
 
 import com.stripe.StripeClient;
 import com.stripe.exception.SignatureVerificationException;
@@ -10,7 +10,7 @@ import com.stripe.net.Webhook;
 import com.stripe.param.PaymentIntentCreateParams;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.side_project.wallet_system.wallet.WalletService;
+import org.side_project.payment_service.client.WalletServiceClient;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -23,22 +23,18 @@ import java.util.UUID;
 public class StripePaymentService {
 
     private final StripeClient stripeClient;
-    private final WalletService walletService;
+    private final WalletServiceClient walletServiceClient;
 
     @Value("${stripe.webhook-secret}")
     private String webhookSecret;
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // Create PaymentIntent — also creates a PENDING deposit transaction
-    // ─────────────────────────────────────────────────────────────────────────
-
     private static final BigDecimal STRIPE_JPY_MIN = BigDecimal.valueOf(50);
 
-    public String createPaymentIntent(UUID memberId, BigDecimal amount) throws StripeException {
+    public String createPaymentIntent(UUID memberId, BigDecimal amount, String notifyEmail) throws StripeException {
         if (amount.compareTo(STRIPE_JPY_MIN) < 0) {
             throw new IllegalArgumentException("error.stripe.amount.min");
         }
-        UUID transactionId = walletService.initiateDeposit(memberId, amount);
+        UUID transactionId = walletServiceClient.initiateDeposit(memberId, amount, notifyEmail);
 
         PaymentIntentCreateParams params = PaymentIntentCreateParams.builder()
                 .setAmount(amount.longValue())
@@ -57,15 +53,11 @@ public class StripePaymentService {
                 .build();
 
         PaymentIntent intent = stripeClient.paymentIntents().create(params);
-        walletService.linkPaymentExternalId(transactionId, intent.getId());
+        walletServiceClient.linkExternalId(transactionId, intent.getId());
         log.info("Stripe PaymentIntent created: id={}, memberId={}, transactionId={}, amount={}",
                  intent.getId(), memberId, transactionId, amount);
         return intent.getClientSecret();
     }
-
-    // ─────────────────────────────────────────────────────────────────────────
-    // Process webhook — on success, complete the PENDING deposit transaction
-    // ─────────────────────────────────────────────────────────────────────────
 
     public boolean processWebhookEvent(String payload, String sigHeader) {
         Event event;
@@ -96,7 +88,7 @@ public class StripePaymentService {
 
         try {
             UUID transactionId = UUID.fromString(transactionIdStr);
-            walletService.completeDeposit(transactionId);
+            walletServiceClient.completeDeposit(transactionId);
             log.info("Stripe deposit completed: intentId={}, transactionId={}", intentId, transactionId);
             return true;
         } catch (RuntimeException e) {

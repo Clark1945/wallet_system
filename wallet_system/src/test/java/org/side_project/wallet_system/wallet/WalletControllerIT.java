@@ -10,11 +10,13 @@ import org.side_project.wallet_system.config.RateLimiterService;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.side_project.wallet_system.config.SecurityConfig;
+import org.side_project.wallet_system.internal.PaymentTokenService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.mock.web.MockHttpSession;
+import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -34,6 +36,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @WebMvcTest(WalletController.class)
 @Import(SecurityConfig.class)
+@TestPropertySource(properties = {
+    "payment.service.base-url=http://localhost:8082",
+    "internal.service.secret=test-internal-secret"
+})
 class WalletControllerIT {
 
     private static Locale originalLocale;
@@ -52,6 +58,7 @@ class WalletControllerIT {
     @Autowired MockMvc mockMvc;
     @MockitoBean WalletService walletService;
     @MockitoBean RateLimiterService rateLimiterService;
+    @MockitoBean PaymentTokenService paymentTokenService;
     @MockitoBean MemberRepository memberRepository;
     @MockitoBean CustomOAuth2UserService oauth2UserService;
     @MockitoBean LoginSuccessHandler loginSuccessHandler;
@@ -78,6 +85,7 @@ class WalletControllerIT {
         given(walletService.getWallet(memberId)).willReturn(wallet);
         given(walletService.getTransactions(eq(memberId), any(), any(), any(), eq(0), eq(10)))
             .willReturn(new PageImpl<>(List.of()));
+        given(paymentTokenService.createToken(any(), any(), any(), any())).willReturn("test-token");
     }
 
     // ── dashboard ─────────────────────────────────────────────
@@ -122,25 +130,25 @@ class WalletControllerIT {
     // ── POST /deposit ─────────────────────────────────────────
 
     @Test
-    void deposit_stripeMethod_redirectsToStripeCheckout() throws Exception {
+    void deposit_stripeMethod_redirectsToPaymentServiceStripeCheckout() throws Exception {
         mockMvc.perform(post("/deposit").with(csrf()).with(user("test@example.com"))
                         .param("amount", "200.00")
                         .param("paymentMethod", "stripe")
                         .session(session))
                 .andExpect(status().is3xxRedirection())
-                .andExpect(redirectedUrl("/payment/stripe/checkout"));
+                .andExpect(redirectedUrl("http://localhost:8082/payment/stripe/checkout?token=test-token"));
 
         then(walletService).should(never()).deposit(any(), any());
     }
 
     @Test
-    void deposit_sbpaymentMethod_redirectsToSBPaymentRequest() throws Exception {
+    void deposit_sbpaymentMethod_redirectsToPaymentServiceSBPaymentRequest() throws Exception {
         mockMvc.perform(post("/deposit").with(csrf()).with(user("test@example.com"))
                         .param("amount", "500.00")
                         .param("paymentMethod", "sbpayment")
                         .session(session))
                 .andExpect(status().is3xxRedirection())
-                .andExpect(redirectedUrl("/payment/sbpayment/request"));
+                .andExpect(redirectedUrl("http://localhost:8082/payment/sbpayment/request?token=test-token"));
 
         then(walletService).should(never()).deposit(any(), any());
     }
@@ -220,13 +228,13 @@ class WalletControllerIT {
                         "Withdrawal submitted. Funds will be transferred within a few seconds."));
 
         then(walletService).should().initiateWithdrawal(
-                eq(memberId), eq(new BigDecimal("100.00")), eq("012"), eq("1234567890"));
+                eq(memberId), eq(new BigDecimal("100.00")), eq("012"), eq("1234567890"), eq("test@example.com"));
     }
 
     @Test
     void withdraw_insufficientBalance_redirectsWithError() throws Exception {
         willThrow(new IllegalArgumentException("error.insufficient.balance"))
-                .given(walletService).initiateWithdrawal(any(), any(), any(), any());
+                .given(walletService).initiateWithdrawal(any(), any(), any(), any(), any());
 
         mockMvc.perform(post("/withdraw").with(csrf()).with(user("test@example.com"))
                         .param("amount", "99999.00")
@@ -253,7 +261,7 @@ class WalletControllerIT {
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/login"));
 
-        then(walletService).should(never()).initiateWithdrawal(any(), any(), any(), any());
+        then(walletService).should(never()).initiateWithdrawal(any(), any(), any(), any(), any());
     }
 
     // ── GET /transfer ─────────────────────────────────────────

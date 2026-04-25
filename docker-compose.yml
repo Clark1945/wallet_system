@@ -24,7 +24,7 @@ services:
 
   mock-bank:
     build:
-      context: ../mock-bank
+      context: ./mock-bank
     ports:
       - "8081:8081"
     environment:
@@ -33,7 +33,8 @@ services:
       - mock_bank_logs:/app/logs
 
   app:
-    build: .
+    build:
+      context: ./wallet_system
     ports:
       - "8080:8080"
     environment:
@@ -49,18 +50,14 @@ services:
       APP_BASE_URL: http://app:8080
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
-      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY}
-      STRIPE_PUBLISHABLE_KEY: ${STRIPE_PUBLISHABLE_KEY}
-      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET}
-      PAYMENT_MERCHANT_ID: ${PAYMENT_MERCHANT_ID}
-      PAYMENT_SERVICE_ID: ${PAYMENT_SERVICE_ID}
-      PAYMENT_HASH_KEY: ${PAYMENT_HASH_KEY}
       WITHDRAW_WEBHOOK_SECRET: ${WITHDRAW_WEBHOOK_SECRET}
       MAIL_HOST: ${MAIL_HOST:-smtp.gmail.com}
       MAIL_PORT: ${MAIL_PORT:-587}
       MAIL_USERNAME: ${MAIL_USERNAME:-}
       MAIL_PASSWORD: ${MAIL_PASSWORD:-}
-      SP_PAYMENT_REDIRECT_URL: ${SP_PAYMENT_REDIRECT_URL}
+      # payment-service integration — must be browser-accessible (localhost), not internal Docker hostname
+      PAYMENT_SERVICE_BASE_URL: http://localhost:8082
+      INTERNAL_SERVICE_SECRET: ${INTERNAL_SERVICE_SECRET}
     volumes:
       - uploads:/app/uploads
       - app_logs:/app/logs
@@ -72,6 +69,31 @@ services:
         condition: service_healthy
       mock-bank:
         condition: service_started
+      payment-service:
+        condition: service_started
+
+  payment-service:
+    build:
+      context: ./payment-service
+    ports:
+      - "8082:8082"
+    environment:
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY}
+      STRIPE_PUBLISHABLE_KEY: ${STRIPE_PUBLISHABLE_KEY}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET}
+      PAYMENT_MERCHANT_ID: ${PAYMENT_MERCHANT_ID}
+      PAYMENT_SERVICE_ID: ${PAYMENT_SERVICE_ID}
+      PAYMENT_HASH_KEY: ${PAYMENT_HASH_KEY}
+      SP_PAYMENT_REDIRECT_URL: ${SP_PAYMENT_REDIRECT_URL}
+      WALLET_SERVICE_BASE_URL: http://app:8080          # container-to-container API calls
+      WALLET_SERVICE_PUBLIC_URL: http://localhost:8080  # browser redirect after payment
+      INTERNAL_SERVICE_SECRET: ${INTERNAL_SERVICE_SECRET}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+    restart: on-failure
+    depends_on:
+      redis:
+        condition: service_healthy
 
   loki:
     image: grafana/loki:3.0.0
@@ -79,14 +101,14 @@ services:
       - "3100:3100"
     command: -config.file=/etc/loki/config.yaml
     volumes:
-      - ./observability/loki-config.yaml:/etc/loki/config.yaml:ro
+      - ./wallet_system/observability/loki-config.yaml:/etc/loki/config.yaml:ro
       - loki_data:/loki
 
   promtail:
     image: grafana/promtail:3.0.0
     command: -config.file=/etc/promtail/config.yaml
     volumes:
-      - ./observability/promtail-config.yaml:/etc/promtail/config.yaml:ro
+      - ./wallet_system/observability/promtail-config.yaml:/etc/promtail/config.yaml:ro
       - app_logs:/logs/wallet-system:ro
       - mock_bank_logs:/logs/mock-bank:ro
     depends_on:
@@ -102,7 +124,7 @@ services:
       GF_AUTH_ANONYMOUS_ENABLED: "true"
       GF_AUTH_ANONYMOUS_ORG_ROLE: Admin
     volumes:
-      - ./observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./wallet_system/observability/grafana/provisioning:/etc/grafana/provisioning:ro
       - grafana_data:/var/lib/grafana
     depends_on:
       - loki

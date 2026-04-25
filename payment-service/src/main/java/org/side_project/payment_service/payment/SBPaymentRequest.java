@@ -1,4 +1,4 @@
-package org.side_project.wallet_system.payment;
+package org.side_project.payment_service.payment;
 
 import lombok.Builder;
 import lombok.Data;

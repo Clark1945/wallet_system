@@ -8,6 +8,8 @@ import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
+import java.math.BigDecimal;
+
 @Slf4j
 @Service
 @Profile("!test")
@@ -41,6 +43,22 @@ public class JavaMailEmailService implements EmailService {
                 "Click the link below to reset your password:\n" + resetUrl +
                 "\n\nThis link expires in 15 minutes." +
                 "\nIf you did not request a password reset, please ignore this email.");
+    }
+
+    @Async
+    @Override
+    public void sendDepositSuccess(String to, BigDecimal amount) {
+        send(to, "Deposit successful",
+                "Your deposit of " + amount.toPlainString() + " has been completed successfully." +
+                "\n\nThank you for using Wallet System.");
+    }
+
+    @Async
+    @Override
+    public void sendWithdrawalSuccess(String to, BigDecimal amount) {
+        send(to, "Withdrawal successful",
+                "Your withdrawal of " + amount.toPlainString() + " has been completed successfully." +
+                "\n\nThank you for using Wallet System.");
     }
 
     private void send(String to, String subject, String text) {

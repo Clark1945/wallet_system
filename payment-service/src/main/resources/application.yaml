@@ -1,0 +1,35 @@
+server:
+  port: 8082
+  forward-headers-strategy: framework
+
+spring:
+  application:
+    name: payment-service
+  messages:
+    basename: messages
+    encoding: UTF-8
+
+logging:
+  level:
+    org.side_project.payment_service: INFO
+
+stripe:
+  secret-key: ${STRIPE_SECRET_KEY}
+  publishable-key: ${STRIPE_PUBLISHABLE_KEY}
+  webhook-secret: ${STRIPE_WEBHOOK_SECRET}
+
+sbpayment:
+  merchant-id: ${PAYMENT_MERCHANT_ID}
+  service-id: ${PAYMENT_SERVICE_ID}
+  hash-key: ${PAYMENT_HASH_KEY}
+  gateway-url: "https://stbfep.sps-system.com/Extra/BuyRequestAction.do"
+  base-url: ${SP_PAYMENT_REDIRECT_URL}
+
+wallet:
+  service:
+    base-url: ${WALLET_SERVICE_BASE_URL:http://localhost:8080}      # service-to-service API calls
+    public-url: ${WALLET_SERVICE_PUBLIC_URL:http://localhost:8080}  # browser redirects
+
+internal:
+  service:
+    secret: ${INTERNAL_SERVICE_SECRET}

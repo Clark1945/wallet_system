@@ -5,8 +5,10 @@ import lombok.RequiredArgsConstructor;
 import org.side_project.wallet_system.config.RateLimiterService;
 import org.side_project.wallet_system.config.SessionConstants;
 import org.side_project.wallet_system.config.SessionUtils;
+import org.side_project.wallet_system.internal.PaymentTokenService;
 import org.side_project.wallet_system.transaction.Transaction;
 import org.side_project.wallet_system.transaction.TransactionType;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.MessageSource;
 import org.springframework.data.domain.Page;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -28,6 +30,10 @@ public class WalletController {
     private final WalletService walletService;
     private final MessageSource messageSource;
     private final RateLimiterService rateLimiterService;
+    private final PaymentTokenService paymentTokenService;
+
+    @Value("${payment.service.base-url}")
+    private String paymentServiceBaseUrl;
 
     @GetMapping("/dashboard")
     public String dashboard(
@@ -66,6 +72,7 @@ public class WalletController {
     @PostMapping("/deposit")
     public String deposit(@RequestParam BigDecimal amount,
                           @RequestParam(defaultValue = "stripe") String paymentMethod,
+                          @RequestParam(required = false) String notifyEmail,
                           HttpSession session,
                           RedirectAttributes redirectAttributes,
                           Locale locale) {
@@ -84,12 +91,12 @@ public class WalletController {
             return "redirect:/deposit";
         }
         if ("sbpayment".equals(paymentMethod)) {
-            session.setAttribute(SessionConstants.SBPAYMENT_PENDING_AMOUNT, amount);
-            return "redirect:/payment/sbpayment/request";
+            String token = paymentTokenService.createToken(memberId, amount, "sbpayment", notifyEmail);
+            return "redirect:" + paymentServiceBaseUrl + "/payment/sbpayment/request?token=" + token;
         }
         if ("stripe".equals(paymentMethod)) {
-            session.setAttribute(SessionConstants.STRIPE_PENDING_AMOUNT, amount);
-            return "redirect:/payment/stripe/checkout";
+            String token = paymentTokenService.createToken(memberId, amount, "stripe", notifyEmail);
+            return "redirect:" + paymentServiceBaseUrl + "/payment/stripe/checkout?token=" + token;
         }
         redirectAttributes.addFlashAttribute("error",
                 messageSource.getMessage("error.payment.unknown", null, "Unknown payment method", locale));
@@ -124,7 +131,7 @@ public class WalletController {
         }
 
         try {
-            walletService.initiateWithdrawal(memberId, amount, bankCode, bankAccount);
+            walletService.initiateWithdrawal(memberId, amount, bankCode, bankAccount, notifyEmail);
             redirectAttributes.addFlashAttribute("success",
                     messageSource.getMessage("flash.withdraw.pending", null, locale));
         } catch (IllegalArgumentException e) {

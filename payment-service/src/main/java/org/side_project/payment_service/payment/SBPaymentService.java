@@ -1,8 +1,8 @@
-package org.side_project.wallet_system.payment;
+package org.side_project.payment_service.payment;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.side_project.wallet_system.wallet.WalletService;
+import org.side_project.payment_service.client.WalletServiceClient;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -21,7 +21,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class SBPaymentService {
 
-    private final WalletService walletService;
+    private final WalletServiceClient walletServiceClient;
 
     @Value("${sbpayment.merchant-id}")
     private String merchantId;
@@ -50,11 +50,7 @@ public class SBPaymentService {
     private static final String TERMINAL_TYPE = "0";
     private static final String LIMIT_SECOND  = "600";
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // Build request
-    // ─────────────────────────────────────────────────────────────────────────
-
-    public SBPaymentRequest buildRequest(UUID memberId, BigDecimal amount) {
+    public SBPaymentRequest buildRequest(UUID memberId, BigDecimal amount, String notifyEmail) {
         String orderId     = UUID.randomUUID().toString().replace("-", "").substring(0, 16);
         String custCode    = memberId.toString();
         // Use JST — SBPS rejects requests whose request_date exceeds limit_second in JST
@@ -66,31 +62,28 @@ public class SBPaymentService {
         String errorUrl   = baseUrl + "/payment/sbpayment/error";
         String pageconUrl = baseUrl + "/payment/sbpayment/result";
 
-        // All fields in definition order (fields 1-28 + 38-39, detail rows omitted).
-        // Empty fields must still be included per spec; their empty values add nothing
-        // to the hash but the form must send them.
         String hashcode = computeHashcode(
             PAY_METHOD, merchantId, serviceId, custCode,
-            "", "",           // sps_cust_no, sps_payment_no
+            "", "",
             orderId,
             ITEM_ID,
-            "",               // pay_item_id
+            "",
             ITEM_NAME,
-            "",               // tax
+            "",
             amountStr,
             PAY_TYPE,
-            "",               // auto_charge_type
+            "",
             SERVICE_TYPE,
-            "", "", "", "",   // div_settele, last_charge_month, camp_type, tracking_id
+            "", "", "", "",
             TERMINAL_TYPE,
             successUrl, cancelUrl, errorUrl, pageconUrl,
-            "", "", "",       // free1, free2, free3
-            "",               // free_csv
+            "", "", "",
+            "",
             requestDate, LIMIT_SECOND
         );
 
-        UUID transactionId = walletService.initiateDeposit(memberId, amount);
-        walletService.linkPaymentExternalId(transactionId, orderId);
+        UUID transactionId = walletServiceClient.initiateDeposit(memberId, amount, notifyEmail);
+        walletServiceClient.linkExternalId(transactionId, orderId);
         log.info("SBPayment request built: orderId={}, memberId={}, transactionId={}, amount={}, requestDate={}",
                  orderId, memberId, transactionId, amount, requestDate);
 
@@ -130,10 +123,6 @@ public class SBPaymentService {
             .build();
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // Process result CGI notification from SBPS
-    // ─────────────────────────────────────────────────────────────────────────
-
     public boolean processResult(Map<String, String> params) {
         String resResult = params.getOrDefault("res_result", "");
         if (!"OK".equalsIgnoreCase(resResult)) {
@@ -149,7 +138,7 @@ public class SBPaymentService {
         }
 
         try {
-            if (!walletService.completeDepositByExternalId(orderId)) {
+            if (!walletServiceClient.completeDepositByExternalId(orderId)) {
                 log.error("SBPayment result: no pending order found for orderId={}", orderId);
                 return false;
             }
@@ -160,10 +149,6 @@ public class SBPaymentService {
             return false;
         }
     }
-
-    // ─────────────────────────────────────────────────────────────────────────
-    // SHA1 hash — request uses UTF-8 per SBPS spec
-    // ─────────────────────────────────────────────────────────────────────────
 
     private String computeHashcode(String... fields) {
         StringBuilder sb = new StringBuilder();

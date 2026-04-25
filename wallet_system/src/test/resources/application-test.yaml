@@ -22,18 +22,6 @@ spring:
       host: localhost
       port: 6379
 
-stripe:
-  secret-key: sk_test_dummy
-  publishable-key: pk_test_dummy
-  webhook-secret: whsec_dummy
-
-sbpayment:
-  merchant-id: test_merchant
-  service-id: test_service
-  hash-key: test_hash_key
-  gateway-url: "https://google.com"
-  base-url: "http://localhost:8080"
-
 withdraw:
   webhook-secret: test-webhook-secret
 
@@ -44,3 +32,11 @@ app:
 
 mock-bank:
   url: "http://localhost:8081"
+
+payment:
+  service:
+    base-url: "http://localhost:8082"
+
+internal:
+  service:
+    secret: test-internal-secret
