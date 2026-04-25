@@ -110,6 +110,8 @@ services:
       INTERNAL_SERVICE_SECRET: ${INTERNAL_SERVICE_SECRET}
       REDIS_HOST: redis
       REDIS_PORT: 6379
+    volumes:
+      - payment_service_logs:/app/logs
     restart: on-failure
     depends_on:
       redis:
@@ -167,10 +169,14 @@ services:
       - ./wallet_system/observability/promtail-config.yaml:/etc/promtail/config.yaml:ro
       - app_logs:/logs/wallet-system:ro
       - mock_bank_logs:/logs/mock-bank:ro
+      - payment_service_logs:/logs/payment-service:ro
+      - email_service_logs:/logs/email-service:ro
     depends_on:
       - loki
       - app
       - mock-bank
+      - payment-service
+      - email-service
 
   email-service:
     build:
@@ -184,6 +190,8 @@ services:
       MAIL_PORT: ${MAIL_PORT:-587}
       MAIL_USERNAME: ${MAIL_USERNAME:-}
       MAIL_PASSWORD: ${MAIL_PASSWORD:-}
+    volumes:
+      - email_service_logs:/app/logs
     restart: on-failure
     depends_on:
       rabbitmq:
@@ -208,6 +216,8 @@ volumes:
   uploads:
   app_logs:
   mock_bank_logs:
+  payment_service_logs:
+  email_service_logs:
   loki_data:
   grafana_data:
   prometheus_data:

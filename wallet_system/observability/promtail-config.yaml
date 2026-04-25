@@ -34,3 +34,29 @@ scrape_configs:
           expression: '^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3} \[[^\]]+\] (?P<level>\S+)'
       - labels:
           level:
+
+  - job_name: payment_service
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          app: payment_service
+          __path__: /logs/payment-service/*.log
+    pipeline_stages:
+      - regex:
+          expression: '^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3} \[[^\]]+\] (?P<level>\S+)'
+      - labels:
+          level:
+
+  - job_name: email_service
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          app: email_service
+          __path__: /logs/email-service/*.log
+    pipeline_stages:
+      - regex:
+          expression: '^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3} \[[^\]]+\] (?P<level>\S+)'
+      - labels:
+          level:

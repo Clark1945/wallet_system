@@ -673,22 +673,22 @@
     {
       "id": 40,
       "type": "row",
-      "title": "Logs — wallet-system",
+      "title": "Logs",
       "gridPos": { "x": 0, "y": 52, "w": 24, "h": 1 },
       "collapsed": false
     },
 
     {
       "id": 41,
-      "title": "Server Logs",
+      "title": "wallet-system logs",
       "type": "logs",
-      "gridPos": { "x": 0, "y": 53, "w": 24, "h": 10 },
+      "gridPos": { "x": 0, "y": 53, "w": 12, "h": 10 },
       "datasource": { "type": "loki", "uid": "wallet-loki" },
       "targets": [
         {
           "refId": "A",
           "datasource": { "type": "loki", "uid": "wallet-loki" },
-          "expr": "{app=~\"wallet_system|mock_bank\"}",
+          "expr": "{app=\"wallet_system\"}",
           "legendFormat": ""
         }
       ],
@@ -697,7 +697,85 @@
         "enableLogDetails": true,
         "prettifyLogMessage": false,
         "showCommonLabels": false,
-        "showLabels": true,
+        "showLabels": false,
+        "showTime": true,
+        "sortOrder": "Descending",
+        "wrapLogMessage": true
+      }
+    },
+
+    {
+      "id": 42,
+      "title": "mock-bank logs",
+      "type": "logs",
+      "gridPos": { "x": 12, "y": 53, "w": 12, "h": 10 },
+      "datasource": { "type": "loki", "uid": "wallet-loki" },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "loki", "uid": "wallet-loki" },
+          "expr": "{app=\"mock_bank\"}",
+          "legendFormat": ""
+        }
+      ],
+      "options": {
+        "dedupStrategy": "none",
+        "enableLogDetails": true,
+        "prettifyLogMessage": false,
+        "showCommonLabels": false,
+        "showLabels": false,
+        "showTime": true,
+        "sortOrder": "Descending",
+        "wrapLogMessage": true
+      }
+    },
+
+    {
+      "id": 43,
+      "title": "payment-service logs",
+      "type": "logs",
+      "gridPos": { "x": 0, "y": 63, "w": 12, "h": 10 },
+      "datasource": { "type": "loki", "uid": "wallet-loki" },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "loki", "uid": "wallet-loki" },
+          "expr": "{app=\"payment_service\"}",
+          "legendFormat": ""
+        }
+      ],
+      "options": {
+        "dedupStrategy": "none",
+        "enableLogDetails": true,
+        "prettifyLogMessage": false,
+        "showCommonLabels": false,
+        "showLabels": false,
+        "showTime": true,
+        "sortOrder": "Descending",
+        "wrapLogMessage": true
+      }
+    },
+
+    {
+      "id": 44,
+      "title": "email-service logs",
+      "type": "logs",
+      "gridPos": { "x": 12, "y": 63, "w": 12, "h": 10 },
+      "datasource": { "type": "loki", "uid": "wallet-loki" },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "loki", "uid": "wallet-loki" },
+          "expr": "{app=\"email_service\"}",
+          "legendFormat": ""
+        }
+      ],
+      "options": {
+        "dedupStrategy": "none",
+        "enableLogDetails": true,
+        "prettifyLogMessage": false,
+        "showCommonLabels": false,
+        "showLabels": false,
         "showTime": true,
         "sortOrder": "Descending",
         "wrapLogMessage": true
