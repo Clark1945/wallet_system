@@ -14,11 +14,13 @@ info:
     Each member automatically receives a **12-character alphanumeric wallet code** (mixed case)
     after completing Email OTP verification during registration. This code is used to identify
     the payee in peer-to-peer transfers (instead of Email) and can be copied from the dashboard.
-  version: 1.2.0
+  version: 1.3.0
 
 servers:
   - url: http://localhost:8080
-    description: Local development
+    description: wallet-service — Auth, Profile, Wallet, Withdraw Webhook
+  - url: http://localhost:8082
+    description: payment-service — Stripe, SoftBank Payment
 
 tags:
   - name: Auth
@@ -28,7 +30,12 @@ tags:
   - name: Wallet
     description: Wallet operations — dashboard, deposit, withdraw, transfer (login required)
   - name: Payment
-    description: Payment gateways — Stripe, SoftBank Payment, withdrawal webhook
+    description: |
+      Payment gateways — Stripe, SoftBank Payment, withdrawal webhook.
+
+      > **Architecture note:** All `/payment/stripe/*` and `/payment/sbpayment/*` endpoints are served
+      > by **payment-service** (`http://localhost:8082`). The `/withdraw/webhook` endpoint is served
+      > by **wallet-service** (`http://localhost:8080`).
 
 # All protected endpoints require session cookie by default
 security:
@@ -519,12 +526,17 @@ paths:
       tags: [Wallet]
       summary: Initiate deposit
       description: |
-        Stores the requested amount in the session and redirects to the corresponding payment gateway page.
+        Creates a one-time payment token (stored in Redis, 15-minute TTL) containing
+        the member ID, amount, payment method, and optional notification email, then
+        redirects the browser to **payment-service** with `?token={uuid}`.
 
-        - `stripe` → `/payment/stripe/checkout` (Stripe.js with 3DS)
-        - `sbpayment` → `/payment/sbpayment/request` (SBPS auto-submit form)
+        - `stripe` → `http://localhost:8082/payment/stripe/checkout?token={token}`
+        - `sbpayment` → `http://localhost:8082/payment/sbpayment/request?token={token}`
 
-        Actual wallet credit happens after a successful payment gateway webhook callback.
+        payment-service validates the token (single-use, consumed on read), initiates
+        a `PENDING` deposit transaction via wallet-service's internal API, then handles
+        the gateway flow. Actual wallet credit happens after the gateway webhook fires.
+        If `notifyEmail` is provided, a confirmation email is sent on deposit completion.
       requestBody:
         required: true
         content:
@@ -543,9 +555,17 @@ paths:
                   enum: [stripe, sbpayment]
                   default: stripe
                   description: Payment method (optional, defaults to stripe)
+                notifyEmail:
+                  type: string
+                  format: email
+                  example: alice@example.com
+                  description: Optional email address to receive a confirmation when the deposit completes
       responses:
         '302':
-          description: stripe → `/payment/stripe/checkout`; sbpayment → `/payment/sbpayment/request`; failure → `/deposit`
+          description: |
+            stripe → `http://localhost:8082/payment/stripe/checkout?token=...`;
+            sbpayment → `http://localhost:8082/payment/sbpayment/request?token=...`;
+            invalid amount or unknown method → `/deposit`
 
   /withdraw:
     get:
@@ -566,9 +586,8 @@ paths:
         then asynchronously notifies the mock bank. The final status (COMPLETED / FAILED)
         is updated via `POST /withdraw/webhook`. On failure, the balance is automatically refunded.
 
-        > **Note:** `bankCode`, `bankAccount`, and `notifyEmail` are front-end fields.
-        > The current backend only processes the `amount` deduction; bank payout and
-        > notification are handled by the mock-bank service.
+        > `bankCode` and `bankAccount` are forwarded to mock-bank for the payout.
+        > If `notifyEmail` is provided, a confirmation email is sent when the withdrawal completes.
       requestBody:
         required: true
         content:
@@ -600,10 +619,12 @@ paths:
                   type: string
                   format: email
                   example: alice@example.com
-                  description: Notification email (front-end field)
+                  description: |
+                    Optional notification email. If provided, a confirmation email is sent
+                    via email-service when the withdrawal completes successfully.
       responses:
         '302':
-          description: Success → `/dashboard` (transaction PENDING, awaiting webhook); failure → `/withdraw`
+          description: Success → `/dashboard` (transaction PENDING, awaiting mock-bank webhook); failure → `/withdraw`
 
   /transfer:
     get:
@@ -657,14 +678,26 @@ paths:
       tags: [Payment]
       summary: Stripe checkout page
       description: |
-        Reads the pending amount from the session, calls the Stripe API to create a PaymentIntent,
-        and renders `stripe-checkout.html` with the `clientSecret` for Stripe.js to handle 3DS and payment confirmation.
-        Redirects to `/deposit` if no pending amount is found in the session.
+        Validates the one-time payment token via wallet-service's internal API (single-use,
+        consumed on read). On success, creates a Stripe PaymentIntent and renders
+        `stripe-checkout.html` with the `clientSecret` for Stripe.js to handle 3DS and
+        payment confirmation. Redirects to wallet-service `/deposit` on invalid/expired token.
+
+        > Served by **payment-service** (`http://localhost:8082`).
+      security: []
+      parameters:
+        - name: token
+          in: query
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: One-time payment token issued by `POST /deposit` on wallet-service
       responses:
         '200':
           description: Stripe checkout page HTML (includes Stripe.js)
         '302':
-          description: No pending amount → `/deposit`; unauthenticated → `/login`; Stripe API error → `/deposit`
+          description: Invalid/expired token → wallet-service `/deposit`; Stripe API error → wallet-service `/deposit`
 
   /payment/stripe/complete:
     get:
@@ -672,30 +705,39 @@ paths:
       summary: Stripe payment success callback
       description: |
         Browser is redirected here by Stripe.js after successful payment.
-        Clears the pending amount from the session and redirects to the dashboard with a success message.
+        Redirects to wallet-service dashboard.
 
-        > **Note:** Actual wallet credit is handled by `POST /payment/stripe/webhook`; this endpoint only handles the browser redirect.
+        > Actual wallet credit is handled by `POST /payment/stripe/webhook`.
+        > Served by **payment-service** (`http://localhost:8082`).
+      security: []
       responses:
         '302':
-          description: → `/dashboard` (with success flash message)
+          description: → wallet-service `/dashboard`
 
   /payment/stripe/cancel:
     get:
       tags: [Payment]
       summary: Stripe payment cancel callback
-      description: Browser is redirected here when the user closes or cancels the Stripe checkout. Clears the pending amount.
+      description: |
+        Browser is redirected here when the user closes or cancels the Stripe checkout.
+
+        > Served by **payment-service** (`http://localhost:8082`).
+      security: []
       responses:
         '302':
-          description: → `/deposit` (with cancellation flash message)
+          description: → wallet-service `/deposit`
 
   /payment/stripe/webhook:
     post:
       tags: [Payment]
       summary: Stripe webhook (server-to-server)
       description: |
-        Called by Stripe servers to deliver `payment_intent.succeeded` events; performs the actual wallet credit.
-        Verifies the request using the `Stripe-Signature` header. Uses an in-memory set to prevent duplicate processing.
-        Any non-2xx response triggers a Stripe retry.
+        Called by Stripe servers to deliver `payment_intent.succeeded` events.
+        Verifies the `Stripe-Signature` header, then calls wallet-service's internal API
+        (`POST /internal/deposit/complete`) to credit the wallet. Idempotent — duplicate
+        deliveries are silently skipped. Any non-2xx response triggers a Stripe retry.
+
+        > Served by **payment-service** (`http://localhost:8082`).
       security: []
       parameters:
         - name: Stripe-Signature
@@ -724,24 +766,41 @@ paths:
       tags: [Payment]
       summary: SBPS payment request page
       description: |
-        Reads the pending amount from the session, builds an SBPS payment request (including SHA-1 hashcode),
+        Validates the one-time payment token via wallet-service's internal API, builds an
+        SBPS payment request (SHA-1 hashcode of concatenated fields + hashKey, timestamp in JST),
         and renders an auto-submit form (`sb-payment.html`) that posts to the SBPS gateway.
-        Redirects to `/deposit` if no pending amount is found in the session.
+        Redirects to wallet-service `/deposit` on invalid/expired token.
+
+        > Served by **payment-service** (`http://localhost:8082`).
+      security: []
+      parameters:
+        - name: token
+          in: query
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: One-time payment token issued by `POST /deposit` on wallet-service
       responses:
         '200':
           description: SBPS auto-submit form page HTML
         '302':
-          description: No pending amount → `/deposit`; unauthenticated → `/login`
+          description: Invalid/expired token → wallet-service `/deposit`
 
   /payment/sbpayment/result:
     post:
       tags: [Payment]
       summary: SBPS result CGI (server-to-server)
       description: |
-        Result CGI endpoint called by the SBPS server.
-        Verifies `res_result=OK` and looks up the `order_id` in the in-memory `pendingOrders` map to perform the wallet credit.
+        Result CGI endpoint called by the SBPS server after payment.
+        Verifies `res_result=OK`, then calls wallet-service's internal API
+        (`POST /internal/deposit/complete-by-external`) using the `order_id` to credit the wallet.
+        Idempotent — duplicate callbacks are silently skipped via PENDING status check.
+
         Request body is **Shift-JIS (Windows-31J)** URL-encoded form data.
         Response format: success `OK,`, failure `NG,<message>`.
+
+        > Served by **payment-service** (`http://localhost:8082`).
       security: []
       requestBody:
         required: true
@@ -768,28 +827,40 @@ paths:
     get:
       tags: [Payment]
       summary: SBPS payment success callback
-      description: Browser is redirected here by SBPS after successful payment. Clears the pending amount.
+      description: |
+        Browser is redirected here by SBPS after successful payment.
+
+        > Served by **payment-service** (`http://localhost:8082`).
+      security: []
       responses:
         '302':
-          description: → `/dashboard` (with success flash message)
+          description: → wallet-service `/dashboard`
 
   /payment/sbpayment/cancel:
     get:
       tags: [Payment]
       summary: SBPS payment cancel callback
-      description: Browser is redirected here when the user cancels payment on the SBPS page. Clears the pending amount.
+      description: |
+        Browser is redirected here when the user cancels payment on the SBPS page.
+
+        > Served by **payment-service** (`http://localhost:8082`).
+      security: []
       responses:
         '302':
-          description: → `/deposit` (with cancellation flash message)
+          description: → wallet-service `/deposit`
 
   /payment/sbpayment/error:
     get:
       tags: [Payment]
       summary: SBPS payment error callback
-      description: Browser is redirected here when SBPS reports a payment error. Clears the pending amount.
+      description: |
+        Browser is redirected here when SBPS reports a payment error.
+
+        > Served by **payment-service** (`http://localhost:8082`).
+      security: []
       responses:
         '302':
-          description: → `/deposit` (with error flash message)
+          description: → wallet-service `/deposit`
 
   # ── Withdraw Webhook ──────────────────────────────────────
 
