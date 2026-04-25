@@ -35,6 +35,14 @@
         <sonar.coverage.jacoco.xmlReportPaths>${project.build.directory}/site/jacoco/jacoco.xml</sonar.coverage.jacoco.xmlReportPaths>
         <sonar.java.source>17</sonar.java.source>
         <sonar.exclusions>**/config/AppConfig.java,**/config/RedisConfig.java</sonar.exclusions>
+        <!-- Exclude infra-only classes from coverage: @Profile("!test") beans and Java records -->
+        <sonar.coverage.exclusions>
+            **/config/RabbitMQConfig.java,
+            **/notification/RabbitMQEmailPublisher.java,
+            **/notification/EmailMessage.java,
+            **/auth/TestModeInitializer.java,
+            **/config/TestModeModelAdvice.java
+        </sonar.coverage.exclusions>
     </properties>
     <dependencies>
         <dependency>
