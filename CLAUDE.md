@@ -4,19 +4,24 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Monorepo Structure
 
-Three Spring Boot services:
+Four Spring Boot services:
 - **`wallet_system/`** — main wallet application (port 8080); detailed guidance in `wallet_system/CLAUDE.md`
 - **`mock-bank/`** — simulated bank withdrawal endpoint (port 8081)
 - **`payment-service/`** — Stripe + SBPS payment gateway handler (port 8082)
+- **`email-service/`** — async email dispatcher (port 8083); consumes RabbitMQ messages and sends via SMTP
 
 ## Build & Run Commands
 
 ```bash
 # Full stack — run from repo root
 # Requires wallet_system/.env (copy from .env.example and fill in credentials)
-# Starts: PostgreSQL, Redis, mock-bank, wallet app, payment-service, Loki, Promtail, Grafana
+# Starts: PostgreSQL, Redis, RabbitMQ, mock-bank, wallet app, payment-service, email-service, Loki, Promtail, Grafana
 docker compose up --build
 # wallet app: http://localhost:8080  |  Grafana: http://localhost:3000
+
+# email-service only
+cd email-service
+./mvnw spring-boot:run
 
 # wallet_system only
 cd wallet_system
@@ -36,6 +41,19 @@ cd mock-bank
 ```
 
 **Rule: run `./mvnw test` after every code change inside `wallet_system/` and fix all failures before finishing.**
+
+## Email Notification Flow (Cross-Service via RabbitMQ)
+
+All email sending is fully decoupled from business logic through RabbitMQ:
+
+1. `wallet_system` publishes an `EmailMessage { type, to, params }` JSON message via `EmailPublisher` → `RabbitTemplate.convertAndSend(exchange="wallet.email", routingKey="email.notification")`
+2. RabbitMQ routes to durable queue `email.notifications`
+3. `email-service` `@RabbitListener` consumes the message and calls `JavaMailEmailService` to send via SMTP
+
+Email types: `REGISTRATION_OTP`, `LOGIN_OTP`, `PASSWORD_RESET`, `DEPOSIT_SUCCESS`, `WITHDRAWAL_SUCCESS`
+
+Test profile: `NoOpEmailPublisher` (`@Profile("test")`) and `RabbitAutoConfiguration` excluded — no RabbitMQ needed for tests.
+RabbitMQ Management UI: `http://localhost:15672` (credentials from `RABBITMQ_USER`/`RABBITMQ_PASS`)
 
 ## Deposit Flow (Cross-Service)
 

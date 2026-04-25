@@ -2,7 +2,7 @@ package org.side_project.wallet_system.auth.service;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.side_project.wallet_system.auth.email.EmailService;
+import org.side_project.wallet_system.notification.EmailPublisher;
 import org.side_project.wallet_system.auth.objects.AuthProvider;
 import org.side_project.wallet_system.auth.objects.Member;
 import org.side_project.wallet_system.auth.objects.MemberStatus;
@@ -29,7 +29,7 @@ public class AuthService {
     private final WalletRepository walletRepository;
     private final PasswordEncoder passwordEncoder;
     private final OtpService otpService;
-    private final EmailService emailService;
+    private final EmailPublisher emailPublisher;
     private final PasswordResetService passwordResetService;
 
     @Value("${app.base-url}")
@@ -88,7 +88,7 @@ public class AuthService {
 
     public void sendRegistrationOtp(UUID memberId, String email) {
         String otp = otpService.generateAndStore(memberId, OtpType.REGISTER);
-        emailService.sendRegistrationOtp(email, otp);
+        emailPublisher.sendRegistrationOtp(email, otp);
     }
 
     @Transactional
@@ -104,7 +104,7 @@ public class AuthService {
             otpService.storeFixedCode(memberId, OtpType.LOGIN, TEST_FIXED_OTP);
         } else {
             String otp = otpService.generateAndStore(memberId, OtpType.LOGIN);
-            emailService.sendLoginOtp(email, otp);
+            emailPublisher.sendLoginOtp(email, otp);
         }
     }
 
@@ -120,7 +120,7 @@ public class AuthService {
                     && member.getAuthProvider() == AuthProvider.LOCAL) {
                 String token    = passwordResetService.generateToken(member.getId());
                 String resetUrl = appBaseUrl + "/reset-password?mid=" + member.getId() + "&token=" + token;
-                emailService.sendPasswordResetLink(email, resetUrl);
+                emailPublisher.sendPasswordResetLink(email, resetUrl);
                 log.info("Password reset link sent: memberId={}", member.getId());
             }
         });

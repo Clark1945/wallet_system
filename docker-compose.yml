@@ -22,6 +22,20 @@ services:
       timeout: 5s
       retries: 5
 
+  rabbitmq:
+    image: rabbitmq:3-management
+    ports:
+      - "5672:5672"
+      - "15672:15672"   # Management UI: http://localhost:15672
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASS}
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   mock-bank:
     build:
       context: ./mock-bank
@@ -51,13 +65,14 @@ services:
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
       WITHDRAW_WEBHOOK_SECRET: ${WITHDRAW_WEBHOOK_SECRET}
-      MAIL_HOST: ${MAIL_HOST:-smtp.gmail.com}
-      MAIL_PORT: ${MAIL_PORT:-587}
-      MAIL_USERNAME: ${MAIL_USERNAME:-}
-      MAIL_PASSWORD: ${MAIL_PASSWORD:-}
       # payment-service integration — must be browser-accessible (localhost), not internal Docker hostname
       PAYMENT_SERVICE_BASE_URL: http://localhost:8082
       INTERNAL_SERVICE_SECRET: ${INTERNAL_SERVICE_SECRET}
+      # RabbitMQ — email notifications published here, consumed by email-service
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: ${RABBITMQ_USER}
+      RABBITMQ_PASS: ${RABBITMQ_PASS}
     volumes:
       - uploads:/app/uploads
       - app_logs:/app/logs
@@ -71,6 +86,8 @@ services:
         condition: service_started
       payment-service:
         condition: service_started
+      rabbitmq:
+        condition: service_healthy
 
   payment-service:
     build:
@@ -115,6 +132,23 @@ services:
       - loki
       - app
       - mock-bank
+
+  email-service:
+    build:
+      context: ./email-service
+    environment:
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: ${RABBITMQ_USER}
+      RABBITMQ_PASS: ${RABBITMQ_PASS}
+      MAIL_HOST: ${MAIL_HOST:-smtp.gmail.com}
+      MAIL_PORT: ${MAIL_PORT:-587}
+      MAIL_USERNAME: ${MAIL_USERNAME:-}
+      MAIL_PASSWORD: ${MAIL_PASSWORD:-}
+    restart: on-failure
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
 
   grafana:
     image: grafana/grafana:11.0.0

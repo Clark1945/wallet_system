@@ -6,7 +6,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.side_project.wallet_system.auth.email.EmailService;
+import org.side_project.wallet_system.notification.EmailPublisher;
 import org.side_project.wallet_system.transaction.Transaction;
 import org.side_project.wallet_system.transaction.TransactionRepository;
 import org.side_project.wallet_system.transaction.TransactionStatus;
@@ -28,7 +28,7 @@ class WalletServiceTest {
 
     @Mock private WalletRepository walletRepository;
     @Mock private TransactionRepository transactionRepository;
-    @Mock private EmailService emailService;
+    @Mock private EmailPublisher emailPublisher;
     @InjectMocks private WalletService walletService;
 
     private UUID memberId;
@@ -303,7 +303,7 @@ class WalletServiceTest {
 
         walletService.completeDeposit(txId);
 
-        then(emailService).should().sendDepositSuccess("user@example.com", new BigDecimal("200.00"));
+        then(emailPublisher).should().sendDepositSuccess("user@example.com", new BigDecimal("200.00"));
     }
 
     @Test
@@ -319,7 +319,7 @@ class WalletServiceTest {
 
         walletService.completeDeposit(txId);
 
-        then(emailService).shouldHaveNoInteractions();
+        then(emailPublisher).shouldHaveNoInteractions();
     }
 
     @Test
@@ -334,7 +334,7 @@ class WalletServiceTest {
 
         walletService.completeWithdrawal(txId);
 
-        then(emailService).should().sendWithdrawalSuccess("user@example.com", new BigDecimal("150.00"));
+        then(emailPublisher).should().sendWithdrawalSuccess("user@example.com", new BigDecimal("150.00"));
     }
 
     @Test
@@ -348,6 +348,6 @@ class WalletServiceTest {
 
         walletService.completeWithdrawal(txId);
 
-        then(emailService).shouldHaveNoInteractions();
+        then(emailPublisher).shouldHaveNoInteractions();
     }
 }

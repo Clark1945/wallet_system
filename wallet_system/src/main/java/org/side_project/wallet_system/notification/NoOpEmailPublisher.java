@@ -1,24 +1,24 @@
-package org.side_project.wallet_system.auth.email;
+package org.side_project.wallet_system.notification;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Profile;
-import org.springframework.stereotype.Service;
+import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
 
 @Slf4j
-@Service
+@Component
 @Profile("test")
-public class NoOpEmailService implements EmailService {
-
-    @Override
-    public void sendLoginOtp(String to, String otp) {
-        log.info("[TEST] sendLoginOtp: to={}, otp={}", to, otp);
-    }
+public class NoOpEmailPublisher implements EmailPublisher {
 
     @Override
     public void sendRegistrationOtp(String to, String otp) {
         log.info("[TEST] sendRegistrationOtp: to={}, otp={}", to, otp);
+    }
+
+    @Override
+    public void sendLoginOtp(String to, String otp) {
+        log.info("[TEST] sendLoginOtp: to={}, otp={}", to, otp);
     }
 
     @Override

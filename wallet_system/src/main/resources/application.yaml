@@ -29,17 +29,11 @@ spring:
   messages:
     basename: messages
     encoding: UTF-8
-  mail:
-    host: ${MAIL_HOST:smtp.gmail.com}
-    port: ${MAIL_PORT:587}
-    username: ${MAIL_USERNAME:}
-    password: ${MAIL_PASSWORD:}
-    properties:
-      mail:
-        smtp:
-          auth: true
-          starttls:
-            enable: true
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USER:guest}
+    password: ${RABBITMQ_PASS:guest}
   data:
     redis:
       host: ${REDIS_HOST:localhost}
@@ -99,6 +93,11 @@ payment:
 internal:
   service:
     secret: ${INTERNAL_SERVICE_SECRET}
+
+rabbitmq:
+  exchange: wallet.email
+  routing-key: email.notification
+  queue: email.notifications
 
 springdoc:
   swagger-ui:

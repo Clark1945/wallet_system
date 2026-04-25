@@ -2,7 +2,7 @@ package org.side_project.wallet_system.wallet;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.side_project.wallet_system.auth.email.EmailService;
+import org.side_project.wallet_system.notification.EmailPublisher;
 import org.side_project.wallet_system.transaction.Transaction;
 import org.side_project.wallet_system.transaction.TransactionRepository;
 import org.side_project.wallet_system.transaction.TransactionSpec;
@@ -40,7 +40,7 @@ public class WalletService {
     private final WalletRepository walletRepository;
     private final TransactionRepository transactionRepository;
     private final HttpClient httpClient;
-    private final EmailService emailService;
+    private final EmailPublisher emailPublisher;
 
     @Value("${mock-bank.url}")
     private String mockBankUrl;
@@ -132,7 +132,7 @@ public class WalletService {
                 transactionRepository.save(tx);
                 log.info("Deposit completed: transactionId={}, amount={}", transactionId, tx.getAmount());
                 if (tx.getNotifyEmail() != null && !tx.getNotifyEmail().isBlank()) {
-                    emailService.sendDepositSuccess(tx.getNotifyEmail(), tx.getAmount());
+                    emailPublisher.sendDepositSuccess(tx.getNotifyEmail(), tx.getAmount());
                 }
             } else {
                 log.warn("completeDeposit on non-PENDING: transactionId={}, currentStatus={}",
@@ -258,7 +258,7 @@ public class WalletService {
                 transactionRepository.save(tx);
                 log.info("Withdrawal completed: transactionId={}, amount={}", transactionId, tx.getAmount());
                 if (tx.getNotifyEmail() != null && !tx.getNotifyEmail().isBlank()) {
-                    emailService.sendWithdrawalSuccess(tx.getNotifyEmail(), tx.getAmount());
+                    emailPublisher.sendWithdrawalSuccess(tx.getNotifyEmail(), tx.getAmount());
                 }
             } else {
                 log.warn("completeWithdrawal on non-REQUEST_COMPLETED: transactionId={}, currentStatus={}",
