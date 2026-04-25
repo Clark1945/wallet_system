@@ -33,7 +33,8 @@ foreach ($svc in $Services) {
     }
     Write-Info "Building $svc ..."
     Push-Location $svcDir
-    & ./mvnw @MvnArgs
+    $mvnCmd = if (Test-Path "./mvnw") { "./mvnw" } else { "mvn" }
+    & $mvnCmd @MvnArgs
     $exitCode = $LASTEXITCODE
     Pop-Location
     if ($exitCode -ne 0) { Write-Fail "Build failed: $svc" }

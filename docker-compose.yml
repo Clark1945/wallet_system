@@ -27,9 +27,12 @@ services:
     ports:
       - "5672:5672"
       - "15672:15672"   # Management UI: http://localhost:15672
+      - "15692:15692"   # Prometheus metrics: http://localhost:15692/metrics
     environment:
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER}
       RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASS}
+    volumes:
+      - ./rabbitmq/enabled_plugins:/etc/rabbitmq/enabled_plugins:ro
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "ping"]
       interval: 10s
@@ -112,6 +115,23 @@ services:
       redis:
         condition: service_healthy
 
+  postgres-exporter:
+    image: prometheuscommunity/postgres-exporter:latest
+    environment:
+      DATA_SOURCE_NAME: "postgresql://postgres:postgres@db:5432/wallet_db?sslmode=disable"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  redis-exporter:
+    image: oliver006/redis_exporter:latest
+    environment:
+      REDIS_ADDR: redis://redis:6379
+      REDIS_PASSWORD: redis
+    depends_on:
+      redis:
+        condition: service_healthy
+
   prometheus:
     image: prom/prometheus:v2.53.0
     ports:
@@ -126,6 +146,10 @@ services:
       - app
       - payment-service
       - email-service
+      - mock-bank
+      - postgres-exporter
+      - redis-exporter
+      - rabbitmq
 
   loki:
     image: grafana/loki:3.0.0

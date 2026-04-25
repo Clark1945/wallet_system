@@ -5,6 +5,15 @@ spring:
   application:
     name: mock-bank
 
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, prometheus
+  metrics:
+    tags:
+      application: ${spring.application.name}
+
 mock-bank:
   fail-rate: 0.10        # probability of sending FAIL callback
   no-callback-rate: 0.10 # probability of sending no callback at all

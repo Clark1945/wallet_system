@@ -40,7 +40,8 @@ for svc in "${SERVICES[@]}"; do
   svc_dir="$ROOT_DIR/$svc"
   [[ -d "$svc_dir" ]] || { info "Skipping $svc (directory not found)"; continue; }
   info "Building $svc ..."
-  (cd "$svc_dir" && ./mvnw $MVN_ARGS) || fail "Build failed: $svc"
+  mvn_cmd="./mvnw"; [[ -f "$svc_dir/mvnw" ]] || mvn_cmd="mvn"
+  (cd "$svc_dir" && $mvn_cmd $MVN_ARGS) || fail "Build failed: $svc"
   ok "$svc built"
 done
 

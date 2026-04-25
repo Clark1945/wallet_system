@@ -1,11 +1,11 @@
 {
   "title": "Wallet System — All Services",
   "uid": "wallet-system-overview",
-  "description": "Multi-service monitoring: wallet-system, payment-service, email-service",
+  "description": "Multi-service monitoring: wallet-system, payment-service, email-service, mock-bank + infrastructure",
   "tags": ["wallet", "jvm", "spring-boot", "microservices"],
   "timezone": "browser",
   "schemaVersion": 39,
-  "version": 2,
+  "version": 3,
   "refresh": "15s",
   "time": { "from": "now-1h", "to": "now" },
   "timepicker": {},
@@ -154,10 +154,158 @@
     },
 
     {
+      "id": 5,
+      "title": "mock-bank",
+      "type": "stat",
+      "gridPos": { "x": 0, "y": 5, "w": 6, "h": 4 },
+      "datasource": { "type": "prometheus", "uid": "wallet-prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "up{job=\"mock-bank\"}",
+          "instant": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "mappings": [
+            { "type": "value", "options": { "0": { "text": "DOWN", "color": "red" }, "1": { "text": "UP", "color": "green" } } }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{ "color": "red", "value": null }, { "color": "green", "value": 1 }]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "orientation": "auto",
+        "textMode": "value",
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "text": { "titleSize": 14, "valueSize": 32 }
+      }
+    },
+
+    {
+      "id": 6,
+      "title": "PostgreSQL",
+      "type": "stat",
+      "gridPos": { "x": 6, "y": 5, "w": 6, "h": 4 },
+      "datasource": { "type": "prometheus", "uid": "wallet-prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "up{job=\"postgres-exporter\"}",
+          "instant": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "mappings": [
+            { "type": "value", "options": { "0": { "text": "DOWN", "color": "red" }, "1": { "text": "UP", "color": "green" } } }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{ "color": "red", "value": null }, { "color": "green", "value": 1 }]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "orientation": "auto",
+        "textMode": "value",
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "text": { "titleSize": 14, "valueSize": 32 }
+      }
+    },
+
+    {
+      "id": 7,
+      "title": "Redis",
+      "type": "stat",
+      "gridPos": { "x": 12, "y": 5, "w": 6, "h": 4 },
+      "datasource": { "type": "prometheus", "uid": "wallet-prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "up{job=\"redis-exporter\"}",
+          "instant": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "mappings": [
+            { "type": "value", "options": { "0": { "text": "DOWN", "color": "red" }, "1": { "text": "UP", "color": "green" } } }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{ "color": "red", "value": null }, { "color": "green", "value": 1 }]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "orientation": "auto",
+        "textMode": "value",
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "text": { "titleSize": 14, "valueSize": 32 }
+      }
+    },
+
+    {
+      "id": 8,
+      "title": "RabbitMQ",
+      "type": "stat",
+      "gridPos": { "x": 18, "y": 5, "w": 6, "h": 4 },
+      "datasource": { "type": "prometheus", "uid": "wallet-prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "up{job=\"rabbitmq\"}",
+          "instant": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "mappings": [
+            { "type": "value", "options": { "0": { "text": "DOWN", "color": "red" }, "1": { "text": "UP", "color": "green" } } }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{ "color": "red", "value": null }, { "color": "green", "value": 1 }]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "orientation": "auto",
+        "textMode": "value",
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "text": { "titleSize": 14, "valueSize": 32 }
+      }
+    },
+
+    {
       "id": 10,
       "type": "row",
       "title": "JVM — $application",
-      "gridPos": { "x": 0, "y": 5, "w": 24, "h": 1 },
+      "gridPos": { "x": 0, "y": 9, "w": 24, "h": 1 },
       "collapsed": false,
       "repeat": null
     },
@@ -166,7 +314,7 @@
       "id": 11,
       "title": "Heap Memory",
       "type": "timeseries",
-      "gridPos": { "x": 0, "y": 6, "w": 16, "h": 8 },
+      "gridPos": { "x": 0, "y": 10, "w": 16, "h": 8 },
       "datasource": { "type": "prometheus", "uid": "wallet-prometheus" },
       "targets": [
         {
@@ -206,7 +354,7 @@
       "id": 12,
       "title": "Heap Usage %",
       "type": "gauge",
-      "gridPos": { "x": 16, "y": 6, "w": 8, "h": 8 },
+      "gridPos": { "x": 16, "y": 10, "w": 8, "h": 8 },
       "datasource": { "type": "prometheus", "uid": "wallet-prometheus" },
       "targets": [
         {
@@ -245,7 +393,7 @@
       "id": 13,
       "title": "Non-Heap Memory",
       "type": "timeseries",
-      "gridPos": { "x": 0, "y": 14, "w": 12, "h": 8 },
+      "gridPos": { "x": 0, "y": 18, "w": 12, "h": 8 },
       "datasource": { "type": "prometheus", "uid": "wallet-prometheus" },
       "targets": [
         {
@@ -280,7 +428,7 @@
       "id": 14,
       "title": "JVM Threads",
       "type": "timeseries",
-      "gridPos": { "x": 12, "y": 14, "w": 12, "h": 8 },
+      "gridPos": { "x": 12, "y": 18, "w": 12, "h": 8 },
       "datasource": { "type": "prometheus", "uid": "wallet-prometheus" },
       "targets": [
         {
@@ -325,7 +473,7 @@
       "id": 20,
       "type": "row",
       "title": "CPU & System — $application",
-      "gridPos": { "x": 0, "y": 22, "w": 24, "h": 1 },
+      "gridPos": { "x": 0, "y": 26, "w": 24, "h": 1 },
       "collapsed": false
     },
 
@@ -333,7 +481,7 @@
       "id": 21,
       "title": "Process CPU Usage",
       "type": "timeseries",
-      "gridPos": { "x": 0, "y": 23, "w": 12, "h": 8 },
+      "gridPos": { "x": 0, "y": 27, "w": 12, "h": 8 },
       "datasource": { "type": "prometheus", "uid": "wallet-prometheus" },
       "targets": [
         {
@@ -377,7 +525,7 @@
       "id": 22,
       "title": "System CPU Usage",
       "type": "timeseries",
-      "gridPos": { "x": 12, "y": 23, "w": 12, "h": 8 },
+      "gridPos": { "x": 12, "y": 27, "w": 12, "h": 8 },
       "datasource": { "type": "prometheus", "uid": "wallet-prometheus" },
       "targets": [
         {
@@ -413,7 +561,7 @@
       "id": 30,
       "type": "row",
       "title": "HTTP — $application",
-      "gridPos": { "x": 0, "y": 31, "w": 24, "h": 1 },
+      "gridPos": { "x": 0, "y": 35, "w": 24, "h": 1 },
       "collapsed": false
     },
 
@@ -421,7 +569,7 @@
       "id": 31,
       "title": "Request Rate (req/s)",
       "type": "timeseries",
-      "gridPos": { "x": 0, "y": 32, "w": 12, "h": 8 },
+      "gridPos": { "x": 0, "y": 36, "w": 12, "h": 8 },
       "datasource": { "type": "prometheus", "uid": "wallet-prometheus" },
       "targets": [
         {
@@ -456,7 +604,7 @@
       "id": 32,
       "title": "5xx Error Rate (req/s)",
       "type": "timeseries",
-      "gridPos": { "x": 12, "y": 32, "w": 12, "h": 8 },
+      "gridPos": { "x": 12, "y": 36, "w": 12, "h": 8 },
       "datasource": { "type": "prometheus", "uid": "wallet-prometheus" },
       "targets": [
         {
@@ -491,7 +639,7 @@
       "id": 33,
       "title": "Average Response Time",
       "type": "timeseries",
-      "gridPos": { "x": 0, "y": 40, "w": 24, "h": 8 },
+      "gridPos": { "x": 0, "y": 44, "w": 24, "h": 8 },
       "datasource": { "type": "prometheus", "uid": "wallet-prometheus" },
       "targets": [
         {
@@ -526,7 +674,7 @@
       "id": 40,
       "type": "row",
       "title": "Logs — wallet-system",
-      "gridPos": { "x": 0, "y": 48, "w": 24, "h": 1 },
+      "gridPos": { "x": 0, "y": 52, "w": 24, "h": 1 },
       "collapsed": false
     },
 
@@ -534,7 +682,7 @@
       "id": 41,
       "title": "Server Logs",
       "type": "logs",
-      "gridPos": { "x": 0, "y": 49, "w": 24, "h": 10 },
+      "gridPos": { "x": 0, "y": 53, "w": 24, "h": 10 },
       "datasource": { "type": "loki", "uid": "wallet-loki" },
       "targets": [
         {
