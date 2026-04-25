@@ -101,6 +101,19 @@ rabbitmq:
   dead-letter-exchange: wallet.email.dlx
   dead-letter-routing-key: email.notification.dead
 
+resilience4j:
+  circuitbreaker:
+    instances:
+      mockBankWithdraw:
+        sliding-window-size: 5
+        minimum-number-of-calls: 3
+        failure-rate-threshold: 60
+        wait-duration-in-open-state: 30s
+        permitted-number-of-calls-in-half-open-state: 2
+        slow-call-rate-threshold: 80
+        slow-call-duration-threshold: 5s
+        register-health-indicator: true
+
 springdoc:
   swagger-ui:
     path: /swagger-ui.html

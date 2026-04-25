@@ -1,5 +1,6 @@
 package org.side_project.wallet_system.wallet;
 
+import org.awaitility.Awaitility;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -14,6 +15,7 @@ import org.side_project.wallet_system.transaction.TransactionType;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.math.BigDecimal;
+import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -28,6 +30,7 @@ class WalletServiceTest {
 
     @Mock private WalletRepository walletRepository;
     @Mock private TransactionRepository transactionRepository;
+    @Mock private MockBankClient mockBankClient;
     @Mock private EmailPublisher emailPublisher;
     @InjectMocks private WalletService walletService;
 
@@ -45,8 +48,9 @@ class WalletServiceTest {
         lenient().when(walletRepository.findByMemberId(memberId)).thenReturn(Optional.of(wallet));
         // findByMemberIdForUpdate — used in deposit/withdraw/initiateWithdrawal
         lenient().when(walletRepository.findByMemberIdForUpdate(memberId)).thenReturn(Optional.of(wallet));
-        ReflectionTestUtils.setField(walletService, "mockBankUrl", "http://localhost:8081");
-        ReflectionTestUtils.setField(walletService, "appBaseUrl",  "http://localhost:8080");
+        ReflectionTestUtils.setField(walletService, "appBaseUrl", "http://localhost:8080");
+        // Wire self-reference so @Transactional proxy is reachable in async fallback tests
+        ReflectionTestUtils.setField(walletService, "self", walletService);
     }
 
     // ── deposit ──────────────────────────────────────────────
@@ -285,6 +289,47 @@ class WalletServiceTest {
         then(transactionRepository).should().save(argThat(tx ->
                 tx.getStatus() == TransactionStatus.REQUEST_COMPLETED
                 && tx.getType() == TransactionType.WITHDRAW));
+    }
+
+    // ── circuit breaker — mock-bank fallback ─────────────────
+
+    @Test
+    void initiateWithdrawal_circuitOpen_immediatelyRefundsBalance() throws Exception {
+        Transaction saved = new Transaction();
+        saved.setId(UUID.randomUUID());
+        saved.setStatus(TransactionStatus.REQUEST_COMPLETED);
+        saved.setFromWalletId(wallet.getId());
+        saved.setAmount(new BigDecimal("400.00"));
+        given(transactionRepository.save(any())).willReturn(saved);
+        given(transactionRepository.findById(saved.getId())).willReturn(Optional.of(saved));
+        given(walletRepository.findByIdForUpdate(wallet.getId())).willReturn(Optional.of(wallet));
+        willThrow(new MockBankUnavailableException("circuit open"))
+            .given(mockBankClient).sendWithdrawRequest(any(), any(), any(), any(), any(), any());
+
+        walletService.initiateWithdrawal(memberId, new BigDecimal("400.00"), "012", "1234567890", null);
+
+        Awaitility.await().atMost(Duration.ofSeconds(2)).untilAsserted(() -> {
+            assertThat(saved.getStatus()).isEqualTo(TransactionStatus.FAILED);
+            assertThat(wallet.getBalance()).isEqualByComparingTo("1000.00"); // refunded back to original
+        });
+    }
+
+    @Test
+    void initiateWithdrawal_mockBankNetworkError_staysRequestCompleted() throws Exception {
+        Transaction saved = new Transaction();
+        saved.setId(UUID.randomUUID());
+        saved.setStatus(TransactionStatus.REQUEST_COMPLETED);
+        given(transactionRepository.save(any())).willReturn(saved);
+        willThrow(new RuntimeException("connection refused"))
+            .given(mockBankClient).sendWithdrawRequest(any(), any(), any(), any(), any(), any());
+
+        walletService.initiateWithdrawal(memberId, new BigDecimal("400.00"), "012", "1234567890", null);
+
+        // Network error (non-CB): transaction stays REQUEST_COMPLETED, TimeoutJob refunds later
+        Awaitility.await().atMost(Duration.ofSeconds(2)).untilAsserted(() ->
+            assertThat(saved.getStatus()).isEqualTo(TransactionStatus.REQUEST_COMPLETED));
+        then(transactionRepository).should(never()).save(argThat(tx ->
+            tx.getStatus() == TransactionStatus.FAILED));
     }
 
     // ── email notification ────────────────────────────────────

@@ -8,15 +8,13 @@ import org.side_project.wallet_system.transaction.TransactionRepository;
 import org.side_project.wallet_system.transaction.TransactionSpec;
 import org.side_project.wallet_system.transaction.TransactionStatus;
 import org.side_project.wallet_system.transaction.TransactionType;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -24,7 +22,6 @@ import org.slf4j.MDC;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
-import java.util.List;
 import java.util.UUID;
 
 @Slf4j
@@ -39,11 +36,13 @@ public class WalletService {
 
     private final WalletRepository walletRepository;
     private final TransactionRepository transactionRepository;
-    private final HttpClient httpClient;
+    private final MockBankClient mockBankClient;
     private final EmailPublisher emailPublisher;
 
-    @Value("${mock-bank.url}")
-    private String mockBankUrl;
+    // Self-injection (lazy) so failWithdrawal runs through the Spring proxy (@Transactional)
+    @Lazy
+    @Autowired
+    private WalletService self;
 
     @Value("${app.base-url}")
     private String appBaseUrl;
@@ -225,23 +224,19 @@ public class WalletService {
 
         String transactionId = saved.getId().toString();
         String callbackUrl = appBaseUrl + "/withdraw/webhook";
-        String body = String.format(
-            "{\"transactionId\":\"%s\",\"amount\":\"%s\",\"bankCode\":\"%s\",\"bankAccount\":\"%s\",\"callbackUrl\":\"%s\"}",
-            transactionId, amount.toPlainString(), bankCode, bankAccount, callbackUrl);
 
         String traceId = MDC.get("traceId");
         CompletableFuture.runAsync(() -> {
             if (traceId != null) MDC.put("traceId", traceId);
             try {
-                HttpRequest.Builder requestBuilder = HttpRequest.newBuilder()
-                    .uri(URI.create(mockBankUrl + "/api/withdraw"))
-                    .header("Content-Type", "application/json")
-                    .POST(HttpRequest.BodyPublishers.ofString(body));
-                if (traceId != null) requestBuilder.header("X-Trace-Id", traceId);
-                httpClient.send(requestBuilder.build(), HttpResponse.BodyHandlers.ofString());
-                log.info("Withdrawal request sent to mock bank: transactionId={}", transactionId);
+                mockBankClient.sendWithdrawRequest(transactionId, amount, bankCode, bankAccount, callbackUrl, traceId);
+            } catch (MockBankUnavailableException e) {
+                // Circuit is OPEN — mock-bank is down; refund immediately instead of waiting for TimeoutJob
+                log.warn("Circuit OPEN: immediately failing withdrawal {}", transactionId);
+                self.failWithdrawal(UUID.fromString(transactionId));
             } catch (Exception e) {
                 log.error("Failed to send withdrawal to mock bank: transactionId={}", transactionId, e);
+                // Transaction stays REQUEST_COMPLETED; TimeoutJob refunds after 5 minutes
             } finally {
                 MDC.remove("traceId");
             }
