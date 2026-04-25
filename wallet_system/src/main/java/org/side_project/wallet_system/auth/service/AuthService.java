@@ -62,6 +62,7 @@ public class AuthService {
 
     public static final String TEST_EMAIL = "test1234@gmail.com";
     private static final String TEST_FIXED_OTP = "123456";
+    private static final String TEST_PASSWORD = "test1234";
 
     @Transactional
     public void ensureTestMemberActive() {
@@ -78,7 +79,7 @@ public class AuthService {
         Member member = new Member();
         member.setName("Test User");
         member.setEmail(TEST_EMAIL);
-        member.setPassword(passwordEncoder.encode("test1234"));
+        member.setPassword(passwordEncoder.encode(TEST_PASSWORD));
         member.setAuthProvider(AuthProvider.LOCAL);
         member.setStatus(MemberStatus.ACTIVE);
         member = memberRepository.save(member);
