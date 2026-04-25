@@ -46,5 +46,7 @@ internal:
 
 rabbitmq:
   exchange: wallet.email
-  routing-key: email.notification
   queue: email.notifications
+  routing-key: email.notification
+  dead-letter-exchange: wallet.email.dlx
+  dead-letter-routing-key: email.notification.dead

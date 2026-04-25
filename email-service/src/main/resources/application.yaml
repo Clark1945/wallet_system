@@ -25,6 +25,9 @@ rabbitmq:
   exchange: wallet.email
   queue: email.notifications
   routing-key: email.notification
+  dead-letter-exchange: wallet.email.dlx
+  dead-letter-queue: email.notifications.dlq
+  dead-letter-routing-key: email.notification.dead
 
 logging:
   level:

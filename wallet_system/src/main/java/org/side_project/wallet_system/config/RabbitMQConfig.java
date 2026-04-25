@@ -4,6 +4,7 @@ import org.springframework.amqp.core.Binding;
 import org.springframework.amqp.core.BindingBuilder;
 import org.springframework.amqp.core.DirectExchange;
 import org.springframework.amqp.core.Queue;
+import org.springframework.amqp.core.QueueBuilder;
 import org.springframework.amqp.rabbit.connection.ConnectionFactory;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.amqp.support.converter.Jackson2JsonMessageConverter;
@@ -26,9 +27,20 @@ public class RabbitMQConfig {
     @Value("${rabbitmq.routing-key}")
     private String routingKey;
 
+    @Value("${rabbitmq.dead-letter-exchange}")
+    private String dlx;
+
+    @Value("${rabbitmq.dead-letter-routing-key}")
+    private String dlqRoutingKey;
+
+    // Declare the queue with DLX args so both publisher and consumer agree on the
+    // queue definition. Prevents RabbitMQ PRECONDITION_FAILED on redeclaration.
     @Bean
     public Queue emailQueue() {
-        return new Queue(queue, true);
+        return QueueBuilder.durable(queue)
+                .withArgument("x-dead-letter-exchange", dlx)
+                .withArgument("x-dead-letter-routing-key", dlqRoutingKey)
+                .build();
     }
 
     @Bean
