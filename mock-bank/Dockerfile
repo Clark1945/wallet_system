@@ -1,5 +1,5 @@
 FROM eclipse-temurin:17-jre-alpine
 WORKDIR /app
-COPY target/mock-bank-0.0.1-SNAPSHOT.jar app.jar
+COPY target/app.jar app.jar
 EXPOSE 8081
 ENTRYPOINT ["java", "-jar", "app.jar"]
