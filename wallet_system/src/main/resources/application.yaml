@@ -5,7 +5,9 @@ server:
     session:
       timeout: 30m
       cookie:
+        # Prevent JavaScript access cookie
         http-only: true
+        # Cross site request contains cookie (partly allow)
         same-site: lax
         # Set secure: true when deploying behind HTTPS
         secure: ${SESSION_COOKIE_SECURE:false}
@@ -26,6 +28,12 @@ spring:
     username: ${DB_USERNAME}
     password: ${DB_PASSWORD}
     driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 20
+      minimum-idle: 5
+      idle-timeout: 600000      # 10 min
+      max-lifetime: 1800000     # 30 min
+      connection-timeout: 30000 # 30 sec
   messages:
     basename: messages
     encoding: UTF-8
@@ -39,6 +47,15 @@ spring:
       host: ${REDIS_HOST:localhost}
       port: ${REDIS_PORT:6379}
       password: ${REDIS_PASSWORD:redis}
+      timeout: 3s
+      lettuce:
+        pool:
+          enabled: true
+          max-active: 16
+          max-idle: 8
+          min-idle: 2
+          max-wait: 2s
+        shutdown-timeout: 100ms
   servlet:
     multipart:
       enabled: true
