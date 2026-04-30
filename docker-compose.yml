@@ -69,7 +69,7 @@ services:
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
       WITHDRAW_WEBHOOK_SECRET: ${WITHDRAW_WEBHOOK_SECRET}
       # payment-service integration — must be browser-accessible (localhost), not internal Docker hostname
-      PAYMENT_SERVICE_BASE_URL: http://localhost:8082
+      PAYMENT_SERVICE_BASE_URL: ${PAYMENT_SERVICE_BASE_URL:-http://localhost:8082}
       INTERNAL_SERVICE_SECRET: ${INTERNAL_SERVICE_SECRET}
       # RabbitMQ — email notifications published here, consumed by email-service
       RABBITMQ_HOST: rabbitmq
