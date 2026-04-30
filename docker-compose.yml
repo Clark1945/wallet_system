@@ -105,8 +105,8 @@ services:
       PAYMENT_SERVICE_ID: ${PAYMENT_SERVICE_ID}
       PAYMENT_HASH_KEY: ${PAYMENT_HASH_KEY}
       SP_PAYMENT_REDIRECT_URL: ${SP_PAYMENT_REDIRECT_URL}
-      WALLET_SERVICE_BASE_URL: http://app:8080          # container-to-container API calls
-      WALLET_SERVICE_PUBLIC_URL: http://localhost:8080  # browser redirect after payment
+      WALLET_SERVICE_BASE_URL: http://app:8080                                        # container-to-container API calls
+      WALLET_SERVICE_PUBLIC_URL: ${WALLET_SERVICE_PUBLIC_URL:-http://localhost:8080}  # browser redirect after payment
       INTERNAL_SERVICE_SECRET: ${INTERNAL_SERVICE_SECRET}
       REDIS_HOST: redis
       REDIS_PORT: 6379
