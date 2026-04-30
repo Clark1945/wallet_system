@@ -33,17 +33,38 @@ MVN_ARGS="clean package --no-transfer-progress"
 COMPOSE_ARGS="up --build"
 [[ "$DETACH" == true ]] && COMPOSE_ARGS="$COMPOSE_ARGS -d"
 
-# ── Build ────────────────────────────────────────────────────────────────────
+# ── Build (parallel) ─────────────────────────────────────────────────────────
 SERVICES=("wallet_system" "payment-service" "email-service" "mock-bank")
+
+declare -A pids
+declare -A logs
 
 for svc in "${SERVICES[@]}"; do
   svc_dir="$ROOT_DIR/$svc"
-  [[ -d "$svc_dir" ]] || { info "Skipping $svc (directory not found)"; continue; }
-  info "Building $svc ..."
+  if [[ ! -d "$svc_dir" ]]; then
+    info "Skipping $svc (directory not found)"
+    continue
+  fi
   mvn_cmd="./mvnw"; [[ -f "$svc_dir/mvnw" ]] || mvn_cmd="mvn"
-  (cd "$svc_dir" && $mvn_cmd $MVN_ARGS) || fail "Build failed: $svc"
-  ok "$svc built"
+  log_file=$(mktemp)
+  logs[$svc]="$log_file"
+  info "Building $svc (parallel) ..."
+  (cd "$svc_dir" && $mvn_cmd $MVN_ARGS > "$log_file" 2>&1) &
+  pids[$svc]=$!
 done
+
+failed=false
+for svc in "${!pids[@]}"; do
+  if wait "${pids[$svc]}"; then
+    ok "$svc built"
+  else
+    echo -e "${RED}[FAIL]${NC} Build failed: $svc — last 20 lines:"
+    tail -20 "${logs[$svc]}"
+    failed=true
+  fi
+  rm -f "${logs[$svc]}"
+done
+[[ "$failed" == true ]] && exit 1
 
 echo ""
 ok "All services built. Starting Docker Compose ..."
