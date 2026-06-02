@@ -16,15 +16,27 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
+import java.time.Duration;
 import java.util.HexFormat;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.*;
 
 @Slf4j
 @RestController
 public class WithdrawController {
 
-    private final HttpClient httpClient = HttpClient.newHttpClient();
+    private final HttpClient httpClient = HttpClient.newBuilder()
+            .connectTimeout(Duration.ofSeconds(5))
+            .build();
+
+    // Dedicated scheduler: the 3-8s delay is held in the delay queue (no thread blocked),
+    // and a pooled thread is only used for the brief callback send. Avoids parking the
+    // shared ForkJoinPool common-pool on Thread.sleep.
+    private final ScheduledExecutorService callbackScheduler =
+            Executors.newScheduledThreadPool(4, r -> {
+                Thread t = new Thread(r, "mock-bank-callback");
+                t.setDaemon(true); // 意思是主程式結束時這些執行緒不會阻擋 JVM 關閉
+                return t;
+            });
 
     @Value("${mock-bank.fail-rate:0.10}")
     private double failRate;
@@ -42,49 +54,51 @@ public class WithdrawController {
 
         int delaySeconds = ThreadLocalRandom.current().nextInt(3, 9);
         String traceId = MDC.get("traceId");
+        double roll = ThreadLocalRandom.current().nextDouble();
 
-        CompletableFuture.runAsync(() -> {
-            if (traceId != null) MDC.put("traceId", traceId);
-            try {
-                double roll = ThreadLocalRandom.current().nextDouble();
+        if (roll < noCallbackRate) {
+            log.warn("Mock bank simulating no-callback: transactionId={}, roll={}",
+                    req.transactionId(), roll);
+            return ResponseEntity.ok().build();
+        }
 
-                if (roll < noCallbackRate) {
-                    log.warn("Mock bank simulating no-callback: transactionId={}, roll={}",
-                            req.transactionId(), roll);
-                    return;
-                }
-
-                log.info("Mock bank processing: transactionId={}, delay={}s",
-                        req.transactionId(), delaySeconds);
-                Thread.sleep(delaySeconds * 1000L);
-
-                String result = (roll < noCallbackRate + failRate) ? "FAIL" : "SUCCESS";
-                String body = String.format(
-                        "{\"transactionId\":\"%s\",\"result\":\"%s\"}",
-                        req.transactionId(), result);
-
-                String signature = computeHmacSha256(body);
-
-                HttpRequest.Builder callbackBuilder = HttpRequest.newBuilder()
-                        .uri(URI.create(req.callbackUrl()))
-                        .header("Content-Type", "application/json")
-                        .header("X-Webhook-Signature", signature)
-                        .POST(HttpRequest.BodyPublishers.ofString(body));
-                if (traceId != null) callbackBuilder.header("X-Trace-Id", traceId);
-
-                HttpResponse<String> response =
-                        httpClient.send(callbackBuilder.build(), HttpResponse.BodyHandlers.ofString());
-                log.info("Mock bank callback sent: transactionId={}, result={}, status={}",
-                        req.transactionId(), result, response.statusCode());
-
-            } catch (Exception e) {
-                log.error("Mock bank callback failed: transactionId={}", req.transactionId(), e);
-            } finally {
-                MDC.remove("traceId");
-            }
-        });
+        boolean fail = roll < noCallbackRate + failRate;
+        log.info("Mock bank processing: transactionId={}, delay={}s",
+                req.transactionId(), delaySeconds);
+        callbackScheduler.schedule(() -> sendCallback(req, fail, traceId),
+                delaySeconds, TimeUnit.SECONDS);
 
         return ResponseEntity.ok().build();
+    }
+
+    private void sendCallback(WithdrawRequest req, boolean fail, String traceId) {
+        if (traceId != null) MDC.put("traceId", traceId);
+        try {
+            String result = fail ? "FAIL" : "SUCCESS";
+            String body = String.format(
+                    "{\"transactionId\":\"%s\",\"result\":\"%s\"}",
+                    req.transactionId(), result);
+
+            String signature = computeHmacSha256(body);
+
+            HttpRequest.Builder callbackBuilder = HttpRequest.newBuilder()
+                    .uri(URI.create(req.callbackUrl()))
+                    .timeout(Duration.ofSeconds(10))
+                    .header("Content-Type", "application/json")
+                    .header("X-Webhook-Signature", signature)
+                    .POST(HttpRequest.BodyPublishers.ofString(body));
+            if (traceId != null) callbackBuilder.header("X-Trace-Id", traceId);
+
+            HttpResponse<String> response =
+                    httpClient.send(callbackBuilder.build(), HttpResponse.BodyHandlers.ofString());
+            log.info("Mock bank callback sent: transactionId={}, result={}, status={}",
+                    req.transactionId(), result, response.statusCode());
+
+        } catch (Exception e) {
+            log.error("Mock bank callback failed: transactionId={}", req.transactionId(), e);
+        } finally {
+            MDC.remove("traceId");
+        }
     }
 
     private String computeHmacSha256(String body) {
