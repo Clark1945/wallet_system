@@ -448,3 +448,5 @@ docker compose up --build
 ### 技術スタック
 
 Spring Boot 4.0.5 · Java 17 · Spring Security · PostgreSQL 14 · Redis · RabbitMQ · Flyway · Thymeleaf · Stripe · SBPS · Docker Compose · Loki · Grafana · Prometheus
+
+.\build-and-run.ps1 -s -d  

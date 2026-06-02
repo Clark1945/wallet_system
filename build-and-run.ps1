@@ -33,7 +33,7 @@ foreach ($svc in $Services) {
     }
     Write-Info "Building $svc ..."
     Push-Location $svcDir
-    $mvnCmd = if (Test-Path "./mvnw") { "./mvnw" } else { "mvn" }
+    $mvnCmd = if ($IsWindows -and (Test-Path "./mvnw.cmd")) { "./mvnw.cmd" } elseif (Test-Path "./mvnw") { "./mvnw" } else { "mvn" }
     & $mvnCmd @MvnArgs
     $exitCode = $LASTEXITCODE
     Pop-Location
