@@ -69,7 +69,7 @@ services:
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
       WITHDRAW_WEBHOOK_SECRET: ${WITHDRAW_WEBHOOK_SECRET}
       # payment-service integration — must be browser-accessible (localhost), not internal Docker hostname
-      PAYMENT_SERVICE_BASE_URL: ${PAYMENT_SERVICE_BASE_URL:-http://localhost:8082}
+      PAYMENT_SERVICE_BASE_URL: ${PAYMENT_SERVICE_BASE_URL:-http://localhost}
       INTERNAL_SERVICE_SECRET: ${INTERNAL_SERVICE_SECRET}
       # RabbitMQ — email notifications published here, consumed by email-service
       RABBITMQ_HOST: rabbitmq
@@ -106,7 +106,7 @@ services:
       PAYMENT_HASH_KEY: ${PAYMENT_HASH_KEY}
       SP_PAYMENT_REDIRECT_URL: ${SP_PAYMENT_REDIRECT_URL}
       WALLET_SERVICE_BASE_URL: http://app:8080                                        # container-to-container API calls
-      WALLET_SERVICE_PUBLIC_URL: ${WALLET_SERVICE_PUBLIC_URL:-http://localhost:8080}  # browser redirect after payment
+      WALLET_SERVICE_PUBLIC_URL: ${WALLET_SERVICE_PUBLIC_URL:-http://localhost}  # browser redirect after payment (via nginx)
       INTERNAL_SERVICE_SECRET: ${INTERNAL_SERVICE_SECRET}
       REDIS_HOST: redis
       REDIS_PORT: 6379
@@ -116,6 +116,16 @@ services:
     depends_on:
       redis:
         condition: service_healthy
+
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - app
+      - payment-service
 
   postgres-exporter:
     image: prometheuscommunity/postgres-exporter:latest
