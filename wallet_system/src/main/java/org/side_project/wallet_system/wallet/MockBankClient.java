@@ -11,6 +11,7 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.time.Duration;
 
 @Slf4j
 @Component
@@ -33,6 +34,7 @@ public class MockBankClient {
 
         HttpRequest.Builder builder = HttpRequest.newBuilder()
             .uri(URI.create(mockBankUrl + "/api/withdraw"))
+            .timeout(Duration.ofSeconds(10))
             .header("Content-Type", "application/json")
             .POST(HttpRequest.BodyPublishers.ofString(body));
         if (traceId != null) builder.header("X-Trace-Id", traceId);
