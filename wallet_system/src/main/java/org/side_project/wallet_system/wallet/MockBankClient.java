@@ -6,6 +6,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
+import java.io.IOException;
 import java.math.BigDecimal;
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -39,7 +40,11 @@ public class MockBankClient {
             .POST(HttpRequest.BodyPublishers.ofString(body));
         if (traceId != null) builder.header("X-Trace-Id", traceId);
 
-        httpClient.send(builder.build(), HttpResponse.BodyHandlers.ofString());
+        HttpResponse<String> response = httpClient.send(builder.build(), HttpResponse.BodyHandlers.ofString());
+        // Treat 5xx as a failure so the circuit breaker counts it; HttpClient does not throw on error status codes.
+        if (response.statusCode() >= 500) {
+            throw new IOException("Mock bank returned " + response.statusCode());
+        }
         log.info("Withdrawal request sent to mock bank: transactionId={}", transactionId);
     }
 

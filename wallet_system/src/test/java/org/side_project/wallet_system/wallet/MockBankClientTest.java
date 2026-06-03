@@ -86,4 +86,29 @@ class MockBankClientTest {
                     "http://callback", null))
             .isInstanceOf(InterruptedException.class);
     }
+
+    @Test
+    void sendWithdrawRequest_serverError_throwsSoCircuitBreakerCounts() throws Exception {
+        HttpResponse response = mock(HttpResponse.class);
+        given(response.statusCode()).willReturn(503);
+        given(httpClient.send(any(), any())).willReturn(response);
+
+        assertThatThrownBy(() ->
+            mockBankClient.sendWithdrawRequest("tx-5xx", new BigDecimal("100.00"), "012", "789",
+                    "http://callback", null))
+            .isInstanceOf(IOException.class)
+            .hasMessageContaining("503");
+    }
+
+    @Test
+    void sendWithdrawRequest_clientError_doesNotThrow() throws Exception {
+        HttpResponse response = mock(HttpResponse.class);
+        given(response.statusCode()).willReturn(400);
+        given(httpClient.send(any(), any())).willReturn(response);
+
+        assertThatCode(() ->
+            mockBankClient.sendWithdrawRequest("tx-4xx", new BigDecimal("100.00"), "012", "789",
+                    "http://callback", null))
+            .doesNotThrowAnyException();
+    }
 }
