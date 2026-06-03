@@ -121,23 +121,25 @@ public class WalletService {
 
     @Transactional
     public void completeDeposit(UUID transactionId) {
-        transactionRepository.findById(transactionId).ifPresent(tx -> {
-            if (tx.getStatus() == TransactionStatus.PENDING) {
-                walletRepository.findByIdForUpdate(tx.getToWalletId()).ifPresent(wallet -> {
-                    wallet.setBalance(wallet.getBalance().add(tx.getAmount()));
-                    walletRepository.save(wallet);
-                });
-                tx.setStatus(TransactionStatus.COMPLETED);
-                transactionRepository.save(tx);
-                log.info("Deposit completed: transactionId={}, amount={}", transactionId, tx.getAmount());
-                if (tx.getNotifyEmail() != null && !tx.getNotifyEmail().isBlank()) {
-                    emailPublisher.sendDepositSuccess(tx.getNotifyEmail(), tx.getAmount());
-                }
-            } else {
-                log.warn("completeDeposit on non-PENDING: transactionId={}, currentStatus={}",
-                        transactionId, tx.getStatus());
-            }
+        Transaction tx = transactionRepository.findById(transactionId).orElse(null);
+        if (tx == null) {
+            return;
+        }
+        // Atomic claim: only the winner of a concurrent/duplicate call proceeds to credit the wallet.
+        int won = transactionRepository.compareAndSetStatus(
+                transactionId, TransactionStatus.PENDING, TransactionStatus.COMPLETED);
+        if (won == 0) {
+            log.warn("completeDeposit skipped (already processed or not PENDING): transactionId={}", transactionId);
+            return;
+        }
+        walletRepository.findByIdForUpdate(tx.getToWalletId()).ifPresent(wallet -> {
+            wallet.setBalance(wallet.getBalance().add(tx.getAmount()));
+            walletRepository.save(wallet);
         });
+        log.info("Deposit completed: transactionId={}, amount={}", transactionId, tx.getAmount());
+        if (tx.getNotifyEmail() != null && !tx.getNotifyEmail().isBlank()) {
+            emailPublisher.sendDepositSuccess(tx.getNotifyEmail(), tx.getAmount());
+        }
     }
 
     @Transactional
@@ -157,16 +159,13 @@ public class WalletService {
 
     @Transactional
     public void failDeposit(UUID transactionId) {
-        transactionRepository.findById(transactionId).ifPresent(tx -> {
-            if (tx.getStatus() == TransactionStatus.PENDING) {
-                tx.setStatus(TransactionStatus.FAILED);
-                transactionRepository.save(tx);
-                log.warn("Deposit failed (timeout): transactionId={}, amount={}", transactionId, tx.getAmount());
-            } else {
-                log.warn("failDeposit on non-PENDING: transactionId={}, currentStatus={}",
-                        transactionId, tx.getStatus());
-            }
-        });
+        int won = transactionRepository.compareAndSetStatus(
+                transactionId, TransactionStatus.PENDING, TransactionStatus.FAILED);
+        if (won == 0) {
+            log.warn("failDeposit skipped (already processed or not PENDING): transactionId={}", transactionId);
+            return;
+        }
+        log.warn("Deposit failed (timeout): transactionId={}", transactionId);
     }
 
     // ── 同步提款（向後相容）──────────────────────────────────────────────────
@@ -247,41 +246,44 @@ public class WalletService {
 
     @Transactional
     public void completeWithdrawal(UUID transactionId) {
-        transactionRepository.findById(transactionId).ifPresent(tx -> {
-            if (tx.getStatus() == TransactionStatus.REQUEST_COMPLETED) {
-                tx.setStatus(TransactionStatus.COMPLETED);
-                transactionRepository.save(tx);
-                log.info("Withdrawal completed: transactionId={}, amount={}", transactionId, tx.getAmount());
-                if (tx.getNotifyEmail() != null && !tx.getNotifyEmail().isBlank()) {
-                    emailPublisher.sendWithdrawalSuccess(tx.getNotifyEmail(), tx.getAmount());
-                }
-            } else {
-                log.warn("completeWithdrawal on non-REQUEST_COMPLETED: transactionId={}, currentStatus={}",
-                        transactionId, tx.getStatus());
-            }
-        });
+        Transaction tx = transactionRepository.findById(transactionId).orElse(null);
+        if (tx == null) {
+            return;
+        }
+        int won = transactionRepository.compareAndSetStatus(
+                transactionId, TransactionStatus.REQUEST_COMPLETED, TransactionStatus.COMPLETED);
+        if (won == 0) {
+            log.warn("completeWithdrawal skipped (already processed or not REQUEST_COMPLETED): transactionId={}", transactionId);
+            return;
+        }
+        log.info("Withdrawal completed: transactionId={}, amount={}", transactionId, tx.getAmount());
+        if (tx.getNotifyEmail() != null && !tx.getNotifyEmail().isBlank()) {
+            emailPublisher.sendWithdrawalSuccess(tx.getNotifyEmail(), tx.getAmount());
+        }
     }
 
     @Transactional
     public void failWithdrawal(UUID transactionId) {
-        transactionRepository.findById(transactionId).ifPresent(tx -> {
-            if (tx.getStatus() == TransactionStatus.REQUEST_COMPLETED) {
-                tx.setStatus(TransactionStatus.FAILED);
-                transactionRepository.save(tx);
-
-                if (tx.getFromWalletId() != null) {
-                    walletRepository.findByIdForUpdate(tx.getFromWalletId()).ifPresent(wallet -> {
-                        wallet.setBalance(wallet.getBalance().add(tx.getAmount()));
-                        walletRepository.save(wallet);
-                        log.info("Withdrawal failed - balance refunded: transactionId={}, walletId={}, amount={}",
-                                transactionId, tx.getFromWalletId(), tx.getAmount());
-                    });
-                }
-            } else {
-                log.warn("failWithdrawal on non-REQUEST_COMPLETED: transactionId={}, currentStatus={}",
-                        transactionId, tx.getStatus());
-            }
-        });
+        Transaction tx = transactionRepository.findById(transactionId).orElse(null);
+        if (tx == null) {
+            return;
+        }
+        // Atomic claim: guards the three refund triggers (circuit breaker, FAIL webhook, timeout job)
+        // so the balance is refunded at most once even if they fire concurrently.
+        int won = transactionRepository.compareAndSetStatus(
+                transactionId, TransactionStatus.REQUEST_COMPLETED, TransactionStatus.FAILED);
+        if (won == 0) {
+            log.warn("failWithdrawal skipped (already processed or not REQUEST_COMPLETED): transactionId={}", transactionId);
+            return;
+        }
+        if (tx.getFromWalletId() != null) {
+            walletRepository.findByIdForUpdate(tx.getFromWalletId()).ifPresent(wallet -> {
+                wallet.setBalance(wallet.getBalance().add(tx.getAmount()));
+                walletRepository.save(wallet);
+                log.info("Withdrawal failed - balance refunded: transactionId={}, walletId={}, amount={}",
+                        transactionId, tx.getFromWalletId(), tx.getAmount());
+            });
+        }
     }
 
     // ── 轉帳（同步，直接 COMPLETED）─────────────────────────────────────────

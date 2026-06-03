@@ -235,12 +235,15 @@ class WalletServiceTest {
         tx.setAmount(new BigDecimal("200.00"));
         tx.setStatus(TransactionStatus.PENDING);
         given(transactionRepository.findById(txId)).willReturn(Optional.of(tx));
+        given(transactionRepository.compareAndSetStatus(txId, TransactionStatus.PENDING, TransactionStatus.COMPLETED))
+                .willReturn(1);
         given(walletRepository.findByIdForUpdate(wallet.getId())).willReturn(Optional.of(wallet));
 
         walletService.completeDeposit(txId);
 
         assertThat(wallet.getBalance()).isEqualByComparingTo("1200.00");
-        assertThat(tx.getStatus()).isEqualTo(TransactionStatus.COMPLETED);
+        then(transactionRepository).should()
+                .compareAndSetStatus(txId, TransactionStatus.PENDING, TransactionStatus.COMPLETED);
     }
 
     @Test
@@ -262,17 +265,57 @@ class WalletServiceTest {
     @Test
     void failDeposit_pending_setsFailed_noRefund() {
         UUID txId = UUID.randomUUID();
-        Transaction tx = new Transaction();
-        tx.setId(txId);
-        tx.setAmount(new BigDecimal("300.00"));
-        tx.setStatus(TransactionStatus.PENDING);
-        given(transactionRepository.findById(txId)).willReturn(Optional.of(tx));
+        given(transactionRepository.compareAndSetStatus(txId, TransactionStatus.PENDING, TransactionStatus.FAILED))
+                .willReturn(1);
 
         walletService.failDeposit(txId);
 
-        assertThat(tx.getStatus()).isEqualTo(TransactionStatus.FAILED);
+        then(transactionRepository).should()
+                .compareAndSetStatus(txId, TransactionStatus.PENDING, TransactionStatus.FAILED);
         assertThat(wallet.getBalance()).isEqualByComparingTo("1000.00"); // no refund — balance was never added
         then(walletRepository).should(never()).save(any());
+    }
+
+    // ── concurrency: lost the compare-and-set race → side effect must NOT run ──
+
+    @Test
+    void completeDeposit_lostRace_doesNotCreditOrEmail() {
+        UUID txId = UUID.randomUUID();
+        Transaction tx = new Transaction();
+        tx.setId(txId);
+        tx.setToWalletId(wallet.getId());
+        tx.setAmount(new BigDecimal("200.00"));
+        tx.setStatus(TransactionStatus.PENDING);
+        tx.setNotifyEmail("user@example.com");
+        given(transactionRepository.findById(txId)).willReturn(Optional.of(tx));
+        // Another concurrent call already flipped PENDING→COMPLETED: this call loses (0 rows updated)
+        given(transactionRepository.compareAndSetStatus(txId, TransactionStatus.PENDING, TransactionStatus.COMPLETED))
+                .willReturn(0);
+
+        walletService.completeDeposit(txId);
+
+        assertThat(wallet.getBalance()).isEqualByComparingTo("1000.00"); // not double-credited
+        then(walletRepository).should(never()).findByIdForUpdate(any());
+        then(emailPublisher).shouldHaveNoInteractions();
+    }
+
+    @Test
+    void failWithdrawal_lostRace_doesNotRefundTwice() {
+        UUID txId = UUID.randomUUID();
+        Transaction tx = new Transaction();
+        tx.setId(txId);
+        tx.setFromWalletId(wallet.getId());
+        tx.setAmount(new BigDecimal("400.00"));
+        tx.setStatus(TransactionStatus.REQUEST_COMPLETED);
+        given(transactionRepository.findById(txId)).willReturn(Optional.of(tx));
+        // Webhook FAIL + timeout job race: the other one already flipped to FAILED, this loses
+        given(transactionRepository.compareAndSetStatus(txId, TransactionStatus.REQUEST_COMPLETED, TransactionStatus.FAILED))
+                .willReturn(0);
+
+        walletService.failWithdrawal(txId);
+
+        assertThat(wallet.getBalance()).isEqualByComparingTo("1000.00"); // refunded at most once
+        then(walletRepository).should(never()).findByIdForUpdate(any());
     }
 
     // ── initiateWithdrawal ───────────────────────────────────────
@@ -302,6 +345,8 @@ class WalletServiceTest {
         saved.setAmount(new BigDecimal("400.00"));
         given(transactionRepository.save(any())).willReturn(saved);
         given(transactionRepository.findById(saved.getId())).willReturn(Optional.of(saved));
+        given(transactionRepository.compareAndSetStatus(
+                saved.getId(), TransactionStatus.REQUEST_COMPLETED, TransactionStatus.FAILED)).willReturn(1);
         given(walletRepository.findByIdForUpdate(wallet.getId())).willReturn(Optional.of(wallet));
         willThrow(new MockBankUnavailableException("circuit open"))
             .given(mockBankClient).sendWithdrawRequest(any(), any(), any(), any(), any(), any());
@@ -309,7 +354,8 @@ class WalletServiceTest {
         walletService.initiateWithdrawal(memberId, new BigDecimal("400.00"), "012", "1234567890", null);
 
         Awaitility.await().atMost(Duration.ofSeconds(2)).untilAsserted(() -> {
-            assertThat(saved.getStatus()).isEqualTo(TransactionStatus.FAILED);
+            then(transactionRepository).should().compareAndSetStatus(
+                    saved.getId(), TransactionStatus.REQUEST_COMPLETED, TransactionStatus.FAILED);
             assertThat(wallet.getBalance()).isEqualByComparingTo("1000.00"); // refunded back to original
         });
     }
@@ -344,6 +390,8 @@ class WalletServiceTest {
         tx.setStatus(TransactionStatus.PENDING);
         tx.setNotifyEmail("user@example.com");
         given(transactionRepository.findById(txId)).willReturn(Optional.of(tx));
+        given(transactionRepository.compareAndSetStatus(txId, TransactionStatus.PENDING, TransactionStatus.COMPLETED))
+                .willReturn(1);
         given(walletRepository.findByIdForUpdate(wallet.getId())).willReturn(Optional.of(wallet));
 
         walletService.completeDeposit(txId);
@@ -360,6 +408,8 @@ class WalletServiceTest {
         tx.setAmount(new BigDecimal("200.00"));
         tx.setStatus(TransactionStatus.PENDING);
         given(transactionRepository.findById(txId)).willReturn(Optional.of(tx));
+        given(transactionRepository.compareAndSetStatus(txId, TransactionStatus.PENDING, TransactionStatus.COMPLETED))
+                .willReturn(1);
         given(walletRepository.findByIdForUpdate(wallet.getId())).willReturn(Optional.of(wallet));
 
         walletService.completeDeposit(txId);
@@ -376,6 +426,8 @@ class WalletServiceTest {
         tx.setStatus(TransactionStatus.REQUEST_COMPLETED);
         tx.setNotifyEmail("user@example.com");
         given(transactionRepository.findById(txId)).willReturn(Optional.of(tx));
+        given(transactionRepository.compareAndSetStatus(txId, TransactionStatus.REQUEST_COMPLETED, TransactionStatus.COMPLETED))
+                .willReturn(1);
 
         walletService.completeWithdrawal(txId);
 
@@ -390,6 +442,8 @@ class WalletServiceTest {
         tx.setAmount(new BigDecimal("150.00"));
         tx.setStatus(TransactionStatus.REQUEST_COMPLETED);
         given(transactionRepository.findById(txId)).willReturn(Optional.of(tx));
+        given(transactionRepository.compareAndSetStatus(txId, TransactionStatus.REQUEST_COMPLETED, TransactionStatus.COMPLETED))
+                .willReturn(1);
 
         walletService.completeWithdrawal(txId);
 
