@@ -318,6 +318,135 @@ class WalletServiceTest {
         then(walletRepository).should(never()).findByIdForUpdate(any());
     }
 
+    // ── transaction not found → no-op, never attempt the compare-and-set ──
+
+    @Test
+    void completeDeposit_notFound_doesNothing() {
+        UUID txId = UUID.randomUUID();
+        given(transactionRepository.findById(txId)).willReturn(Optional.empty());
+
+        walletService.completeDeposit(txId);
+
+        then(transactionRepository).should(never()).compareAndSetStatus(any(), any(), any());
+        then(walletRepository).should(never()).findByIdForUpdate(any());
+        then(emailPublisher).shouldHaveNoInteractions();
+    }
+
+    @Test
+    void completeWithdrawal_notFound_doesNothing() {
+        UUID txId = UUID.randomUUID();
+        given(transactionRepository.findById(txId)).willReturn(Optional.empty());
+
+        walletService.completeWithdrawal(txId);
+
+        then(transactionRepository).should(never()).compareAndSetStatus(any(), any(), any());
+        then(emailPublisher).shouldHaveNoInteractions();
+    }
+
+    @Test
+    void failWithdrawal_notFound_doesNothing() {
+        UUID txId = UUID.randomUUID();
+        given(transactionRepository.findById(txId)).willReturn(Optional.empty());
+
+        walletService.failWithdrawal(txId);
+
+        then(transactionRepository).should(never()).compareAndSetStatus(any(), any(), any());
+        then(walletRepository).should(never()).findByIdForUpdate(any());
+    }
+
+    // ── failDeposit lost the race → skip silently ──
+
+    @Test
+    void failDeposit_lostRace_doesNothing() {
+        UUID txId = UUID.randomUUID();
+        given(transactionRepository.compareAndSetStatus(txId, TransactionStatus.PENDING, TransactionStatus.FAILED))
+                .willReturn(0);
+
+        walletService.failDeposit(txId);
+
+        assertThat(wallet.getBalance()).isEqualByComparingTo("1000.00");
+        then(walletRepository).should(never()).save(any());
+    }
+
+    // ── completeWithdrawal lost the race → no success email ──
+
+    @Test
+    void completeWithdrawal_lostRace_doesNotEmail() {
+        UUID txId = UUID.randomUUID();
+        Transaction tx = new Transaction();
+        tx.setId(txId);
+        tx.setAmount(new BigDecimal("150.00"));
+        tx.setStatus(TransactionStatus.REQUEST_COMPLETED);
+        tx.setNotifyEmail("user@example.com");
+        given(transactionRepository.findById(txId)).willReturn(Optional.of(tx));
+        given(transactionRepository.compareAndSetStatus(txId, TransactionStatus.REQUEST_COMPLETED, TransactionStatus.COMPLETED))
+                .willReturn(0);
+
+        walletService.completeWithdrawal(txId);
+
+        then(emailPublisher).shouldHaveNoInteractions();
+    }
+
+    // ── blank notifyEmail → credit/complete but skip the success email ──
+
+    @Test
+    void completeDeposit_blankNotifyEmail_creditsButSendsNoEmail() {
+        UUID txId = UUID.randomUUID();
+        Transaction tx = new Transaction();
+        tx.setId(txId);
+        tx.setToWalletId(wallet.getId());
+        tx.setAmount(new BigDecimal("200.00"));
+        tx.setStatus(TransactionStatus.PENDING);
+        tx.setNotifyEmail("   ");
+        given(transactionRepository.findById(txId)).willReturn(Optional.of(tx));
+        given(transactionRepository.compareAndSetStatus(txId, TransactionStatus.PENDING, TransactionStatus.COMPLETED))
+                .willReturn(1);
+        given(walletRepository.findByIdForUpdate(wallet.getId())).willReturn(Optional.of(wallet));
+
+        walletService.completeDeposit(txId);
+
+        assertThat(wallet.getBalance()).isEqualByComparingTo("1200.00");
+        then(emailPublisher).shouldHaveNoInteractions();
+    }
+
+    @Test
+    void completeWithdrawal_blankNotifyEmail_completesButSendsNoEmail() {
+        UUID txId = UUID.randomUUID();
+        Transaction tx = new Transaction();
+        tx.setId(txId);
+        tx.setAmount(new BigDecimal("150.00"));
+        tx.setStatus(TransactionStatus.REQUEST_COMPLETED);
+        tx.setNotifyEmail("   ");
+        given(transactionRepository.findById(txId)).willReturn(Optional.of(tx));
+        given(transactionRepository.compareAndSetStatus(txId, TransactionStatus.REQUEST_COMPLETED, TransactionStatus.COMPLETED))
+                .willReturn(1);
+
+        walletService.completeWithdrawal(txId);
+
+        then(emailPublisher).shouldHaveNoInteractions();
+    }
+
+    // ── failWithdrawal with no source wallet → mark FAILED, nothing to refund ──
+
+    @Test
+    void failWithdrawal_noFromWallet_setsFailedWithoutRefund() {
+        UUID txId = UUID.randomUUID();
+        Transaction tx = new Transaction();
+        tx.setId(txId);
+        tx.setFromWalletId(null);
+        tx.setAmount(new BigDecimal("400.00"));
+        tx.setStatus(TransactionStatus.REQUEST_COMPLETED);
+        given(transactionRepository.findById(txId)).willReturn(Optional.of(tx));
+        given(transactionRepository.compareAndSetStatus(txId, TransactionStatus.REQUEST_COMPLETED, TransactionStatus.FAILED))
+                .willReturn(1);
+
+        walletService.failWithdrawal(txId);
+
+        then(transactionRepository).should()
+                .compareAndSetStatus(txId, TransactionStatus.REQUEST_COMPLETED, TransactionStatus.FAILED);
+        then(walletRepository).should(never()).findByIdForUpdate(any());
+    }
+
     // ── initiateWithdrawal ───────────────────────────────────────
 
     @Test
