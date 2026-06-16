@@ -2,6 +2,7 @@ package org.side_project.wallet_system.wallet;
 
 import jakarta.servlet.http.HttpSession;
 import lombok.RequiredArgsConstructor;
+import org.side_project.wallet_system.config.CurrentMember;
 import org.side_project.wallet_system.config.RateLimiterService;
 import org.side_project.wallet_system.config.SessionConstants;
 import org.side_project.wallet_system.config.SessionUtils;
@@ -41,10 +42,7 @@ public class WalletController {
             @RequestParam(required = false) String type,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
-            HttpSession session, Model model) {
-
-        UUID memberId = SessionUtils.getMemberId(session);
-        if (memberId == null) return "redirect:/login";
+            @CurrentMember UUID memberId, HttpSession session, Model model) {
 
         Wallet wallet = walletService.getWallet(memberId);
         TransactionType txType = (type != null && !type.isBlank()) ? TransactionType.valueOf(type) : null;
@@ -60,10 +58,7 @@ public class WalletController {
     }
 
     @GetMapping("/deposit")
-    public String depositPage(HttpSession session, Model model) {
-        UUID memberId = SessionUtils.getMemberId(session);
-        if (memberId == null) return "redirect:/login";
-
+    public String depositPage(@CurrentMember UUID memberId, HttpSession session, Model model) {
         model.addAttribute("wallet", walletService.getWallet(memberId));
         model.addAttribute(SessionConstants.MEMBER_NAME, SessionUtils.getMemberName(session));
         return "deposit";
@@ -73,12 +68,9 @@ public class WalletController {
     public String deposit(@RequestParam BigDecimal amount,
                           @RequestParam(defaultValue = "stripe") String paymentMethod,
                           @RequestParam(required = false) String notifyEmail,
-                          HttpSession session,
+                          @CurrentMember UUID memberId,
                           RedirectAttributes redirectAttributes,
                           Locale locale) {
-        UUID memberId = SessionUtils.getMemberId(session);
-        if (memberId == null) return "redirect:/login";
-
         if (!rateLimiterService.isAllowed("deposit:" + memberId, 10, Duration.ofMinutes(1))) {
             redirectAttributes.addFlashAttribute("error",
                     messageSource.getMessage("error.rate.limit", null, locale));
@@ -104,10 +96,7 @@ public class WalletController {
     }
 
     @GetMapping("/withdraw")
-    public String withdrawPage(HttpSession session, Model model) {
-        UUID memberId = SessionUtils.getMemberId(session);
-        if (memberId == null) return "redirect:/login";
-
+    public String withdrawPage(@CurrentMember UUID memberId, HttpSession session, Model model) {
         model.addAttribute("wallet", walletService.getWallet(memberId));
         model.addAttribute(SessionConstants.MEMBER_NAME, SessionUtils.getMemberName(session));
         return "withdraw";
@@ -118,12 +107,9 @@ public class WalletController {
                            @RequestParam String bankCode,
                            @RequestParam String bankAccount,
                            @RequestParam String notifyEmail,
-                           HttpSession session,
+                           @CurrentMember UUID memberId,
                            RedirectAttributes redirectAttributes,
                            Locale locale) {
-        UUID memberId = SessionUtils.getMemberId(session);
-        if (memberId == null) return "redirect:/login";
-
         if (!rateLimiterService.isAllowed("withdraw:" + memberId, 5, Duration.ofMinutes(1))) {
             redirectAttributes.addFlashAttribute("error",
                     messageSource.getMessage("error.rate.limit", null, locale));
@@ -142,10 +128,7 @@ public class WalletController {
     }
 
     @GetMapping("/transfer")
-    public String transferPage(HttpSession session, Model model) {
-        UUID memberId = SessionUtils.getMemberId(session);
-        if (memberId == null) return "redirect:/login";
-
+    public String transferPage(@CurrentMember UUID memberId, HttpSession session, Model model) {
         model.addAttribute("wallet", walletService.getWallet(memberId));
         model.addAttribute(SessionConstants.MEMBER_NAME, SessionUtils.getMemberName(session));
         return "transfer";
@@ -154,12 +137,9 @@ public class WalletController {
     @PostMapping("/transfer")
     public String transfer(@RequestParam String toWalletCode,
                            @RequestParam BigDecimal amount,
-                           HttpSession session,
+                           @CurrentMember UUID memberId,
                            RedirectAttributes redirectAttributes,
                            Locale locale) {
-        UUID memberId = SessionUtils.getMemberId(session);
-        if (memberId == null) return "redirect:/login";
-
         if (!rateLimiterService.isAllowed("transfer:" + memberId, 10, Duration.ofMinutes(1))) {
             redirectAttributes.addFlashAttribute("error",
                     messageSource.getMessage("error.rate.limit", null, locale));
