@@ -16,6 +16,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # full history so the coverage gate can diff against the base branch
 
       - name: Set up Java 17
         uses: actions/setup-java@v4
@@ -24,8 +26,15 @@ jobs:
           distribution: temurin
           cache: maven
 
-      - name: Run tests
-        run: ./mvnw test
+      - name: Run tests + coverage report
+        run: ./mvnw test jacoco:report
+
+      - name: Coverage gate (new code >= 80%)
+        if: github.event_name == 'pull_request'
+        working-directory: ${{ github.workspace }}
+        run: |
+          git fetch --no-tags origin "${{ github.base_ref }}:refs/remotes/origin/${{ github.base_ref }}"
+          python3 scripts/check_new_code_coverage.py --base "origin/${{ github.base_ref }}"
 
       - name: Upload test report
         if: failure()

@@ -63,6 +63,7 @@ class WalletControllerIT {
     @MockitoBean CustomOAuth2UserService oauth2UserService;
     @MockitoBean LoginSuccessHandler loginSuccessHandler;
     @MockitoBean LoginAttemptService loginAttemptService;
+    @MockitoBean org.side_project.wallet_system.audit.AuditService auditService;
 
     private MockHttpSession session;
     private UUID memberId;

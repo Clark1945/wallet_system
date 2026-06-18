@@ -19,6 +19,7 @@ import org.springframework.mock.web.MockHttpSession;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import org.side_project.wallet_system.audit.AuditService;
 import org.side_project.wallet_system.config.SecurityConfig;
 
 import java.util.Locale;
@@ -66,6 +67,8 @@ class ProfileControllerIT {
     LoginAttemptService loginAttemptService;
     @MockitoBean
     RateLimiterService rateLimiterService;
+    @MockitoBean
+    AuditService auditService;
 
     private MockHttpSession session;
     private UUID memberId;

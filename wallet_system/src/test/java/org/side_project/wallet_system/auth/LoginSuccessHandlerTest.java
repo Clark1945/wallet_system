@@ -8,6 +8,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.side_project.wallet_system.audit.AuditService;
 import org.side_project.wallet_system.auth.oauth.CustomOAuth2User;
 import org.side_project.wallet_system.auth.oauth.CustomUserDetails;
 import org.side_project.wallet_system.auth.oauth.LoginSuccessHandler;
@@ -29,6 +30,7 @@ class LoginSuccessHandlerTest {
     @Mock private OtpService otpService;
     @Mock private AuthService authService;
     @Mock private LoginAttemptService loginAttemptService;
+    @Mock private AuditService auditService;
     @InjectMocks private LoginSuccessHandler handler;
 
     @Mock private HttpServletRequest request;

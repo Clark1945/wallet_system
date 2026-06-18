@@ -2,6 +2,10 @@ package org.side_project.wallet_system.wallet;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.side_project.wallet_system.audit.AuditAction;
+import org.side_project.wallet_system.audit.AuditLog;
+import org.side_project.wallet_system.audit.AuditResult;
+import org.side_project.wallet_system.audit.AuditService;
 import org.side_project.wallet_system.notification.EmailPublisher;
 import org.side_project.wallet_system.transaction.Transaction;
 import org.side_project.wallet_system.transaction.TransactionRepository;
@@ -38,6 +42,7 @@ public class WalletService {
     private final TransactionRepository transactionRepository;
     private final MockBankClient mockBankClient;
     private final EmailPublisher emailPublisher;
+    private final AuditService auditService;
 
     // Self-injection (lazy) so failWithdrawal runs through the Spring proxy (@Transactional)
     @Lazy
@@ -94,6 +99,7 @@ public class WalletService {
         tx.setDescription(DESC_DEPOSIT);
         tx.setStatus(TransactionStatus.COMPLETED);
         transactionRepository.save(tx);
+        auditTx(memberId, AuditAction.DEPOSIT_COMPLETED, AuditResult.SUCCESS, tx.getId(), amount, null);
         log.info("Deposit: memberId={}, amount={}, newBalance={}", memberId, amount, wallet.getBalance());
     }
 
@@ -115,6 +121,7 @@ public class WalletService {
         tx.setStatus(TransactionStatus.PENDING);
         tx.setNotifyEmail(notifyEmail);
         tx = transactionRepository.save(tx);
+        auditTx(memberId, AuditAction.DEPOSIT_INITIATED, AuditResult.SUCCESS, tx.getId(), amount, null);
         log.info("Deposit initiated: memberId={}, amount={}, transactionId={}", memberId, amount, tx.getId());
         return tx.getId();
     }
@@ -136,6 +143,7 @@ public class WalletService {
             wallet.setBalance(wallet.getBalance().add(tx.getAmount()));
             walletRepository.save(wallet);
         });
+        auditTx(null, AuditAction.DEPOSIT_COMPLETED, AuditResult.SUCCESS, transactionId, tx.getAmount(), null);
         log.info("Deposit completed: transactionId={}, amount={}", transactionId, tx.getAmount());
         if (tx.getNotifyEmail() != null && !tx.getNotifyEmail().isBlank()) {
             emailPublisher.sendDepositSuccess(tx.getNotifyEmail(), tx.getAmount());
@@ -165,6 +173,7 @@ public class WalletService {
             log.warn("failDeposit skipped (already processed or not PENDING): transactionId={}", transactionId);
             return;
         }
+        auditTx(null, AuditAction.DEPOSIT_FAILED, AuditResult.FAILURE, transactionId, null, "timeout");
         log.warn("Deposit failed (timeout): transactionId={}", transactionId);
     }
 
@@ -180,6 +189,7 @@ public class WalletService {
                 .orElseThrow(() -> new WalletNotFoundException(memberId));
         if (wallet.getBalance().compareTo(amount) < 0) {
             log.warn("Withdrawal rejected - insufficient balance: memberId={}, amount={}, balance={}", memberId, amount, wallet.getBalance());
+            auditTx(memberId, AuditAction.WITHDRAWAL_INITIATED, AuditResult.FAILURE, null, amount, "insufficient balance");
             throw new IllegalArgumentException("error.insufficient.balance");
         }
         wallet.setBalance(wallet.getBalance().subtract(amount));
@@ -192,6 +202,7 @@ public class WalletService {
         tx.setDescription(DESC_WITHDRAWAL);
         tx.setStatus(TransactionStatus.COMPLETED);
         transactionRepository.save(tx);
+        auditTx(memberId, AuditAction.WITHDRAWAL_COMPLETED, AuditResult.SUCCESS, tx.getId(), amount, null);
         log.info("Withdrawal: memberId={}, amount={}, newBalance={}", memberId, amount, wallet.getBalance());
     }
 
@@ -207,6 +218,7 @@ public class WalletService {
                 .orElseThrow(() -> new WalletNotFoundException(memberId));
         if (wallet.getBalance().compareTo(amount) < 0) {
             log.warn("Withdrawal rejected - insufficient balance: memberId={}, amount={}, balance={}", memberId, amount, wallet.getBalance());
+            auditTx(memberId, AuditAction.WITHDRAWAL_INITIATED, AuditResult.FAILURE, null, amount, "insufficient balance");
             throw new IllegalArgumentException("error.insufficient.balance");
         }
         wallet.setBalance(wallet.getBalance().subtract(amount));
@@ -220,6 +232,8 @@ public class WalletService {
         tx.setStatus(TransactionStatus.REQUEST_COMPLETED);
         tx.setNotifyEmail(notifyEmail);
         Transaction saved = transactionRepository.save(tx);
+        auditTx(memberId, AuditAction.WITHDRAWAL_INITIATED, AuditResult.SUCCESS, saved.getId(), amount,
+                "bank=" + bankCode);
 
         String transactionId = saved.getId().toString();
         String callbackUrl = appBaseUrl + "/withdraw/webhook";
@@ -256,6 +270,7 @@ public class WalletService {
             log.warn("completeWithdrawal skipped (already processed or not REQUEST_COMPLETED): transactionId={}", transactionId);
             return;
         }
+        auditTx(null, AuditAction.WITHDRAWAL_COMPLETED, AuditResult.SUCCESS, transactionId, tx.getAmount(), null);
         log.info("Withdrawal completed: transactionId={}, amount={}", transactionId, tx.getAmount());
         if (tx.getNotifyEmail() != null && !tx.getNotifyEmail().isBlank()) {
             emailPublisher.sendWithdrawalSuccess(tx.getNotifyEmail(), tx.getAmount());
@@ -284,6 +299,7 @@ public class WalletService {
                         transactionId, tx.getFromWalletId(), tx.getAmount());
             });
         }
+        auditTx(null, AuditAction.WITHDRAWAL_FAILED, AuditResult.FAILURE, transactionId, tx.getAmount(), "refunded");
     }
 
     // ── 轉帳（同步，直接 COMPLETED）─────────────────────────────────────────
@@ -299,15 +315,18 @@ public class WalletService {
                 .orElseThrow(() -> new WalletNotFoundException(fromMemberId));
         if (fromWallet.getWalletCode().equals(toWalletCode)) {
             log.warn("Transfer rejected - self-transfer: memberId={}", fromMemberId);
+            auditTx(fromMemberId, AuditAction.TRANSFER, AuditResult.FAILURE, null, amount, "self-transfer");
             throw new IllegalArgumentException("error.self.transfer");
         }
         if (fromWallet.getBalance().compareTo(amount) < 0) {
             log.warn("Transfer rejected - insufficient balance: fromMemberId={}, amount={}, balance={}", fromMemberId, amount, fromWallet.getBalance());
+            auditTx(fromMemberId, AuditAction.TRANSFER, AuditResult.FAILURE, null, amount, "insufficient balance");
             throw new IllegalArgumentException("error.insufficient.balance");
         }
         Wallet toWallet = walletRepository.findByWalletCode(toWalletCode)
                 .orElseThrow(() -> {
                     log.warn("Transfer rejected - wallet not found: toWalletCode={}", toWalletCode);
+                    auditTx(fromMemberId, AuditAction.TRANSFER, AuditResult.FAILURE, null, amount, "recipient not found");
                     return new IllegalArgumentException("error.wallet.not.found");
                 });
 
@@ -322,6 +341,7 @@ public class WalletService {
         // Re-check balance with the freshly locked values
         if (lockedFrom.getBalance().compareTo(amount) < 0) {
             log.warn("Transfer rejected - insufficient balance after lock: fromMemberId={}, amount={}, balance={}", fromMemberId, amount, lockedFrom.getBalance());
+            auditTx(fromMemberId, AuditAction.TRANSFER, AuditResult.FAILURE, null, amount, "insufficient balance");
             throw new IllegalArgumentException("error.insufficient.balance");
         }
 
@@ -338,6 +358,23 @@ public class WalletService {
         tx.setDescription(String.format(DESC_TRANSFER_TO, toWalletCode));
         tx.setStatus(TransactionStatus.COMPLETED);
         transactionRepository.save(tx);
+        auditTx(fromMemberId, AuditAction.TRANSFER, AuditResult.SUCCESS, tx.getId(), amount,
+                "to=" + toWalletCode);
         log.info("Transfer: fromMemberId={}, toWalletCode={}, amount={}", fromMemberId, toWalletCode, amount);
+    }
+
+    // ── Audit helpers ────────────────────────────────────────────────────────
+
+    private void auditTx(UUID actorId, AuditAction action, AuditResult result,
+                         UUID transactionId, BigDecimal amount, String detail) {
+        auditService.record(AuditLog.builder()
+                .actorId(actorId)
+                .action(action)
+                .result(result)
+                .targetType(transactionId != null ? "TRANSACTION" : null)
+                .targetId(transactionId != null ? transactionId.toString() : null)
+                .amount(amount)
+                .detail(detail)
+                .build());
     }
 }
