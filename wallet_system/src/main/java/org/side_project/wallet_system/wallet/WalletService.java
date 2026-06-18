@@ -34,7 +34,6 @@ import java.util.UUID;
 public class WalletService {
 
     private static final String DESC_DEPOSIT            = "Deposit";
-    private static final String DESC_WITHDRAWAL         = "Withdrawal";
     private static final String DESC_WITHDRAWAL_TO_BANK = "Withdrawal to bank %s / %s";
     private static final String DESC_TRANSFER_TO        = "Transfer to %s";
 
@@ -77,30 +76,6 @@ public class WalletService {
             TransactionSpec.filter(wallet.getId(), type, startDate, endDate),
             PageRequest.of(page, size)
         );
-    }
-
-    // ── 同步儲值（向後相容，狀態直接 COMPLETED）────────────────────────────
-
-    @Transactional
-    public void deposit(UUID memberId, BigDecimal amount) {
-        if (amount.compareTo(BigDecimal.ZERO) <= 0) {
-            log.warn("Deposit rejected - non-positive amount: memberId={}, amount={}", memberId, amount);
-            throw new IllegalArgumentException("error.amount.positive");
-        }
-        Wallet wallet = walletRepository.findByMemberIdForUpdate(memberId)
-                .orElseThrow(() -> new WalletNotFoundException(memberId));
-        wallet.setBalance(wallet.getBalance().add(amount));
-        walletRepository.save(wallet);
-
-        Transaction tx = new Transaction();
-        tx.setToWalletId(wallet.getId());
-        tx.setType(TransactionType.DEPOSIT);
-        tx.setAmount(amount);
-        tx.setDescription(DESC_DEPOSIT);
-        tx.setStatus(TransactionStatus.COMPLETED);
-        transactionRepository.save(tx);
-        auditTx(memberId, AuditAction.DEPOSIT_COMPLETED, AuditResult.SUCCESS, tx.getId(), amount, null);
-        log.info("Deposit: memberId={}, amount={}, newBalance={}", memberId, amount, wallet.getBalance());
     }
 
     // ── 非同步儲值（PENDING → COMPLETED / FAILED）────────────────────────────
@@ -175,35 +150,6 @@ public class WalletService {
         }
         auditTx(null, AuditAction.DEPOSIT_FAILED, AuditResult.FAILURE, transactionId, null, "timeout");
         log.warn("Deposit failed (timeout): transactionId={}", transactionId);
-    }
-
-    // ── 同步提款（向後相容）──────────────────────────────────────────────────
-
-    @Transactional
-    public void withdraw(UUID memberId, BigDecimal amount) {
-        if (amount.compareTo(BigDecimal.ZERO) <= 0) {
-            log.warn("Withdrawal rejected - non-positive amount: memberId={}, amount={}", memberId, amount);
-            throw new IllegalArgumentException("error.amount.positive");
-        }
-        Wallet wallet = walletRepository.findByMemberIdForUpdate(memberId)
-                .orElseThrow(() -> new WalletNotFoundException(memberId));
-        if (wallet.getBalance().compareTo(amount) < 0) {
-            log.warn("Withdrawal rejected - insufficient balance: memberId={}, amount={}, balance={}", memberId, amount, wallet.getBalance());
-            auditTx(memberId, AuditAction.WITHDRAWAL_INITIATED, AuditResult.FAILURE, null, amount, "insufficient balance");
-            throw new IllegalArgumentException("error.insufficient.balance");
-        }
-        wallet.setBalance(wallet.getBalance().subtract(amount));
-        walletRepository.save(wallet);
-
-        Transaction tx = new Transaction();
-        tx.setFromWalletId(wallet.getId());
-        tx.setType(TransactionType.WITHDRAW);
-        tx.setAmount(amount);
-        tx.setDescription(DESC_WITHDRAWAL);
-        tx.setStatus(TransactionStatus.COMPLETED);
-        transactionRepository.save(tx);
-        auditTx(memberId, AuditAction.WITHDRAWAL_COMPLETED, AuditResult.SUCCESS, tx.getId(), amount, null);
-        log.info("Withdrawal: memberId={}, amount={}, newBalance={}", memberId, amount, wallet.getBalance());
     }
 
     // ── 非同步提款（REQUEST_COMPLETED → COMPLETED / FAILED）─────────────────

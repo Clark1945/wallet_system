@@ -56,63 +56,7 @@ class WalletServiceTest {
         ReflectionTestUtils.setField(walletService, "self", walletService);
     }
 
-    // ── deposit ──────────────────────────────────────────────
-
-    @Test
-    void deposit_validAmount_increasesBalance() {
-        walletService.deposit(memberId, new BigDecimal("500.00"));
-
-        assertThat(wallet.getBalance()).isEqualByComparingTo("1500.00");
-        then(transactionRepository).should().save(argThat(tx ->
-                tx.getType() == TransactionType.DEPOSIT
-                && tx.getAmount().compareTo(new BigDecimal("500.00")) == 0));
-    }
-
-    @Test
-    void deposit_zeroAmount_throws() {
-        assertThatThrownBy(() -> walletService.deposit(memberId, BigDecimal.ZERO))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("error.amount.positive");
-    }
-
-    @Test
-    void deposit_negativeAmount_throws() {
-        assertThatThrownBy(() -> walletService.deposit(memberId, new BigDecimal("-1")))
-                .isInstanceOf(IllegalArgumentException.class);
-    }
-
     // ── withdraw ─────────────────────────────────────────────
-
-    @Test
-    void withdraw_sufficientBalance_decreasesBalance() {
-        walletService.withdraw(memberId, new BigDecimal("300.00"));
-
-        assertThat(wallet.getBalance()).isEqualByComparingTo("700.00");
-        then(transactionRepository).should().save(argThat(tx ->
-                tx.getType() == TransactionType.WITHDRAW));
-    }
-
-    @Test
-    void withdraw_exactBalance_succeeds() {
-        walletService.withdraw(memberId, new BigDecimal("1000.00"));
-
-        assertThat(wallet.getBalance()).isEqualByComparingTo("0.00");
-    }
-
-    @Test
-    void withdraw_insufficientBalance_throws() {
-        assertThatThrownBy(() -> walletService.withdraw(memberId, new BigDecimal("2000.00")))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("error.insufficient.balance");
-
-        assertThat(wallet.getBalance()).isEqualByComparingTo("1000.00");
-    }
-
-    @Test
-    void withdraw_zeroAmount_throws() {
-        assertThatThrownBy(() -> walletService.withdraw(memberId, BigDecimal.ZERO))
-                .isInstanceOf(IllegalArgumentException.class);
-    }
 
     @Test
     void initiateWithdrawal_insufficientBalance_throws() {
@@ -198,26 +142,6 @@ class WalletServiceTest {
     }
 
     // ── status set by sync operations ────────────────────────────
-
-    @Test
-    void deposit_setsStatusCompleted() {
-        given(transactionRepository.save(any())).willAnswer(inv -> inv.getArgument(0));
-
-        walletService.deposit(memberId, new BigDecimal("100.00"));
-
-        then(transactionRepository).should().save(argThat(tx ->
-                tx.getStatus() == TransactionStatus.COMPLETED));
-    }
-
-    @Test
-    void withdraw_setsStatusCompleted() {
-        given(transactionRepository.save(any())).willAnswer(inv -> inv.getArgument(0));
-
-        walletService.withdraw(memberId, new BigDecimal("100.00"));
-
-        then(transactionRepository).should().save(argThat(tx ->
-                tx.getStatus() == TransactionStatus.COMPLETED));
-    }
 
     @Test
     void transfer_setsStatusCompleted() {
