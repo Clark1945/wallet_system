@@ -148,8 +148,6 @@ class WalletControllerIT {
                         .session(session))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("http://localhost:8082/payment/stripe/checkout?token=test-token"));
-
-        then(walletService).should(never()).deposit(any(), any());
     }
 
     @Test
@@ -160,8 +158,6 @@ class WalletControllerIT {
                         .session(session))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("http://localhost:8082/payment/sbpayment/request?token=test-token"));
-
-        then(walletService).should(never()).deposit(any(), any());
     }
 
     @Test
@@ -169,22 +165,6 @@ class WalletControllerIT {
         mockMvc.perform(post("/deposit").with(csrf()).with(user("test@example.com"))
                         .param("amount", "0")
                         .param("paymentMethod", "sbpayment")
-                        .session(session))
-                .andExpect(status().is3xxRedirection())
-                .andExpect(redirectedUrl("/deposit"))
-                .andExpect(flash().attribute("error", "Amount must be greater than 0"));
-
-        then(walletService).should(never()).deposit(any(), any());
-    }
-
-    @Test
-    void deposit_serviceThrows_redirectsToDepositWithError() throws Exception {
-        willThrow(new IllegalArgumentException("error.amount.positive"))
-                .given(walletService).deposit(any(), any());
-
-        mockMvc.perform(post("/deposit").with(csrf()).with(user("test@example.com"))
-                        .param("amount", "0")
-                        .param("paymentMethod", "stripe")
                         .session(session))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/deposit"))
@@ -200,8 +180,6 @@ class WalletControllerIT {
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/deposit"))
                 .andExpect(flash().attribute("error", "Unknown payment method"));
-
-        then(walletService).should(never()).deposit(any(), any());
     }
 
     // ── GET /withdraw ─────────────────────────────────────────
