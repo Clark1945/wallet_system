@@ -38,4 +38,6 @@ application-local.yaml
 application-local.yml
 
 ### Claude Code ###
-.claude/
+# Ignore local Claude config, but keep shared project skills tracked
+.claude/*
+!.claude/skills/
