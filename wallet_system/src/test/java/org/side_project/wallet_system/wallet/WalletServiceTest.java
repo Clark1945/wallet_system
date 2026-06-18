@@ -7,6 +7,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.side_project.wallet_system.audit.AuditService;
 import org.side_project.wallet_system.notification.EmailPublisher;
 import org.side_project.wallet_system.transaction.Transaction;
 import org.side_project.wallet_system.transaction.TransactionRepository;
@@ -32,6 +33,7 @@ class WalletServiceTest {
     @Mock private TransactionRepository transactionRepository;
     @Mock private MockBankClient mockBankClient;
     @Mock private EmailPublisher emailPublisher;
+    @Mock private AuditService auditService;
     @InjectMocks private WalletService walletService;
 
     private UUID memberId;

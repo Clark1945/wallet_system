@@ -2,6 +2,10 @@ package org.side_project.wallet_system.auth.service;
 
 import jakarta.servlet.http.HttpSession;
 import lombok.RequiredArgsConstructor;
+import org.side_project.wallet_system.audit.AuditAction;
+import org.side_project.wallet_system.audit.AuditLog;
+import org.side_project.wallet_system.audit.AuditResult;
+import org.side_project.wallet_system.audit.AuditService;
 import org.side_project.wallet_system.auth.objects.Member;
 import org.side_project.wallet_system.auth.objects.OtpType;
 import org.side_project.wallet_system.config.SessionConstants;
@@ -21,6 +25,7 @@ public class AuthFlowService {
     private final PasswordResetService passwordResetService;
     private final MessageSource messageSource;
     private final OtpService otpService;
+    private final AuditService auditService;
 
     // ─── Login OTP ──────────────────────────────────────────────────────────────
 
@@ -67,6 +72,11 @@ public class AuthFlowService {
         session.setAttribute(SessionConstants.MEMBER_ID,   memberId.toString());
         session.setAttribute(SessionConstants.MEMBER_NAME, memberName);
         authService.updateLastLogin(memberId);
+        auditService.record(AuditLog.builder()
+                .actorId(memberId).actorEmail(authService.getEmailById(memberId))
+                .action(AuditAction.LOGIN_SUCCESS).result(AuditResult.SUCCESS)
+                .targetType("MEMBER").targetId(memberId.toString())
+                .detail("provider=LOCAL").build());
         return "redirect:/dashboard";
     }
 
@@ -146,6 +156,11 @@ public class AuthFlowService {
         }
 
         otpService.consumeToken(otpToken);
+        auditService.record(AuditLog.builder()
+                .actorId(memberId)
+                .action(AuditAction.REGISTER).result(AuditResult.SUCCESS)
+                .targetType("MEMBER").targetId(memberId.toString())
+                .build());
         redirectAttributes.addFlashAttribute("success",
                 messageSource.getMessage("flash.register.success", null, locale));
         return "redirect:/login";
@@ -216,6 +231,11 @@ public class AuthFlowService {
         session.removeAttribute(SessionConstants.RESET_MID);
         session.removeAttribute(SessionConstants.RESET_TOKEN);
         authService.resetPassword(mid, password);
+        auditService.record(AuditLog.builder()
+                .actorId(mid)
+                .action(AuditAction.PASSWORD_RESET).result(AuditResult.SUCCESS)
+                .targetType("MEMBER").targetId(mid.toString())
+                .build());
         redirectAttributes.addFlashAttribute("success",
                 messageSource.getMessage("flash.reset.success", null, locale));
         return "redirect:/login";

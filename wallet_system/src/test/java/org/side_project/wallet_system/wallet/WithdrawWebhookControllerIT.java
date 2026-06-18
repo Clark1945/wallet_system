@@ -42,6 +42,7 @@ class WithdrawWebhookControllerIT {
     @MockitoBean CustomOAuth2UserService oauth2UserService;
     @MockitoBean LoginSuccessHandler loginSuccessHandler;
     @MockitoBean LoginAttemptService loginAttemptService;
+    @MockitoBean org.side_project.wallet_system.audit.AuditService auditService;
 
     private String json(String transactionId, String result) {
         return String.format("{\"transactionId\":\"%s\",\"result\":\"%s\"}", transactionId, result);

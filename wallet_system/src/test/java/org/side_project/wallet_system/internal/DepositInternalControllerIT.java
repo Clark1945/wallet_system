@@ -47,6 +47,7 @@ class DepositInternalControllerIT {
     @MockitoBean CustomOAuth2UserService oauth2UserService;
     @MockitoBean LoginSuccessHandler loginSuccessHandler;
     @MockitoBean LoginAttemptService loginAttemptService;
+    @MockitoBean org.side_project.wallet_system.audit.AuditService auditService;
 
     // ── X-Internal-Secret authentication ─────────────────────────
 

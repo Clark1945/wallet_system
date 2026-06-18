@@ -4,6 +4,10 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.side_project.wallet_system.audit.AuditAction;
+import org.side_project.wallet_system.audit.AuditLog;
+import org.side_project.wallet_system.audit.AuditResult;
+import org.side_project.wallet_system.audit.AuditService;
 import org.side_project.wallet_system.auth.objects.AuthProvider;
 import org.side_project.wallet_system.auth.oauth.CustomOAuth2UserService;
 import org.side_project.wallet_system.auth.oauth.CustomUserDetails;
@@ -88,7 +92,8 @@ public class SecurityConfig {
     public SecurityFilterChain filterChain(HttpSecurity http,
                                            CustomOAuth2UserService oauth2UserService,
                                            LoginSuccessHandler loginSuccessHandler,
-                                           LoginAttemptService loginAttemptService) throws Exception {
+                                           LoginAttemptService loginAttemptService,
+                                           AuditService auditService) throws Exception {
         http
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/login", "/login/otp", "/login/otp/resend",
@@ -103,7 +108,7 @@ public class SecurityConfig {
             .formLogin(form -> form
                 .loginPage("/login")
                 .usernameParameter("email")
-                .failureHandler(loginFailureHandler(loginAttemptService))
+                .failureHandler(loginFailureHandler(loginAttemptService, auditService))
                 .successHandler(loginSuccessHandler)
                 .permitAll()
             )
@@ -130,16 +135,26 @@ public class SecurityConfig {
         return http.build();
     }
 
-    private AuthenticationFailureHandler loginFailureHandler(LoginAttemptService loginAttemptService) {
+    private AuthenticationFailureHandler loginFailureHandler(LoginAttemptService loginAttemptService,
+                                                             AuditService auditService) {
         return (request, response, exception) -> {
+            String email = request.getParameter("email");
+            String normalizedEmail = (email != null && !email.isBlank()) ? email.strip().toLowerCase() : null;
             if (exception instanceof LockedException) {
+                auditService.record(AuditLog.builder()
+                        .actorEmail(normalizedEmail)
+                        .action(AuditAction.LOGIN_FAILURE).result(AuditResult.FAILURE)
+                        .detail("account locked").build());
                 response.sendRedirect("/login?locked");
                 return;
             }
-            String email = request.getParameter("email");
-            if (email != null && !email.isBlank()) {
-                loginAttemptService.recordFailure(email.strip().toLowerCase());
+            if (normalizedEmail != null) {
+                loginAttemptService.recordFailure(normalizedEmail);
             }
+            auditService.record(AuditLog.builder()
+                    .actorEmail(normalizedEmail)
+                    .action(AuditAction.LOGIN_FAILURE).result(AuditResult.FAILURE)
+                    .detail("bad credentials").build());
             response.sendRedirect("/login?error");
         };
     }

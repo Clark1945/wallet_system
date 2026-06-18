@@ -5,6 +5,10 @@ import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.side_project.wallet_system.audit.AuditAction;
+import org.side_project.wallet_system.audit.AuditLog;
+import org.side_project.wallet_system.audit.AuditResult;
+import org.side_project.wallet_system.audit.AuditService;
 import org.side_project.wallet_system.auth.service.LoginAttemptService;
 import org.side_project.wallet_system.auth.service.OtpService;
 import org.side_project.wallet_system.auth.objects.OtpType;
@@ -25,6 +29,7 @@ public class LoginSuccessHandler implements AuthenticationSuccessHandler {
     private final OtpService otpService;
     private final AuthService authService;
     private final LoginAttemptService loginAttemptService;
+    private final AuditService auditService;
 
     @Override
     public void onAuthenticationSuccess(HttpServletRequest request,
@@ -35,8 +40,10 @@ public class LoginSuccessHandler implements AuthenticationSuccessHandler {
         if (principal instanceof CustomUserDetails ud) {
             UUID memberId = ud.getMemberId();
             String email  = ud.getUsername();
-            log.info("Login success (LOCAL): memberId={}", memberId);
+            log.info("Login credentials verified (LOCAL): memberId={}", memberId);
             loginAttemptService.clearFailures(email);
+            // LOGIN_SUCCESS is audited only once the mandatory OTP second factor passes
+            // (AuthFlowService.verifyLoginOtp) — password verification alone is not a completed login.
 
             try {
                 authService.sendLoginOtp(memberId, email);
@@ -56,6 +63,11 @@ public class LoginSuccessHandler implements AuthenticationSuccessHandler {
             session.setAttribute(SessionConstants.MEMBER_ID,   memberId.toString());
             session.setAttribute(SessionConstants.MEMBER_NAME, memberName);
             authService.updateLastLogin(memberId);
+            auditService.record(AuditLog.builder()
+                    .actorId(memberId).actorEmail(authService.getEmailById(memberId))
+                    .action(AuditAction.LOGIN_SUCCESS).result(AuditResult.SUCCESS)
+                    .targetType("MEMBER").targetId(memberId.toString())
+                    .detail("provider=GOOGLE").build());
             response.sendRedirect("/dashboard");
 
         } else {

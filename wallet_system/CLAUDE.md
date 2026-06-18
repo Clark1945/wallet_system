@@ -203,6 +203,17 @@ The fallback returns the raw key if no translation exists.
 - `/transfer` — 10 requests / minute
 - `/withdraw` — 5 requests / minute
 
+### Audit Log
+
+`audit/` package records an append-only trail of security- and money-relevant actions to the `audit_logs` table (Flyway `V3`).
+
+- `AuditService.record(AuditLog)` is the single entry point. Two guarantees:
+  - **Survives business rollback** — the actual insert (`AuditService.persist`) runs in a new transaction (`@Transactional(propagation = REQUIRES_NEW)`, reached via lazy self-injection), so a failed/refunded operation is still recorded.
+  - **Never breaks the caller** — any failure to write the audit row is logged and swallowed.
+- Each row captures actor (`actorId`/`actorEmail`, null for system/anonymous events such as webhooks or failed logins), `action`, `result`, `targetType`/`targetId`, `amount`, `detail`, and request context (`ipAddress` from the first `X-Forwarded-For` hop, `userAgent`, `traceId` from MDC) auto-enriched from `RequestContextHolder` when a request is bound.
+- Wired into: every `WalletService` money path (deposit/withdrawal/transfer — success, rejection, and refund), login success (`LoginSuccessHandler`), login failure (`SecurityConfig` failure handler), registration activation and password reset (`AuthFlowService`).
+- `AuditAction` enum covers `LOGIN_SUCCESS`/`LOGIN_FAILURE`/`REGISTER`/`PASSWORD_RESET` and `DEPOSIT_*`/`WITHDRAWAL_*`/`TRANSFER`.
+
 ### OpenAPI / Swagger
 
 Spec-first: `src/main/resources/static/openapi.yaml` is the source of truth. Swagger UI at `/swagger-ui.html`.

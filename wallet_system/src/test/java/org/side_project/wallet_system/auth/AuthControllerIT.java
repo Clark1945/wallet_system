@@ -21,6 +21,7 @@ import org.springframework.context.annotation.Import;
 import org.springframework.mock.web.MockHttpSession;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import org.side_project.wallet_system.audit.AuditService;
 import org.side_project.wallet_system.config.SecurityConfig;
 
 import java.util.UUID;
@@ -52,6 +53,8 @@ class AuthControllerIT {
     LoginAttemptService loginAttemptService;
     @MockitoBean
     RateLimiterService rateLimiterService;
+    @MockitoBean
+    AuditService auditService;
 
     @BeforeEach
     void setUp() {
