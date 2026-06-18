@@ -33,6 +33,11 @@ public class GlobalExceptionHandler {
     public void handleNoResource() {
     }
 
+    @ExceptionHandler(NotAuthenticatedException.class)
+    public String handleNotAuthenticated() {
+        return "redirect:/login";
+    }
+
     @ExceptionHandler(Exception.class)
     public String handleUnexpected(Exception ex, HttpServletRequest request) {
         log.error("Unexpected error on {}", request.getRequestURI(), ex);

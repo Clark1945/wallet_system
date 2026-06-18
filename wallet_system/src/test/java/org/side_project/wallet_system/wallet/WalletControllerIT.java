@@ -99,6 +99,16 @@ class WalletControllerIT {
     }
 
     @Test
+    void dashboard_authenticatedButNoSessionMember_redirectsToLogin() throws Exception {
+        // Spring Security authenticates the request (e.g. password verified) but the login OTP
+        // step has not run, so no memberId is in the session. The @CurrentMember resolver must
+        // reject this via NotAuthenticatedException → GlobalExceptionHandler → /login.
+        mockMvc.perform(get("/dashboard").with(user("test@example.com")))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/login"));
+    }
+
+    @Test
     void dashboard_withSession_returnsOkAndDashboardView() throws Exception {
         mockMvc.perform(get("/dashboard")
                         .with(user("test@example.com"))
