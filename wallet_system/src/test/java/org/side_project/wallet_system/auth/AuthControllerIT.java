@@ -21,6 +21,7 @@ import org.springframework.context.annotation.Import;
 import org.springframework.mock.web.MockHttpSession;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import org.side_project.wallet_system.audit.AuditAction;
 import org.side_project.wallet_system.audit.AuditService;
 import org.side_project.wallet_system.config.SecurityConfig;
 
@@ -338,5 +339,44 @@ class AuthControllerIT {
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/login"))
                 .andExpect(flash().attributeExists("error"));
+    }
+
+    // ─── Login failure auditing (SecurityConfig failure handler) ──────────────────
+
+    @Test
+    void formLogin_badCredentials_redirectsToErrorAndAuditsFailure() throws Exception {
+        given(loginAttemptService.isLocked("ghost@example.com")).willReturn(false);
+        given(memberRepository.findByEmail("ghost@example.com")).willReturn(java.util.Optional.empty());
+
+        mockMvc.perform(post("/login").with(csrf())
+                        .param("email", "ghost@example.com")
+                        .param("password", "wrong-password"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/login?error"));
+
+        then(loginAttemptService).should().recordFailure("ghost@example.com");
+        then(auditService).should().record(argThat(a ->
+                a.getAction() == AuditAction.LOGIN_FAILURE
+                        && "bad credentials".equals(a.getDetail())
+                        && "ghost@example.com".equals(a.getActorEmail())));
+    }
+
+    @Test
+    void formLogin_lockedAccount_stillAuditsLoginFailure() throws Exception {
+        // NOTE: DaoAuthenticationProvider wraps the LockedException thrown by the
+        // UserDetailsService into InternalAuthenticationServiceException, so the handler's
+        // LockedException branch does not fire and the redirect is /login?error (not ?locked).
+        // Either way the attempt must be audited as a LOGIN_FAILURE.
+        given(loginAttemptService.isLocked("locked@example.com")).willReturn(true);
+
+        mockMvc.perform(post("/login").with(csrf())
+                        .param("email", "locked@example.com")
+                        .param("password", "whatever"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/login?error"));
+
+        then(auditService).should().record(argThat(a ->
+                a.getAction() == AuditAction.LOGIN_FAILURE
+                        && "locked@example.com".equals(a.getActorEmail())));
     }
 }

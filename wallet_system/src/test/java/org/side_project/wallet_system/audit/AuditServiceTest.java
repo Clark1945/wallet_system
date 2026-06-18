@@ -14,6 +14,8 @@ import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
+import java.time.LocalDateTime;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatNoException;
 import static org.mockito.ArgumentMatchers.any;
@@ -110,5 +112,57 @@ class AuditServiceTest {
     void record_nullEntry_isNoOp() {
         auditService.record(null);
         verifyNoInteractions(auditLogRepository);
+    }
+
+    @Test
+    void record_doesNotOverwritePresetContextFields() {
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.addHeader("X-Forwarded-For", "1.1.1.1");
+        request.addHeader("User-Agent", "request-ua");
+        RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(request));
+        MDC.put("traceId", "request-trace");
+
+        AuditLog entry = AuditLog.builder()
+                .action(AuditAction.LOGIN_SUCCESS).result(AuditResult.SUCCESS)
+                .ipAddress("9.9.9.9").userAgent("preset-ua").traceId("preset-trace")
+                .build();
+
+        auditService.record(entry);
+
+        ArgumentCaptor<AuditLog> captor = ArgumentCaptor.forClass(AuditLog.class);
+        verify(auditLogRepository).save(captor.capture());
+        AuditLog saved = captor.getValue();
+        assertThat(saved.getIpAddress()).isEqualTo("9.9.9.9");      // preset kept
+        assertThat(saved.getUserAgent()).isEqualTo("preset-ua");    // preset kept
+        assertThat(saved.getTraceId()).isEqualTo("preset-trace");   // preset kept
+    }
+
+    @Test
+    void record_keepsShortUserAgentUntruncated() {
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.addHeader("User-Agent", "short-ua");
+        RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(request));
+
+        AuditLog entry = AuditLog.builder()
+                .action(AuditAction.TRANSFER).result(AuditResult.SUCCESS).build();
+        auditService.record(entry);
+
+        ArgumentCaptor<AuditLog> captor = ArgumentCaptor.forClass(AuditLog.class);
+        verify(auditLogRepository).save(captor.capture());
+        assertThat(captor.getValue().getUserAgent()).isEqualTo("short-ua");
+    }
+
+    @Test
+    void onCreate_setsCreatedAtWhenNull_andPreservesWhenPresent() {
+        AuditLog fresh = AuditLog.builder()
+                .action(AuditAction.REGISTER).result(AuditResult.SUCCESS).build();
+        fresh.onCreate();
+        assertThat(fresh.getCreatedAt()).isNotNull();
+
+        LocalDateTime fixed = LocalDateTime.of(2020, 1, 1, 0, 0);
+        AuditLog preset = AuditLog.builder()
+                .action(AuditAction.REGISTER).result(AuditResult.SUCCESS).createdAt(fixed).build();
+        preset.onCreate();
+        assertThat(preset.getCreatedAt()).isEqualTo(fixed);
     }
 }

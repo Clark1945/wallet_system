@@ -25,6 +25,7 @@ import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.*;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.never;
 
 @ExtendWith(MockitoExtension.class)
 class WalletServiceTest {
@@ -113,6 +114,17 @@ class WalletServiceTest {
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
+    @Test
+    void initiateWithdrawal_insufficientBalance_throws() {
+        assertThatThrownBy(() -> walletService.initiateWithdrawal(
+                memberId, new BigDecimal("2000.00"), "012", "00012345678", null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("error.insufficient.balance");
+
+        assertThat(wallet.getBalance()).isEqualByComparingTo("1000.00");
+        then(transactionRepository).should(never()).save(any());
+    }
+
     // ── transfer ─────────────────────────────────────────────
 
     @Test
@@ -155,6 +167,28 @@ class WalletServiceTest {
         assertThatThrownBy(() -> walletService.transfer(memberId, "ToCode000001", new BigDecimal("9999")))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("error.insufficient.balance");
+    }
+
+    @Test
+    void transfer_insufficientBalanceAfterLock_throws() {
+        // Pre-lock read sees enough balance, but the freshly-locked row has less → post-lock recheck rejects.
+        Wallet toWallet = new Wallet();
+        toWallet.setId(UUID.randomUUID());
+        toWallet.setBalance(BigDecimal.ZERO);
+        toWallet.setWalletCode("ToCode000001");
+        given(walletRepository.findByWalletCode("ToCode000001")).willReturn(Optional.of(toWallet));
+
+        Wallet lockedFrom = new Wallet();
+        lockedFrom.setId(wallet.getId());
+        lockedFrom.setBalance(new BigDecimal("50.00"));
+        lockedFrom.setWalletCode(wallet.getWalletCode());
+        given(walletRepository.findByIdsForUpdate(any())).willReturn(List.of(lockedFrom, toWallet));
+
+        assertThatThrownBy(() -> walletService.transfer(memberId, "ToCode000001", new BigDecimal("500.00")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("error.insufficient.balance");
+
+        then(transactionRepository).should(never()).save(any());
     }
 
     @Test
