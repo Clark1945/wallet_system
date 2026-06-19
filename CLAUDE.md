@@ -4,20 +4,23 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Monorepo Structure
 
-Four Spring Boot services:
+Four Spring Boot services, fronted by an nginx reverse proxy:
 - **`wallet_system/`** — main wallet application (port 8080); detailed guidance in `wallet_system/CLAUDE.md`
 - **`mock-bank/`** — simulated bank withdrawal endpoint (port 8081)
 - **`payment-service/`** — Stripe + SBPS payment gateway handler (port 8082)
 - **`email-service/`** — async email dispatcher (port 8083); consumes RabbitMQ messages and sends via SMTP
+- **`nginx/`** — reverse proxy and single browser-facing HTTP entry point (port 80); routes `/payment/**` to payment-service and everything else to the wallet app. See `nginx/nginx.conf`.
 
 ## Build & Run Commands
 
 ```bash
 # Full stack — run from repo root
 # Requires wallet_system/.env (copy from .env.example and fill in credentials)
-# Starts: PostgreSQL, Redis, RabbitMQ, mock-bank, wallet app, payment-service, email-service, Loki, Promtail, Grafana
+# Starts: nginx, PostgreSQL, Redis, RabbitMQ, mock-bank, wallet app, payment-service,
+#         email-service, Prometheus, postgres-exporter, redis-exporter, Loki, Promtail, Grafana
 docker compose up --build
-# wallet app: http://localhost:8080  |  Grafana: http://localhost:3000
+# Entry point (via nginx): http://localhost  |  Grafana: http://localhost:3000
+# The wallet app's own port 8080 is also published for direct access during development.
 
 # email-service only
 cd email-service
@@ -68,12 +71,13 @@ Deposits span wallet_system and payment-service:
 
 ## Withdrawal Flow (Cross-Service)
 
-1. User POSTs to `/withdraw` → `WalletService.withdraw()` deducts balance, creates `Transaction` with status `REQUEST_COMPLETED`, then calls `HttpClient.sendAsync()` to `POST mock-bank:8081/api/withdraw`.
+1. User POSTs to `/withdraw` → `WalletService.initiateWithdrawal()` deducts balance, creates `Transaction` with status `REQUEST_COMPLETED`, then asynchronously (`CompletableFuture.runAsync`) calls `MockBankClient.sendWithdrawRequest()` to `POST mock-bank:8081/api/withdraw`.
 2. mock-bank responds `200 OK` immediately, then fires a callback to `POST wallet_system:8080/withdraw/webhook` after a 3–8 second random delay.
 3. `WithdrawWebhookController` verifies `X-Webhook-Signature: sha256=<hex>` (HMAC-SHA256 of raw body, key = `WITHDRAW_WEBHOOK_SECRET`), then sets `Transaction.status = COMPLETED` on SUCCESS or `FAILED` + refunds balance on FAIL.
-4. **Timeout safety:** `TransactionTimeoutJob` (`@Scheduled(fixedDelay = 60_000)`) runs every 60 seconds and refunds any `PENDING` or `REQUEST_COMPLETED` transaction older than 5 minutes.
+4. **Circuit breaker:** `MockBankClient.sendWithdrawRequest()` is wrapped with resilience4j `@CircuitBreaker(name = "mockBankWithdraw")`; mock-bank 5xx responses count as failures. When the circuit is OPEN the fallback throws `MockBankUnavailableException`, and `WalletService` refunds the withdrawal immediately instead of waiting for the timeout job.
+5. **Timeout safety:** `TransactionTimeoutJob` (`@Scheduled(fixedDelay = 60_000)`) runs every 60 seconds and refunds any `PENDING` or `REQUEST_COMPLETED` transaction older than 5 minutes.
 
-Transaction status lifecycle: `PENDING` → `REQUEST_COMPLETED` → `COMPLETED` (or `FAILED` on timeout)
+Transaction status lifecycle: `PENDING` → `REQUEST_COMPLETED` → `COMPLETED` (or `FAILED` on timeout). Status transitions use an atomic CAS update (`TransactionRepository.compareAndSetStatus`) so concurrent/duplicate webhook or timeout calls can never double-credit or double-refund.
 
 ## mock-bank
 
@@ -130,3 +134,7 @@ See `wallet_system/CLAUDE.md` for complete details.
 ### Transaction Filtering & Pagination
 
 `TransactionSpec` builds JPA `Specification` predicates for type (`DEPOSIT`/`WITHDRAW`/`TRANSFER`) and date range. `TransactionRepository` extends `JpaSpecificationExecutor`. Controllers pass a `Pageable` (default 10 per page, ordered by `createdAt` DESC).
+
+### Audit Log
+
+The `audit/` package writes an append-only trail of auth and money events to the `audit_logs` table. `AuditService.record()` persists in a new transaction (`REQUIRES_NEW`) so rows survive business rollbacks, and swallows its own failures so it never breaks the caller. See `wallet_system/CLAUDE.md` for the full field list and wiring.
