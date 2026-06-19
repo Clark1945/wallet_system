@@ -77,7 +77,7 @@ PAYMENT_SERVICE_BASE_URL=http://localhost:8082
 - `wallet/` — `WalletController`, `WalletService`, `Wallet` (JPA entity), `WalletRepository`, `WalletNotFoundException`, `WithdrawWebhookController`
 - `transaction/` — `Transaction` (JPA entity), `TransactionRepository`, `TransactionType` (enum: `DEPOSIT`/`WITHDRAW`/`TRANSFER`), `TransactionStatus` (enum: `PENDING`/`REQUEST_COMPLETED`/`COMPLETED`/`FAILED`), `TransactionSpec` (JPA Criteria filtering), `TransactionTimeoutJob`
 - `internal/` — `DepositInternalController` (`@RestController`, `/internal/**`; called only by payment-service), `PaymentTokenService` (creates/consumes one-time tokens in Redis with key `payment_token:{uuid}`, 15-min TTL); `dto/` — shared record types for the internal API
-- `config/` — `SecurityConfig`, `AppConfig` (`@EnableAsync`, `HttpClient` bean), `WebConfig` (`AcceptHeaderLocaleResolver` + `/uploads/**` resource handler), `RedisConfig`, `TraceIdFilter`, `GlobalExceptionHandler` (`@ControllerAdvice`), `SessionConstants` (session key constants), `SessionUtils` (helper to extract `UUID` memberId from session)
+- `config/` — `SecurityConfig`, `AppConfig` (`@EnableAsync`, `HttpClient` bean), `WebConfig` (`AcceptHeaderLocaleResolver` + `/uploads/**` resource handler + registers `CurrentMemberArgumentResolver`), `RedisConfig`, `TraceIdFilter`, `GlobalExceptionHandler` (`@ControllerAdvice`), `SessionConstants` (session key constants), `SessionUtils` (helper to extract `UUID` memberId from session), `@CurrentMember` + `CurrentMemberArgumentResolver` (inject the logged-in member's `UUID` into controller methods; throws `NotAuthenticatedException` if no session member is present)
 
 This is a **server-rendered MVC app**, not a REST API. All controllers are `@Controller` and return Thymeleaf view names. Flash attributes carry success/error messages between redirects.
 
@@ -91,7 +91,7 @@ Spring Security handles all authentication via `SecurityConfig`. Five login meth
 - **Password reset:** `PasswordResetService` generates a UUID token (15-minute TTL in Redis), emails a reset link. Token is single-use; the mid+token is temporarily stored in session during the reset form flow.
 - **Account lockout:** `LoginAttemptService` tracks failed attempts in Redis (key `login_attempts:{email}`); after 5 failures, account locks for 15 minutes.
 
-`LoginSuccessHandler` fires after both form/OAuth2 flows — it stores `memberId` (UUID string) and `memberName` in `HttpSession` via `SessionConstants.MEMBER_ID` / `SessionConstants.MEMBER_NAME`, then redirects to `/dashboard`. Controllers retrieve these via `SessionUtils.getMemberId(session)`.
+`LoginSuccessHandler` fires after both form/OAuth2 flows — it stores `memberId` (UUID string) and `memberName` in `HttpSession` via `SessionConstants.MEMBER_ID` / `SessionConstants.MEMBER_NAME`, then redirects to `/dashboard`. Controllers obtain the logged-in member's id by declaring a `@CurrentMember UUID memberId` parameter, resolved by `CurrentMemberArgumentResolver` (throws `NotAuthenticatedException` if no session member is present). `SessionUtils.getMemberId(session)` remains the lower-level helper the resolver delegates to.
 
 `Member.authProvider` (`LOCAL` or `GOOGLE`) distinguishes account origin; `password` is nullable for OAuth2 members. `UserDetailsService` bean filters for `LOCAL` + `ACTIVE` members only.
 
@@ -130,10 +130,12 @@ Fields beyond basics: `nickname`, `phone`, `bio`, `birthday` (LocalDate), `avata
 3. On payment success, payment-service calls `POST /internal/deposit/complete` or `POST /internal/deposit/complete-by-external`. All `/internal/**` calls require `X-Internal-Secret` header.
 
 **Async withdrawal flow:**
-1. `WalletService.withdraw()` deducts balance, creates a `Transaction` with status `REQUEST_COMPLETED`, fires `HttpClient.sendAsync()` to `POST mock-bank:8081/api/withdraw`.
+1. `WalletService.initiateWithdrawal()` deducts balance, creates a `Transaction` with status `REQUEST_COMPLETED`, then on a `CompletableFuture.runAsync()` (propagating the MDC `traceId`) calls `MockBankClient.sendWithdrawRequest()` → `POST mock-bank:8081/api/withdraw`.
 2. mock-bank responds `200 OK` immediately, then calls back `POST /withdraw/webhook` after a 3–8 second delay.
 3. `WithdrawWebhookController` verifies `X-Webhook-Signature: sha256=<hex>` (HMAC-SHA256 of raw request body, key = `WITHDRAW_WEBHOOK_SECRET`), then processes `{"transactionId":"...", "result":"SUCCESS"/"FAIL"}`: SUCCESS → `COMPLETED`; FAIL → `FAILED` + balance refunded.
-4. `TransactionTimeoutJob` (`@Scheduled(fixedDelay = 60_000)`) runs every 60 seconds; any `PENDING` or `REQUEST_COMPLETED` transaction older than 5 minutes is set to `FAILED` and balance is refunded.
+4. **Circuit breaker:** `MockBankClient.sendWithdrawRequest()` is wrapped with resilience4j `@CircuitBreaker(name = "mockBankWithdraw")`; it treats mock-bank `5xx` responses as failures (the JDK `HttpClient` does not throw on error status). When the circuit is OPEN the fallback throws `MockBankUnavailableException`, and `initiateWithdrawal` calls `self.failWithdrawal()` to refund immediately rather than waiting for the timeout job.
+5. `TransactionTimeoutJob` (`@Scheduled(fixedDelay = 60_000)`) runs every 60 seconds; any `PENDING` or `REQUEST_COMPLETED` transaction older than 5 minutes is set to `FAILED` and balance is refunded.
+6. **Atomic transitions:** all status changes (complete/fail for both deposit and withdrawal) go through `TransactionRepository.compareAndSetStatus(id, expected, new)`, a CAS-style `@Modifying` update. Only the caller that wins the CAS proceeds to credit/refund, so concurrent or duplicate webhook + timeout calls can never double-credit or double-refund.
 
 ### Internal Deposit API (`/internal/**`)
 
@@ -145,7 +147,7 @@ Exposed exclusively for payment-service. Protected by `X-Internal-Secret` header
 - `POST /internal/deposit/complete` — marks transaction `COMPLETED`, credits wallet
 - `POST /internal/deposit/complete-by-external` — looks up transaction by `paymentExternalId`, then completes; returns `404` if not found
 
-Idempotency: `completeDeposit()` checks the transaction is still `PENDING` before acting; duplicate calls are silently skipped.
+Idempotency: `completeDeposit()` atomically claims the transaction via `TransactionRepository.compareAndSetStatus(id, PENDING, COMPLETED)`; only the winning call credits the wallet, so duplicate calls are silently skipped.
 
 ### Error Handling
 
@@ -227,3 +229,4 @@ Spec-first: `src/main/resources/static/openapi.yaml` is the source of truth. Swa
 - Controller ITs validate redirects, flash attributes, and model attributes via MockMvc result matchers
 - `WalletControllerIT` sets up session state via `MockHttpSession` with a `memberId` attribute
 - `ProfileServiceTest` uses `@TempDir` and `ReflectionTestUtils.setField()` to inject `uploadDir`
+- **CI coverage gate:** the GitHub Actions workflow enforces ≥80% JaCoCo line coverage on *new/changed* code (diff gate). New code paths need accompanying tests or the build fails.
