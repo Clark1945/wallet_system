@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+#
+# Pre-commit gate: run the wallet_system test suite before a commit is created,
+# so you never commit on top of failing tests.
+#
+# Coverage is intentionally NOT checked here — the new-code coverage script diffs
+# committed history (base...HEAD), which doesn't yet include the changes being
+# committed. Coverage is enforced at pre-push (and in CI) instead.
+#
+# Skips automatically when no wallet_system/src changes are staged.
+# To bypass in an emergency:  git commit --no-verify
+set -uo pipefail
+
+ROOT="$(git rev-parse --show-toplevel)"
+cd "$ROOT" || exit 1
+
+# Only run when wallet_system source is actually part of this commit.
+STAGED="$(git diff --cached --name-only -- 'wallet_system/src/' 2>/dev/null)"
+if [ -z "$STAGED" ]; then
+  echo "[pre-commit] No staged wallet_system/src changes — skipping tests."
+  exit 0
+fi
+
+# JaCoCo 0.8.12 cannot instrument Java 25; prefer the SDKMAN default (Java 17).
+if [ -s "$HOME/.sdkman/bin/sdkman-init.sh" ]; then
+  # shellcheck disable=SC1091
+  source "$HOME/.sdkman/bin/sdkman-init.sh"
+fi
+
+echo "[pre-commit] Running wallet_system tests..."
+if ! ( cd "$ROOT/wallet_system" && ./mvnw -q test ); then
+  echo "[pre-commit] ❌ Tests failed — commit aborted. (override: git commit --no-verify)"
+  exit 1
+fi
+
+echo "[pre-commit] ✅ Tests pass."
+exit 0

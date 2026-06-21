@@ -19,11 +19,14 @@ Version-controlled hooks live in `.githooks/`. Enable them **once per clone**:
 git config core.hooksPath .githooks
 ```
 
-`.githooks/pre-push` runs the wallet_system test suite + the new-code coverage check
-(the same gate as CI / the `coverage-gate` skill) before a push, and aborts the push on
-failure. It auto-skips when the push contains no `wallet_system/src` changes, and uses the
-SDKMAN-default JDK (keep it on Java 17 — JaCoCo 0.8.12 cannot instrument Java 25). Bypass in
-an emergency with `git push --no-verify`.
+Two hooks, both auto-skipping when no `wallet_system/src` changes are involved, and both
+using the SDKMAN-default JDK (keep it on Java 17 — JaCoCo 0.8.12 cannot instrument Java 25):
+
+- **`.githooks/pre-commit`** — runs the wallet_system test suite before a commit is created,
+  so you never commit on top of failing tests. Bypass with `git commit --no-verify`.
+- **`.githooks/pre-push`** — runs the test suite + the new-code coverage check (the same gate
+  as CI / the `coverage-gate` skill) before a push. Coverage lives here, not in pre-commit,
+  because it diffs committed history (`base...HEAD`). Bypass with `git push --no-verify`.
 
 ## Build & Run Commands
 
