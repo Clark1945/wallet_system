@@ -11,6 +11,20 @@ Four Spring Boot services, fronted by an nginx reverse proxy:
 - **`email-service/`** — async email dispatcher (port 8083); consumes RabbitMQ messages and sends via SMTP
 - **`nginx/`** — reverse proxy and single browser-facing HTTP entry point (port 80); routes `/payment/**` to payment-service and everything else to the wallet app. See `nginx/nginx.conf`.
 
+## Git Hooks (pre-push gate)
+
+Version-controlled hooks live in `.githooks/`. Enable them **once per clone**:
+
+```bash
+git config core.hooksPath .githooks
+```
+
+`.githooks/pre-push` runs the wallet_system test suite + the new-code coverage check
+(the same gate as CI / the `coverage-gate` skill) before a push, and aborts the push on
+failure. It auto-skips when the push contains no `wallet_system/src` changes, and uses the
+SDKMAN-default JDK (keep it on Java 17 — JaCoCo 0.8.12 cannot instrument Java 25). Bypass in
+an emergency with `git push --no-verify`.
+
 ## Build & Run Commands
 
 ```bash

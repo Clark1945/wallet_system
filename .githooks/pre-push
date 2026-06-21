@@ -1,0 +1,51 @@
+#!/usr/bin/env bash
+#
+# Pre-push gate for wallet_system: run the test suite + the new-code coverage
+# check (the same gate CI and the coverage-gate skill enforce) before allowing
+# a push. Mirrors: cd wallet_system && ./mvnw test jacoco:report
+#                  python3 scripts/check_new_code_coverage.py --base <base>
+#
+# Version-controlled and shared via:  git config core.hooksPath .githooks
+# Skips automatically when the push contains no wallet_system source changes,
+# so docs-only / skill-only pushes stay fast.
+#
+# To bypass in an emergency:  git push --no-verify
+set -uo pipefail
+
+ROOT="$(git rev-parse --show-toplevel)"
+cd "$ROOT" || exit 1
+
+# Base to diff against (prefer the remote mainline; fall back to local master).
+BASE="origin/master"
+git rev-parse --verify --quiet "$BASE" >/dev/null || BASE="master"
+
+# Skip the heavy checks unless wallet_system source actually changed in this push.
+CHANGED="$(git diff --name-only "${BASE}...HEAD" -- 'wallet_system/src/' 2>/dev/null)"
+if [ -z "$CHANGED" ]; then
+  echo "[pre-push] No wallet_system/src changes vs ${BASE} — skipping tests."
+  exit 0
+fi
+
+# JaCoCo 0.8.12 cannot instrument Java 25; prefer the SDKMAN default (Java 17).
+if [ -s "$HOME/.sdkman/bin/sdkman-init.sh" ]; then
+  # shellcheck disable=SC1091
+  source "$HOME/.sdkman/bin/sdkman-init.sh"
+fi
+
+echo "[pre-push] Running tests + JaCoCo report (this may take a minute)..."
+if ! ( cd "$ROOT/wallet_system" && ./mvnw -q test jacoco:report ); then
+  echo "[pre-push] ❌ Tests failed — push aborted. (override: git push --no-verify)"
+  exit 1
+fi
+
+PY="python"
+command -v python >/dev/null 2>&1 || PY="python3"
+
+echo "[pre-push] Checking new-code coverage (>= 80%) vs ${BASE}..."
+if ! "$PY" "$ROOT/scripts/check_new_code_coverage.py" --base "$BASE"; then
+  echo "[pre-push] ❌ New-code coverage below 80% — push aborted. (override: git push --no-verify)"
+  exit 1
+fi
+
+echo "[pre-push] ✅ Tests pass and new-code coverage OK — proceeding with push."
+exit 0
