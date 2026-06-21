@@ -1,0 +1,15 @@
+# Profile for Testcontainers integration tests: real PostgreSQL + real Flyway migrations.
+# The datasource values below are placeholders only — @ServiceConnection injects the
+# actual container connection at runtime. They exist so property binding doesn't fail
+# on the base application.yaml's ${DB_URL}/${DB_USERNAME}/${DB_PASSWORD} placeholders.
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/placeholder
+    username: placeholder
+    password: placeholder
+  flyway:
+    enabled: true
+  jpa:
+    hibernate:
+      # Validate that the JPA entities match the Flyway-created schema (catches drift).
+      ddl-auto: validate
