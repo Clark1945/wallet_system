@@ -22,6 +22,18 @@ services:
       timeout: 5s
       retries: 5
 
+  mongo:
+    image: mongo:7
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   rabbitmq:
     image: rabbitmq:3-management
     ports:
@@ -207,6 +219,24 @@ services:
       rabbitmq:
         condition: service_healthy
 
+  audit-service:
+    build:
+      context: ./audit-service
+    environment:
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: ${RABBITMQ_USER}
+      RABBITMQ_PASS: ${RABBITMQ_PASS}
+      MONGODB_URI: mongodb://mongo:27017/audit
+    volumes:
+      - audit_service_logs:/app/logs
+    restart: on-failure
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      mongo:
+        condition: service_healthy
+
   grafana:
     image: grafana/grafana:11.0.0
     ports:
@@ -228,6 +258,8 @@ volumes:
   mock_bank_logs:
   payment_service_logs:
   email_service_logs:
+  audit_service_logs:
+  mongo_data:
   loki_data:
   grafana_data:
   prometheus_data:

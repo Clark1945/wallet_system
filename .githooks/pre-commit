@@ -9,7 +9,8 @@
 #
 # Skips automatically when no wallet_system/src changes are staged.
 # To bypass in an emergency:  git commit --no-verify
-set -uo pipefail
+# Note: no `set -u` — sourcing sdkman-init.sh below references unset vars (ZSH_VERSION).
+set -o pipefail
 
 ROOT="$(git rev-parse --show-toplevel)"
 cd "$ROOT" || exit 1

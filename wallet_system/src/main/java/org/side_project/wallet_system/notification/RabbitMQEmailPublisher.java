@@ -18,10 +18,10 @@ public class RabbitMQEmailPublisher implements EmailPublisher {
 
     private final RabbitTemplate rabbitTemplate;
 
-    @Value("${rabbitmq.exchange}")
+    @Value("${rabbitmq.email.exchange}")
     private String exchange;
 
-    @Value("${rabbitmq.routing-key}")
+    @Value("${rabbitmq.email.routing-key}")
     private String routingKey;
 
     @Override

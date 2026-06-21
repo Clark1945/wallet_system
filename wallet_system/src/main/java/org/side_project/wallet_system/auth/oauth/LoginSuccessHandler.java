@@ -63,11 +63,14 @@ public class LoginSuccessHandler implements AuthenticationSuccessHandler {
             session.setAttribute(SessionConstants.MEMBER_ID,   memberId.toString());
             session.setAttribute(SessionConstants.MEMBER_NAME, memberName);
             authService.updateLastLogin(memberId);
-            auditService.record(AuditLog.builder()
+
+            AuditLog log = AuditLog.builder()
                     .actorId(memberId).actorEmail(authService.getEmailById(memberId))
                     .action(AuditAction.LOGIN_SUCCESS).result(AuditResult.SUCCESS)
                     .targetType("MEMBER").targetId(memberId.toString())
-                    .detail("provider=GOOGLE").build());
+                    .detail("provider=GOOGLE").build();
+            auditService.record(log);
+
             response.sendRedirect("/dashboard");
 
         } else {

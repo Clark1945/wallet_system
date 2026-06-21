@@ -72,11 +72,12 @@ public class AuthFlowService {
         session.setAttribute(SessionConstants.MEMBER_ID,   memberId.toString());
         session.setAttribute(SessionConstants.MEMBER_NAME, memberName);
         authService.updateLastLogin(memberId);
-        auditService.record(AuditLog.builder()
+        AuditLog log = AuditLog.builder()
                 .actorId(memberId).actorEmail(authService.getEmailById(memberId))
                 .action(AuditAction.LOGIN_SUCCESS).result(AuditResult.SUCCESS)
                 .targetType("MEMBER").targetId(memberId.toString())
-                .detail("provider=LOCAL").build());
+                .detail("provider=LOCAL").build();
+        auditService.record(log);
         return "redirect:/dashboard";
     }
 
@@ -156,11 +157,12 @@ public class AuthFlowService {
         }
 
         otpService.consumeToken(otpToken);
-        auditService.record(AuditLog.builder()
+        AuditLog log = AuditLog.builder()
                 .actorId(memberId)
                 .action(AuditAction.REGISTER).result(AuditResult.SUCCESS)
                 .targetType("MEMBER").targetId(memberId.toString())
-                .build());
+                .build();
+        auditService.record(log);
         redirectAttributes.addFlashAttribute("success",
                 messageSource.getMessage("flash.register.success", null, locale));
         return "redirect:/login";
@@ -231,11 +233,12 @@ public class AuthFlowService {
         session.removeAttribute(SessionConstants.RESET_MID);
         session.removeAttribute(SessionConstants.RESET_TOKEN);
         authService.resetPassword(mid, password);
-        auditService.record(AuditLog.builder()
+        AuditLog log = AuditLog.builder()
                 .actorId(mid)
                 .action(AuditAction.PASSWORD_RESET).result(AuditResult.SUCCESS)
                 .targetType("MEMBER").targetId(mid.toString())
-                .build());
+                .build();
+        auditService.record(log);
         redirectAttributes.addFlashAttribute("success",
                 messageSource.getMessage("flash.reset.success", null, locale));
         return "redirect:/login";

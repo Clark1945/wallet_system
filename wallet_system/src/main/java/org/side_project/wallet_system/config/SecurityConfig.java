@@ -141,20 +141,22 @@ public class SecurityConfig {
             String email = request.getParameter("email");
             String normalizedEmail = (email != null && !email.isBlank()) ? email.strip().toLowerCase() : null;
             if (exception instanceof LockedException) {
-                auditService.record(AuditLog.builder()
+                AuditLog log = AuditLog.builder()
                         .actorEmail(normalizedEmail)
                         .action(AuditAction.LOGIN_FAILURE).result(AuditResult.FAILURE)
-                        .detail("account locked").build());
+                        .detail("account locked").build();
+                auditService.record(log);
                 response.sendRedirect("/login?locked");
                 return;
             }
             if (normalizedEmail != null) {
                 loginAttemptService.recordFailure(normalizedEmail);
             }
-            auditService.record(AuditLog.builder()
+            AuditLog log = AuditLog.builder()
                     .actorEmail(normalizedEmail)
                     .action(AuditAction.LOGIN_FAILURE).result(AuditResult.FAILURE)
-                    .detail("bad credentials").build());
+                    .detail("bad credentials").build();
+            auditService.record(log);
             response.sendRedirect("/login?error");
         };
     }

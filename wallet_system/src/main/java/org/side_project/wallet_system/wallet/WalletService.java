@@ -313,7 +313,7 @@ public class WalletService {
 
     private void auditTx(UUID actorId, AuditAction action, AuditResult result,
                          UUID transactionId, BigDecimal amount, String detail) {
-        auditService.record(AuditLog.builder()
+        AuditLog auditLog = AuditLog.builder()
                 .actorId(actorId)
                 .action(action)
                 .result(result)
@@ -321,6 +321,7 @@ public class WalletService {
                 .targetId(transactionId != null ? transactionId.toString() : null)
                 .amount(amount)
                 .detail(detail)
-                .build());
+                .build();
+        auditService.record(auditLog);
     }
 }
