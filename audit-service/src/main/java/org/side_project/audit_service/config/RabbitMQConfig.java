@@ -1,6 +1,8 @@
 package org.side_project.audit_service.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import org.springframework.amqp.core.Binding;
 import org.springframework.amqp.core.BindingBuilder;
 import org.springframework.amqp.core.DirectExchange;
@@ -68,8 +70,13 @@ public class RabbitMQConfig {
     }
 
     @Bean
-    public MessageConverter jsonMessageConverter(ObjectMapper objectMapper) {
-        // Reuse Spring Boot's auto-configured ObjectMapper (already handles java.time).
+    public MessageConverter jsonMessageConverter() {
+        // Spring Boot 4 auto-configures a Jackson 3 ObjectMapper, but Jackson2JsonMessageConverter
+        // needs a Jackson 2 (com.fasterxml.jackson) ObjectMapper — so build our own here.
+        // JavaTimeModule lets us (de)serialize the java.time fields on AuditLog.
+        ObjectMapper objectMapper = new ObjectMapper()
+                .registerModule(new JavaTimeModule())
+                .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
         Jackson2JsonMessageConverter converter = new Jackson2JsonMessageConverter(objectMapper);
         // The publisher (wallet_system) stamps a __TypeId__ header with its own class name.
         // INFERRED precedence makes us deserialize into the @RabbitListener parameter type

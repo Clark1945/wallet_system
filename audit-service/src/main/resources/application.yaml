@@ -18,9 +18,9 @@ spring:
     port: ${RABBITMQ_PORT:5672}
     username: ${RABBITMQ_USER:guest}
     password: ${RABBITMQ_PASS:guest}
-  data:
-    mongodb:
-      uri: ${MONGODB_URI:mongodb://localhost:27017/audit}
+  # Spring Boot 4 moved the MongoDB properties from `spring.data.mongodb` to `spring.mongodb`.
+  mongodb:
+    uri: ${MONGODB_URI:mongodb://localhost:27017/audit}
 
 rabbitmq:
   exchange: wallet.audit.log
