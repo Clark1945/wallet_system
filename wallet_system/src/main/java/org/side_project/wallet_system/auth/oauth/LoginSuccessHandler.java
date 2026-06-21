@@ -64,7 +64,6 @@ public class LoginSuccessHandler implements AuthenticationSuccessHandler {
             session.setAttribute(SessionConstants.MEMBER_NAME, memberName);
             authService.updateLastLogin(memberId);
 
-            //TODO call audit-service using MQ
             AuditLog log = AuditLog.builder()
                     .actorId(memberId).actorEmail(authService.getEmailById(memberId))
                     .action(AuditAction.LOGIN_SUCCESS).result(AuditResult.SUCCESS)

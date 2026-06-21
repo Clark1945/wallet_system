@@ -313,7 +313,6 @@ public class WalletService {
 
     private void auditTx(UUID actorId, AuditAction action, AuditResult result,
                          UUID transactionId, BigDecimal amount, String detail) {
-//TODO call RabbitMQ
         AuditLog auditLog = AuditLog.builder()
                 .actorId(actorId)
                 .action(action)

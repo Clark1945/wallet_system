@@ -72,7 +72,6 @@ public class AuthFlowService {
         session.setAttribute(SessionConstants.MEMBER_ID,   memberId.toString());
         session.setAttribute(SessionConstants.MEMBER_NAME, memberName);
         authService.updateLastLogin(memberId);
-//TODO      CALL RAbbitmq
         AuditLog log = AuditLog.builder()
                 .actorId(memberId).actorEmail(authService.getEmailById(memberId))
                 .action(AuditAction.LOGIN_SUCCESS).result(AuditResult.SUCCESS)
@@ -158,7 +157,6 @@ public class AuthFlowService {
         }
 
         otpService.consumeToken(otpToken);
-//      TODO call RabbitMQ
         AuditLog log = AuditLog.builder()
                 .actorId(memberId)
                 .action(AuditAction.REGISTER).result(AuditResult.SUCCESS)
@@ -235,7 +233,6 @@ public class AuthFlowService {
         session.removeAttribute(SessionConstants.RESET_MID);
         session.removeAttribute(SessionConstants.RESET_TOKEN);
         authService.resetPassword(mid, password);
-//      TODO call RabbitMQ
         AuditLog log = AuditLog.builder()
                 .actorId(mid)
                 .action(AuditAction.PASSWORD_RESET).result(AuditResult.SUCCESS)

@@ -141,7 +141,6 @@ public class SecurityConfig {
             String email = request.getParameter("email");
             String normalizedEmail = (email != null && !email.isBlank()) ? email.strip().toLowerCase() : null;
             if (exception instanceof LockedException) {
-//TODO call RabbitMQ
                 AuditLog log = AuditLog.builder()
                         .actorEmail(normalizedEmail)
                         .action(AuditAction.LOGIN_FAILURE).result(AuditResult.FAILURE)
