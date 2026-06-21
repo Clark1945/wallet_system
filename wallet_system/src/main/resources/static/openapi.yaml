@@ -14,7 +14,7 @@ info:
     Each member automatically receives a **12-character alphanumeric wallet code** (mixed case)
     after completing Email OTP verification during registration. This code is used to identify
     the payee in peer-to-peer transfers (instead of Email) and can be copied from the dashboard.
-  version: 1.3.0
+  version: 1.4.0
 
 servers:
   - url: http://localhost:8080
@@ -36,6 +36,11 @@ tags:
       > **Architecture note:** All `/payment/stripe/*` and `/payment/sbpayment/*` endpoints are served
       > by **payment-service** (`http://localhost:8082`). The `/withdraw/webhook` endpoint is served
       > by **wallet-service** (`http://localhost:8080`).
+  - name: Internal
+    description: |
+      Internal service-to-service API (`/internal/**`) — called **only** by payment-service.
+      Served by **wallet-service** (`http://localhost:8080`). Authenticated via the
+      `X-Internal-Secret` header (not the session cookie); returns `401` if the header is missing or wrong.
 
 # All protected endpoints require session cookie by default
 security:
@@ -870,10 +875,24 @@ paths:
       summary: Withdrawal result webhook (server-to-server)
       description: |
         Called by the mock bank service to report the final withdrawal result.
-        - `result=SUCCESS`: marks the transaction as COMPLETED
-        - Any other value (including `FAILED`): marks the transaction as FAILED and refunds the balance
-        Returns 400 if `transactionId` is missing or malformed.
+        - `result=SUCCESS` (case-insensitive): marks the transaction as COMPLETED
+        - Any other value (e.g. `FAIL`): marks the transaction as FAILED and refunds the balance
+
+        **Signature:** the request is authenticated by the `X-Webhook-Signature` header — an
+        HMAC-SHA256 of the **raw request body** (key = `WITHDRAW_WEBHOOK_SECRET`), formatted as
+        `sha256=<hex>`. Requests with a missing or invalid signature are rejected with `401`.
+        Status transitions are idempotent (CAS), so duplicate callbacks are safe.
+
+        > Served by **wallet-service** (`http://localhost:8080`); called by **mock-bank**.
       security: []
+      parameters:
+        - name: X-Webhook-Signature
+          in: header
+          required: true
+          schema:
+            type: string
+            example: sha256=9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08
+          description: HMAC-SHA256 of the raw request body, formatted as `sha256=<hex>`
       requestBody:
         required: true
         content:
@@ -889,16 +908,151 @@ paths:
                   description: Withdrawal transaction UUID
                 result:
                   type: string
-                  enum: [SUCCESS, FAILED]
+                  enum: [SUCCESS, FAIL]
                   example: SUCCESS
-                  description: Withdrawal outcome
+                  description: Withdrawal outcome (`SUCCESS`, or any other value treated as failure)
       responses:
         '200':
-          description: Processed successfully
+          description: Processed successfully (COMPLETED on SUCCESS; FAILED + refunded otherwise)
         '400':
-          description: Missing or malformed transactionId
+          description: Invalid JSON body, or missing / malformed transactionId
+        '401':
+          description: Missing or invalid `X-Webhook-Signature`
         '500':
           description: Failed to update transaction status (internal error)
+
+  # ── Internal API (service-to-service; payment-service only) ──
+
+  /internal/token/{token}:
+    get:
+      tags: [Internal]
+      summary: Validate and consume a one-time payment token
+      description: |
+        Validates a one-time payment token (Redis, 15-minute TTL) and **consumes it on read**
+        (single-use). Returns the deposit context the payment flow needs.
+
+        > Served by **wallet-service**; called by **payment-service**.
+      security:
+        - internalSecret: []
+      parameters:
+        - name: token
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: One-time payment token issued by `POST /deposit`
+      responses:
+        '200':
+          description: Token valid; returns the payment context
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentTokenData'
+        '401':
+          description: Missing or wrong `X-Internal-Secret`
+        '404':
+          description: Token not found, expired, or already consumed
+
+  /internal/deposit/initiate:
+    post:
+      tags: [Internal]
+      summary: Create a PENDING deposit transaction
+      description: |
+        Creates a `PENDING` deposit transaction and returns its id. Called by payment-service
+        before redirecting the browser to the payment gateway.
+
+        > Served by **wallet-service**; called by **payment-service**.
+      security:
+        - internalSecret: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InitiateDepositRequest'
+      responses:
+        '200':
+          description: Transaction created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InitiateDepositResponse'
+        '401':
+          description: Missing or wrong `X-Internal-Secret`
+
+  /internal/deposit/link-external:
+    post:
+      tags: [Internal]
+      summary: Link an external payment id to a transaction
+      description: |
+        Sets `paymentExternalId` on the transaction, used by SBPS for idempotent lookup via
+        `complete-by-external`.
+
+        > Served by **wallet-service**; called by **payment-service**.
+      security:
+        - internalSecret: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LinkExternalRequest'
+      responses:
+        '200':
+          description: Linked (no-op if the transaction does not exist)
+        '401':
+          description: Missing or wrong `X-Internal-Secret`
+
+  /internal/deposit/complete:
+    post:
+      tags: [Internal]
+      summary: Complete a deposit by transaction id
+      description: |
+        Marks the transaction `COMPLETED` and credits the wallet. **Idempotent** — the wallet is
+        credited only by the caller that wins the atomic `PENDING → COMPLETED` transition (CAS),
+        so duplicate deliveries (e.g. Stripe webhook retries) are silently skipped.
+
+        > Served by **wallet-service**; called by **payment-service** (Stripe webhook).
+      security:
+        - internalSecret: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CompleteDepositRequest'
+      responses:
+        '200':
+          description: Processed (credited once, or skipped if already completed)
+        '401':
+          description: Missing or wrong `X-Internal-Secret`
+
+  /internal/deposit/complete-by-external:
+    post:
+      tags: [Internal]
+      summary: Complete a deposit by external payment id
+      description: |
+        Looks up the transaction by `paymentExternalId`, then completes it (same idempotent credit
+        as `/internal/deposit/complete`). Used by the SBPS result CGI, which only knows the external
+        `order_id`.
+
+        > Served by **wallet-service**; called by **payment-service** (SBPS result CGI).
+      security:
+        - internalSecret: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CompleteByExternalRequest'
+      responses:
+        '200':
+          description: Found and processed
+        '401':
+          description: Missing or wrong `X-Internal-Secret`
+        '404':
+          description: No transaction found for the given external id
 
 # ── Components ──────────────────────────────────────────────
 
@@ -909,3 +1063,70 @@ components:
       in: cookie
       name: JSESSIONID
       description: Session cookie set after successful OTP verification at `POST /login/otp`
+    internalSecret:
+      type: apiKey
+      in: header
+      name: X-Internal-Secret
+      description: Shared secret authenticating `/internal/**` service-to-service calls from payment-service
+  schemas:
+    PaymentTokenData:
+      type: object
+      properties:
+        memberId:
+          type: string
+          format: uuid
+        amount:
+          type: number
+          example: 1000.00
+        method:
+          type: string
+          enum: [stripe, sbpayment]
+        notifyEmail:
+          type: string
+          format: email
+          nullable: true
+          description: Optional email to notify when the deposit completes
+    InitiateDepositRequest:
+      type: object
+      required: [memberId, amount]
+      properties:
+        memberId:
+          type: string
+          format: uuid
+        amount:
+          type: number
+          example: 1000.00
+        notifyEmail:
+          type: string
+          format: email
+          nullable: true
+    InitiateDepositResponse:
+      type: object
+      properties:
+        transactionId:
+          type: string
+          format: uuid
+    LinkExternalRequest:
+      type: object
+      required: [transactionId, externalId]
+      properties:
+        transactionId:
+          type: string
+          format: uuid
+        externalId:
+          type: string
+          description: External payment id (e.g. SBPS order id)
+    CompleteDepositRequest:
+      type: object
+      required: [transactionId]
+      properties:
+        transactionId:
+          type: string
+          format: uuid
+    CompleteByExternalRequest:
+      type: object
+      required: [externalId]
+      properties:
+        externalId:
+          type: string
+          description: External payment id previously linked via `/internal/deposit/link-external`
