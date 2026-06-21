@@ -174,4 +174,54 @@ class AuthServiceTest {
 
         assertThat(result).isEmpty();
     }
+
+    // ─── getEmailById / getNameById / findByEmail ────────────────────────────────
+
+    @Test
+    void getEmailById_found_returnsEmail() {
+        UUID id = UUID.randomUUID();
+        Member m = new Member();
+        m.setEmail("alice@test.com");
+        given(memberRepository.findById(id)).willReturn(Optional.of(m));
+
+        assertThat(authService.getEmailById(id)).isEqualTo("alice@test.com");
+    }
+
+    @Test
+    void getEmailById_notFound_throws() {
+        UUID id = UUID.randomUUID();
+        given(memberRepository.findById(id)).willReturn(Optional.empty());
+
+        assertThatThrownBy(() -> authService.getEmailById(id))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("error.member.not.found");
+    }
+
+    @Test
+    void getNameById_found_returnsName() {
+        UUID id = UUID.randomUUID();
+        Member m = new Member();
+        m.setName("Alice");
+        given(memberRepository.findById(id)).willReturn(Optional.of(m));
+
+        assertThat(authService.getNameById(id)).isEqualTo("Alice");
+    }
+
+    @Test
+    void getNameById_notFound_throws() {
+        UUID id = UUID.randomUUID();
+        given(memberRepository.findById(id)).willReturn(Optional.empty());
+
+        assertThatThrownBy(() -> authService.getNameById(id))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("error.member.not.found");
+    }
+
+    @Test
+    void findByEmail_delegatesToRepository() {
+        Member m = new Member();
+        given(memberRepository.findByEmail("bob@test.com")).willReturn(Optional.of(m));
+
+        assertThat(authService.findByEmail("bob@test.com")).contains(m);
+    }
 }
