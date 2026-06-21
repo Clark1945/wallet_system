@@ -1,0 +1,68 @@
+# TODO — Audit domain extraction
+
+Tracks the remaining work after moving audit logging out of `wallet_system` into a dedicated
+event-driven **audit-service** (RabbitMQ → MongoDB).
+
+_Last updated: 2026-06-21_
+
+---
+
+## ✅ Done (already on `master`)
+
+- **wallet_system publishes audit events** instead of writing them inline — `AuditService.record()`
+  enriches (IP / user-agent / trace id) then publishes via `AuditLogPublisher`
+  (interface + `RabbitMQAuditLogPublisher` / `NoOpAuditLogPublisher`). Call sites unchanged.
+- **audit-service** — new microservice: `@RabbitListener` on `audit.log.notification` →
+  `AuditLogRepository.save()` into **MongoDB** (`AuditLog` is a Mongo `@Document`). Consistent
+  `org.side_project.audit_service` package; email-service leftovers removed.
+- **Spring Boot 4 fixes** — Jackson 2 `ObjectMapper` for `Jackson2JsonMessageConverter` (Boot 4
+  auto-configures Jackson 3); MongoDB props under `spring.mongodb.*`; `INFERRED` type mapper so
+  the publisher's `__TypeId__` header doesn't force loading wallet's class.
+- **docker-compose** — added `mongo` + `audit-service` services and volumes.
+- Publisher unit tests; coverage-gate script hardened (UTF-8 on Windows + honors
+  `sonar.coverage.exclusions`).
+
+## ✅ Done (PR #14, pending merge)
+
+- **Removed wallet_system's dead audit persistence** — deleted `AuditLogRepository`; `AuditLog`
+  is now a plain event payload (no JPA `@Entity`); `V4__drop_audit_logs.sql` drops the table.
+
+---
+
+## 🔲 Remaining
+
+### 1. End-to-end verification (publish → Mongo)  ·  priority: high
+The pipeline compiles and the service boots, but a real "trigger an audit event → document appears
+in Mongo" run has **not** been verified.
+- Bring up `rabbitmq`, `mongo`, `audit-service` (+ `app` for a real trigger, or publish a test
+  message to exchange `wallet.audit.log` / routing key `audit.log.notification`).
+- Confirm a document lands in the `audit_logs` collection: `db.audit_logs.find()`.
+
+### 2. Stamp `createdAt` at the publisher  ·  priority: medium
+wallet_system no longer persists, so the `@PrePersist` hook never ran — published events carry
+`createdAt = null`. The consumer currently stamps it on receipt (`AuditLogListener`), which is the
+*consume* time, not the *event* time.
+- Set `createdAt = now()` in `AuditService.record()` (or when building the `AuditLog`) before
+  publishing, so the timestamp reflects when the action happened.
+
+### 3. Idempotent consumer  ·  priority: medium
+RabbitMQ is at-least-once; a redelivery currently produces a **duplicate** Mongo document because
+there is no stable event id (`AuditLog.id` is null on the wire).
+- Generate a stable event id in wallet_system before publishing and use it as the Mongo `_id`
+  (or an indexed `eventId` with an upsert), so redelivery is a no-op.
+
+### 4. CI job for audit-service  ·  priority: medium
+`.github/workflows/ci.yml` has no `audit-service` job — its tests don't run in CI.
+- Add a `test-audit-service` job mirroring `test-email-service`.
+
+### 5. Observability wiring  ·  priority: low
+audit-service isn't scraped/shipped like the other services.
+- Prometheus: add an `audit-service` scrape target in `wallet_system/observability/prometheus.yml`.
+- Promtail: mount `audit_service_logs` and add a scrape job in `promtail-config.yaml`.
+- Add `audit-service` to the relevant `depends_on` lists in docker-compose.
+
+### 6. Minor / cleanup  ·  priority: low
+- **DLQ ownership** — both wallet_system and audit-service declare the audit queue/DLQ. They are
+  aligned now (`audit.log.notification` + `…​.dlq`), but ideally the publisher declares only the
+  exchange and the consumer owns the queue + DLQ.
+- **audit-service Dockerfile** `EXPOSE` was corrected to 8084; double-check no stale 8083 refs.
