@@ -3,22 +3,17 @@ package org.side_project.wallet_system.audit;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.side_project.wallet_system.notification.AuditLogPublisher;
 import org.slf4j.MDC;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Propagation;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
 /**
- * Writes audit records. Two guarantees:
- * <ul>
- *   <li><b>Survives business rollback</b> — {@link #persist} runs in a new transaction
- *       ({@code REQUIRES_NEW}), so a failed/refunded operation is still recorded.</li>
- *   <li><b>Never breaks the caller</b> — any failure to audit is logged and swallowed.</li>
- * </ul>
+ * Records audit events. Enriches each entry with request context (IP, user agent, trace id) and
+ * publishes it via {@link AuditLogPublisher} for the audit domain to consume and persist.
+ *
+ * <p><b>Never breaks the caller</b> — any failure to record is logged and swallowed.
  */
 @Slf4j
 @Service
@@ -27,16 +22,11 @@ public class AuditService {
 
     private static final int USER_AGENT_MAX = 255;
 
-    private final AuditLogRepository auditLogRepository;
-
-    // Self-injection (lazy) so persist() runs through the Spring proxy (REQUIRES_NEW).
-    @Lazy
-    @Autowired
-    private AuditService self;
+    private final AuditLogPublisher auditLogPublisher;
 
     /**
      * Records an audit entry, enriching it with the current request's IP, user agent and trace id
-     * when available. Best-effort: never throws.
+     * when available, then publishing it as an event. Best-effort: never throws.
      */
     public void record(AuditLog entry) {
         if (entry == null) {
@@ -44,15 +34,10 @@ public class AuditService {
         }
         try {
             enrichFromRequestContext(entry);
-            self.persist(entry);
+            auditLogPublisher.publish(entry);
         } catch (Exception e) {
-            log.error("Failed to write audit log: action={}, actorId={}", entry.getAction(), entry.getActorId(), e);
+            log.error("Failed to record audit log: action={}, actorId={}", entry.getAction(), entry.getActorId(), e);
         }
-    }
-
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public void persist(AuditLog entry) {
-        auditLogRepository.save(entry);
     }
 
     private void enrichFromRequestContext(AuditLog entry) {

@@ -116,11 +116,18 @@ internal:
     secret: ${INTERNAL_SERVICE_SECRET}
 
 rabbitmq:
-  exchange: wallet.email
-  queue: email.notifications
-  routing-key: email.notification
-  dead-letter-exchange: wallet.email.dlx
-  dead-letter-routing-key: email.notification.dead
+  email:
+    exchange: wallet.email
+    queue: email.notifications
+    routing-key: email.notification
+    dead-letter-exchange: wallet.email.dlx
+    dead-letter-routing-key: email.notification.dead
+  auditLog:
+    exchange: wallet.audit.log
+    queue: audit.log.notification
+    routing-key: audit.log.notification
+    dead-letter-exchange: wallet.audit.logs.dlx
+    dead-letter-routing-key: audit.logs.dead
 
 resilience4j:
   circuitbreaker:
