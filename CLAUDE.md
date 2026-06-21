@@ -4,11 +4,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Monorepo Structure
 
-Four Spring Boot services, fronted by an nginx reverse proxy:
+Five Spring Boot services, fronted by an nginx reverse proxy:
 - **`wallet_system/`** — main wallet application (port 8080); detailed guidance in `wallet_system/CLAUDE.md`
 - **`mock-bank/`** — simulated bank withdrawal endpoint (port 8081)
 - **`payment-service/`** — Stripe + SBPS payment gateway handler (port 8082)
 - **`email-service/`** — async email dispatcher (port 8083); consumes RabbitMQ messages and sends via SMTP
+- **`audit-service/`** — async audit-log consumer (port 8084); consumes RabbitMQ messages and persists them to MongoDB
 - **`nginx/`** — reverse proxy and single browser-facing HTTP entry point (port 80); routes `/payment/**` to payment-service and everything else to the wallet app. See `nginx/nginx.conf`.
 
 ## Git Hooks (pre-push gate)
@@ -33,14 +34,19 @@ using the SDKMAN-default JDK (keep it on Java 17 — JaCoCo 0.8.12 cannot instru
 ```bash
 # Full stack — run from repo root
 # Requires wallet_system/.env (copy from .env.example and fill in credentials)
-# Starts: nginx, PostgreSQL, Redis, RabbitMQ, mock-bank, wallet app, payment-service,
-#         email-service, Prometheus, postgres-exporter, redis-exporter, Loki, Promtail, Grafana
+# Starts: nginx, PostgreSQL, Redis, MongoDB, RabbitMQ, mock-bank, wallet app, payment-service,
+#         email-service, audit-service, Prometheus, postgres-exporter, redis-exporter,
+#         Loki, Promtail, Grafana
 docker compose up --build
 # Entry point (via nginx): http://localhost  |  Grafana: http://localhost:3000
 # The wallet app's own port 8080 is also published for direct access during development.
 
 # email-service only
 cd email-service
+./mvnw spring-boot:run
+
+# audit-service only
+cd audit-service
 ./mvnw spring-boot:run
 
 # wallet_system only
@@ -74,6 +80,18 @@ Email types: `REGISTRATION_OTP`, `LOGIN_OTP`, `PASSWORD_RESET`, `DEPOSIT_SUCCESS
 
 Test profile: `NoOpEmailPublisher` (`@Profile("test")`) and `RabbitAutoConfiguration` excluded — no RabbitMQ needed for tests.
 RabbitMQ Management UI: `http://localhost:15672` (credentials from `RABBITMQ_USER`/`RABBITMQ_PASS`)
+
+## Audit Log Flow (Cross-Service via RabbitMQ)
+
+Audit logging is decoupled from business logic the same way email is:
+
+1. `wallet_system` enriches an `AuditLog` (actor, action, result, request context) and **publishes** it via `AuditLogPublisher` → `RabbitTemplate.convertAndSend(exchange="wallet.audit.log", routingKey="audit.log.notification")`. It no longer writes to its own DB.
+2. RabbitMQ routes to durable queue `audit.log.notification` (with dead-letter queue `audit.log.notification.dlq` for poison messages).
+3. `audit-service` `@RabbitListener` consumes the message and persists it to the MongoDB `audit_logs` collection.
+
+The publisher stamps a `__TypeId__` header; `audit-service` configures `Jackson2JavaTypeMapper.TypePrecedence.INFERRED` so the message deserializes into its own `AuditLog` type. The Jackson 2 `ObjectMapper` is built explicitly (Spring Boot 4 auto-configures a Jackson 3 bean) with `JavaTimeModule` registered for the `java.time` fields.
+
+Test profile: `NoOpAuditLogPublisher` (`@Profile("test")`) on the wallet side — no RabbitMQ/MongoDB needed for tests.
 
 ## Deposit Flow (Cross-Service)
 
@@ -154,4 +172,4 @@ See `wallet_system/CLAUDE.md` for complete details.
 
 ### Audit Log
 
-The `audit/` package writes an append-only trail of auth and money events to the `audit_logs` table. `AuditService.record()` persists in a new transaction (`REQUIRES_NEW`) so rows survive business rollbacks, and swallows its own failures so it never breaks the caller. See `wallet_system/CLAUDE.md` for the full field list and wiring.
+The `audit/` package builds an append-only trail of auth and money events. `AuditService.record()` enriches each entry with request context and **publishes** it to RabbitMQ via `AuditLogPublisher` (it no longer writes to a DB itself); `audit-service` consumes and persists to MongoDB. Publishing failures are logged and swallowed so auditing never breaks the caller. See the "Audit Log Flow" section above and `wallet_system/CLAUDE.md` for the full field list and wiring.
