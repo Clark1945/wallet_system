@@ -20,7 +20,7 @@ def added_main_lines(base, module):
     """Return {basename.java: set(line numbers added vs base)} under module/src/main."""
     diff = subprocess.run(
         ["git", "diff", f"{base}...HEAD", "--unified=0", "--", f"{module}/src/main"],
-        capture_output=True, text=True,
+        capture_output=True, text=True, encoding="utf-8",
     ).stdout
     added, cur = {}, None
     for line in diff.splitlines():
@@ -33,6 +33,25 @@ def added_main_lines(base, module):
                 start, cnt = int(m.group(1)), int(m.group(2) or 1)
                 added.setdefault(cur, set()).update(range(start, start + cnt))
     return added
+
+
+def coverage_excluded_basenames(module):
+    """Basenames of .java files listed in <module>/pom.xml's sonar.coverage.exclusions.
+
+    Mirrors SonarCloud: declarative/infra classes (e.g. @Profile beans, config, DTOs)
+    are excluded from the coverage metric there, so the diff gate should match."""
+    try:
+        tree = ET.parse(f"{module}/pom.xml")
+    except (OSError, ET.ParseError):
+        return set()
+    out = set()
+    for el in tree.iter():
+        if el.tag.endswith("sonar.coverage.exclusions"):
+            for token in re.split(r"[,\s]+", el.text or ""):
+                token = token.strip()
+                if token.endswith(".java"):
+                    out.add(os.path.basename(token))
+    return out
 
 
 def line_coverage(report_path):
@@ -63,6 +82,12 @@ def main():
         return 2
 
     added = added_main_lines(args.base, args.module)
+    excluded = coverage_excluded_basenames(args.module)
+    dropped = sorted(fn for fn in added if fn in excluded)
+    for fn in dropped:
+        del added[fn]
+    if dropped:
+        print(f"Excluded (sonar.coverage.exclusions): {', '.join(dropped)}\n")
     cov = line_coverage(report)
     if not added:
         print(f"No added main lines vs {args.base}; nothing to gate.")
