@@ -207,12 +207,13 @@ The fallback returns the raw key if no translation exists.
 
 ### Audit Log
 
-`audit/` package records an append-only trail of security- and money-relevant actions to the `audit_logs` table (Flyway `V3`).
+`audit/` package builds an append-only trail of security- and money-relevant actions and **publishes** them to RabbitMQ; the separate `audit-service` consumes and persists them to MongoDB (see the repo-root CLAUDE.md "Audit Log Flow" section). wallet_system no longer writes audit rows itself.
 
-- `AuditService.record(AuditLog)` is the single entry point. Two guarantees:
-  - **Survives business rollback** — the actual insert (`AuditService.persist`) runs in a new transaction (`@Transactional(propagation = REQUIRES_NEW)`, reached via lazy self-injection), so a failed/refunded operation is still recorded.
-  - **Never breaks the caller** — any failure to write the audit row is logged and swallowed.
-- Each row captures actor (`actorId`/`actorEmail`, null for system/anonymous events such as webhooks or failed logins), `action`, `result`, `targetType`/`targetId`, `amount`, `detail`, and request context (`ipAddress` from the first `X-Forwarded-For` hop, `userAgent`, `traceId` from MDC) auto-enriched from `RequestContextHolder` when a request is bound.
+- `AuditService.record(AuditLog)` is the single entry point. It enriches the entry with request context, then hands it to an `AuditLogPublisher`:
+  - `RabbitMQAuditLogPublisher` (`@Profile("!test")`) — `convertAndSend` to exchange `wallet.audit.log` / routing key `audit.log.notification`.
+  - `NoOpAuditLogPublisher` (`@Profile("test")`) — does nothing, so tests need no broker.
+  - **Never breaks the caller** — any failure to publish is logged and swallowed.
+- Each entry captures actor (`actorId`/`actorEmail`, null for system/anonymous events such as webhooks or failed logins), `action`, `result`, `targetType`/`targetId`, `amount`, `detail`, and request context (`ipAddress` from the first `X-Forwarded-For` hop, `userAgent`, `traceId` from MDC) auto-enriched from `RequestContextHolder` when a request is bound. `createdAt` is stamped by `audit-service` on receipt.
 - Wired into: every `WalletService` money path (deposit/withdrawal/transfer — success, rejection, and refund), login success (`LoginSuccessHandler`), login failure (`SecurityConfig` failure handler), registration activation and password reset (`AuthFlowService`).
 - `AuditAction` enum covers `LOGIN_SUCCESS`/`LOGIN_FAILURE`/`REGISTER`/`PASSWORD_RESET` and `DEPOSIT_*`/`WITHDRAWAL_*`/`TRANSFER`.
 
