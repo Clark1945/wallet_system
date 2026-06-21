@@ -1,0 +1,44 @@
+server:
+  port: 8084
+
+spring:
+  application:
+    name: audit-service
+  rabbitmq:
+    listener:
+      simple:
+        retry:
+          enabled: true
+          max-attempts: 3
+          initial-interval: 2000ms
+          multiplier: 2.0
+          max-interval: 10000ms
+        default-requeue-rejected: false
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USER:guest}
+    password: ${RABBITMQ_PASS:guest}
+  data:
+    mongodb:
+      uri: ${MONGODB_URI:mongodb://localhost:27017/audit}
+
+rabbitmq:
+  exchange: wallet.audit.log
+  queue: audit.log.notification
+  routing-key: audit.log.notification
+  dead-letter-exchange: wallet.audit.logs.dlx
+  dead-letter-queue: audit.log.notification.dlq
+  dead-letter-routing-key: audit.logs.dead
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, prometheus
+  metrics:
+    tags:
+      application: ${spring.application.name}
+
+logging:
+  level:
+    org.side_project.audit_service: INFO

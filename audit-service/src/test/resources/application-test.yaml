@@ -1,0 +1,15 @@
+spring:
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.amqp.RabbitAutoConfiguration
+  data:
+    mongodb:
+      uri: mongodb://localhost:27017/audit_test
+
+rabbitmq:
+  exchange: wallet.audit.log
+  queue: audit.log.notification
+  routing-key: audit.log.notification
+  dead-letter-exchange: wallet.audit.logs.dlx
+  dead-letter-queue: audit.log.notification.dlq
+  dead-letter-routing-key: audit.logs.dead
