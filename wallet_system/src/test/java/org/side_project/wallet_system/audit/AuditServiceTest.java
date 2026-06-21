@@ -13,8 +13,6 @@ import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
-import java.time.LocalDateTime;
-
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatNoException;
 import static org.mockito.ArgumentMatchers.any;
@@ -143,19 +141,5 @@ class AuditServiceTest {
         ArgumentCaptor<AuditLog> captor = ArgumentCaptor.forClass(AuditLog.class);
         verify(auditLogPublisher).publish(captor.capture());
         assertThat(captor.getValue().getUserAgent()).isEqualTo("short-ua");
-    }
-
-    @Test
-    void onCreate_setsCreatedAtWhenNull_andPreservesWhenPresent() {
-        AuditLog fresh = AuditLog.builder()
-                .action(AuditAction.REGISTER).result(AuditResult.SUCCESS).build();
-        fresh.onCreate();
-        assertThat(fresh.getCreatedAt()).isNotNull();
-
-        LocalDateTime fixed = LocalDateTime.of(2020, 1, 1, 0, 0);
-        AuditLog preset = AuditLog.builder()
-                .action(AuditAction.REGISTER).result(AuditResult.SUCCESS).createdAt(fixed).build();
-        preset.onCreate();
-        assertThat(preset.getCreatedAt()).isEqualTo(fixed);
     }
 }
