@@ -111,4 +111,17 @@ class MockBankClientTest {
                     "http://callback", null))
             .doesNotThrowAnyException();
     }
+
+    // ── circuit breaker fallback ───────────────────────────────
+
+    @Test
+    void sendWithdrawRequestFallback_throwsMockBankUnavailable() {
+        Throwable cause = new IOException("connection refused");
+
+        assertThatThrownBy(() -> ReflectionTestUtils.invokeMethod(
+                mockBankClient, "sendWithdrawRequestFallback",
+                "tx-fb", new BigDecimal("100.00"), "012", "789", "http://callback", "trace-x", cause))
+            .isInstanceOf(MockBankUnavailableException.class)
+            .hasMessageContaining("connection refused");
+    }
 }

@@ -17,9 +17,14 @@ import org.springframework.test.util.ReflectionTestUtils;
 
 import java.math.BigDecimal;
 import java.time.Duration;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -537,5 +542,95 @@ class WalletServiceTest {
         walletService.completeWithdrawal(txId);
 
         then(emailPublisher).shouldHaveNoInteractions();
+    }
+
+    // ── getTransactions (query / pagination) ─────────────────────
+
+    @Test
+    void getTransactions_returnsTransactionsForWallet() {
+        Transaction tx = new Transaction();
+        given(transactionRepository.findByWalletId(wallet.getId())).willReturn(List.of(tx));
+
+        List<Transaction> result = walletService.getTransactions(memberId);
+
+        assertThat(result).containsExactly(tx);
+    }
+
+    @Test
+    void getTransactions_paged_returnsPage() {
+        Page<Transaction> page = new PageImpl<>(List.of(new Transaction()));
+        given(transactionRepository.findByWalletId(any(UUID.class), any(Pageable.class))).willReturn(page);
+
+        Page<Transaction> result = walletService.getTransactions(memberId, 0, 10);
+
+        assertThat(result.getContent()).hasSize(1);
+    }
+
+    @Test
+    void getTransactions_filteredByTypeAndDate_returnsPage() {
+        Page<Transaction> page = new PageImpl<>(List.of(new Transaction()));
+        given(transactionRepository.findAll(any(Specification.class), any(Pageable.class))).willReturn(page);
+
+        Page<Transaction> result = walletService.getTransactions(
+                memberId, TransactionType.DEPOSIT, LocalDate.now().minusDays(7), LocalDate.now(), 0, 10);
+
+        assertThat(result.getContent()).hasSize(1);
+    }
+
+    // ── linkPaymentExternalId ────────────────────────────────────
+
+    @Test
+    void linkPaymentExternalId_found_setsIdAndSaves() {
+        UUID txId = UUID.randomUUID();
+        Transaction tx = new Transaction();
+        tx.setId(txId);
+        given(transactionRepository.findById(txId)).willReturn(Optional.of(tx));
+
+        walletService.linkPaymentExternalId(txId, "ext-123");
+
+        assertThat(tx.getPaymentExternalId()).isEqualTo("ext-123");
+        then(transactionRepository).should().save(tx);
+    }
+
+    @Test
+    void linkPaymentExternalId_notFound_doesNothing() {
+        UUID txId = UUID.randomUUID();
+        given(transactionRepository.findById(txId)).willReturn(Optional.empty());
+
+        walletService.linkPaymentExternalId(txId, "ext-123");
+
+        then(transactionRepository).should(never()).save(any());
+    }
+
+    // ── completeDepositByExternalId ──────────────────────────────
+
+    @Test
+    void completeDepositByExternalId_found_creditsAndReturnsTrue() {
+        UUID txId = UUID.randomUUID();
+        Transaction tx = new Transaction();
+        tx.setId(txId);
+        tx.setToWalletId(wallet.getId());
+        tx.setAmount(new BigDecimal("300.00"));
+        tx.setStatus(TransactionStatus.PENDING);
+        given(transactionRepository.findByPaymentExternalId("ext-1")).willReturn(Optional.of(tx));
+        given(transactionRepository.findById(txId)).willReturn(Optional.of(tx));
+        given(transactionRepository.compareAndSetStatus(txId, TransactionStatus.PENDING, TransactionStatus.COMPLETED))
+                .willReturn(1);
+        given(walletRepository.findByIdForUpdate(wallet.getId())).willReturn(Optional.of(wallet));
+
+        boolean result = walletService.completeDepositByExternalId("ext-1");
+
+        assertThat(result).isTrue();
+        assertThat(wallet.getBalance()).isEqualByComparingTo("1300.00");
+    }
+
+    @Test
+    void completeDepositByExternalId_notFound_returnsFalse() {
+        given(transactionRepository.findByPaymentExternalId("missing")).willReturn(Optional.empty());
+
+        boolean result = walletService.completeDepositByExternalId("missing");
+
+        assertThat(result).isFalse();
+        then(transactionRepository).should(never()).compareAndSetStatus(any(), any(), any());
     }
 }
