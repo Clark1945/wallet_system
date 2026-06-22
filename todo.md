@@ -31,12 +31,11 @@ _Last updated: 2026-06-21_
 
 ## 🔲 Remaining
 
-### 1. End-to-end verification (publish → Mongo)  ·  priority: high
-The pipeline compiles and the service boots, but a real "trigger an audit event → document appears
-in Mongo" run has **not** been verified.
-- Bring up `rabbitmq`, `mongo`, `audit-service` (+ `app` for a real trigger, or publish a test
-  message to exchange `wallet.audit.log` / routing key `audit.log.notification`).
-- Confirm a document lands in the `audit_logs` collection: `db.audit_logs.find()`.
+### 1. End-to-end verification (publish → Mongo)  ·  ✅ DONE
+Verified locally with docker compose: published an audit event to `wallet.audit.log`; the
+audit-service `@RabbitListener` consumed it and persisted a document to the MongoDB `audit_logs`
+collection (`_id` = the stable event id; fields + `createdAt` intact). Redelivering the same event
+three times left a single document — idempotency confirmed.
 
 ### 2. Stamp `createdAt` at the publisher  ·  ✅ DONE
 `AuditService.record()` now stamps `createdAt = now()` (event time) before publishing, since the
