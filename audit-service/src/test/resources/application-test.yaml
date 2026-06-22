@@ -2,9 +2,8 @@ spring:
   autoconfigure:
     exclude:
       - org.springframework.boot.autoconfigure.amqp.RabbitAutoConfiguration
-  data:
-    mongodb:
-      uri: mongodb://localhost:27017/audit_test
+  mongodb:
+    uri: mongodb://localhost:27017/audit_test
 
 rabbitmq:
   exchange: wallet.audit.log

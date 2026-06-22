@@ -19,6 +19,8 @@ spring:
     username: ${RABBITMQ_USER:guest}
     password: ${RABBITMQ_PASS:guest}
   # Spring Boot 4 moved the MongoDB properties from `spring.data.mongodb` to `spring.mongodb`.
+  # UUID encoding (AuditLog.actorId) is configured in MongoConfig — the `uuid-representation`
+  # property is a no-op under Spring Boot 4.
   mongodb:
     uri: ${MONGODB_URI:mongodb://localhost:27017/audit}
 
