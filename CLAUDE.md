@@ -29,6 +29,23 @@ using the SDKMAN-default JDK (keep it on Java 17 — JaCoCo 0.8.12 cannot instru
   as CI / the `coverage-gate` skill) before a push. Coverage lives here, not in pre-commit,
   because it diffs committed history (`base...HEAD`). Bypass with `git push --no-verify`.
 
+## Local development & Spring Boot 4 notes
+
+- **Use Java 17 locally.** JaCoCo 0.8.12 cannot instrument Java 25, so `./mvnw test` (with
+  coverage) fails on a Java 25 JDK. Use SDKMAN: `sdk use java 17`. The git hooks source the
+  SDKMAN default, so keep it on 17.
+- **Spring Boot 4 uses Jackson 3** (`tools.jackson`) for the auto-configured `ObjectMapper`, but
+  Spring AMQP's `Jackson2JsonMessageConverter` needs a **Jackson 2** (`com.fasterxml.jackson`)
+  mapper — construct your own `new ObjectMapper()` and add `jackson-datatype-jsr310` +
+  `JavaTimeModule` for `java.time` fields (see each service's `RabbitMQConfig`).
+- **Cross-service deserialization:** publishers stamp a `__TypeId__` header; consumers set
+  `DefaultJackson2JavaTypeMapper` to `TypePrecedence.INFERRED` so messages deserialize into the
+  consumer's own type, not the publisher's class.
+- **MongoDB props live under `spring.mongodb.*`** in Boot 4 (moved from `spring.data.mongodb.*`).
+- **Test-slice annotations moved to module packages**, e.g. `@DataJpaTest` →
+  `org.springframework.boot.data.jpa.test.autoconfigure`, `@WebMvcTest` →
+  `org.springframework.boot.webmvc.test.autoconfigure`.
+
 ## Build & Run Commands
 
 ```bash
