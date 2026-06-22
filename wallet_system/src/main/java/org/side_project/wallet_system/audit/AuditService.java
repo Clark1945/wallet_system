@@ -9,6 +9,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
+import java.time.LocalDateTime;
+import java.util.UUID;
+
 /**
  * Records audit events. Enriches each entry with request context (IP, user agent, trace id) and
  * publishes it via {@link AuditLogPublisher} for the audit domain to consume and persist.
@@ -33,6 +36,15 @@ public class AuditService {
             return;
         }
         try {
+            // wallet no longer persists, so the old @PrePersist hook is gone — stamp here instead.
+            // The id is a stable event id: the consumer uses it as the Mongo _id so save() upserts,
+            // making at-least-once redeliveries idempotent. createdAt is the event time.
+            if (entry.getId() == null) {
+                entry.setId(UUID.randomUUID());
+            }
+            if (entry.getCreatedAt() == null) {
+                entry.setCreatedAt(LocalDateTime.now());
+            }
             enrichFromRequestContext(entry);
             auditLogPublisher.publish(entry);
         } catch (Exception e) {

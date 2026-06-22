@@ -13,6 +13,9 @@ import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
+import java.time.LocalDateTime;
+import java.util.UUID;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatNoException;
 import static org.mockito.ArgumentMatchers.any;
@@ -113,8 +116,11 @@ class AuditServiceTest {
         RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(request));
         MDC.put("traceId", "request-trace");
 
+        UUID presetId = UUID.randomUUID();
+        LocalDateTime presetCreatedAt = LocalDateTime.of(2020, 1, 1, 0, 0);
         AuditLog entry = AuditLog.builder()
                 .action(AuditAction.LOGIN_SUCCESS).result(AuditResult.SUCCESS)
+                .id(presetId).createdAt(presetCreatedAt)
                 .ipAddress("9.9.9.9").userAgent("preset-ua").traceId("preset-trace")
                 .build();
 
@@ -123,6 +129,8 @@ class AuditServiceTest {
         ArgumentCaptor<AuditLog> captor = ArgumentCaptor.forClass(AuditLog.class);
         verify(auditLogPublisher).publish(captor.capture());
         AuditLog published = captor.getValue();
+        assertThat(published.getId()).isEqualTo(presetId);                 // preset kept (else-branch)
+        assertThat(published.getCreatedAt()).isEqualTo(presetCreatedAt);   // preset kept (else-branch)
         assertThat(published.getIpAddress()).isEqualTo("9.9.9.9");      // preset kept
         assertThat(published.getUserAgent()).isEqualTo("preset-ua");    // preset kept
         assertThat(published.getTraceId()).isEqualTo("preset-trace");   // preset kept
@@ -141,5 +149,19 @@ class AuditServiceTest {
         ArgumentCaptor<AuditLog> captor = ArgumentCaptor.forClass(AuditLog.class);
         verify(auditLogPublisher).publish(captor.capture());
         assertThat(captor.getValue().getUserAgent()).isEqualTo("short-ua");
+    }
+
+    @Test
+    void record_stampsStableIdAndCreatedAt() {
+        AuditLog entry = AuditLog.builder()
+                .action(AuditAction.LOGIN_SUCCESS).result(AuditResult.SUCCESS).build();
+
+        auditService.record(entry);
+
+        ArgumentCaptor<AuditLog> captor = ArgumentCaptor.forClass(AuditLog.class);
+        verify(auditLogPublisher).publish(captor.capture());
+        AuditLog published = captor.getValue();
+        assertThat(published.getId()).isNotNull();         // stable event id -> consumer dedupes
+        assertThat(published.getCreatedAt()).isNotNull();  // event time stamped by publisher
     }
 }
