@@ -47,18 +47,15 @@ in Mongo" run has **not** been verified.
 Mongo `_id`, so `save()` upserts and an at-least-once redelivery overwrites the same document
 instead of duplicating it.
 
-### 4. CI job for audit-service  ·  priority: medium
-`.github/workflows/ci.yml` has no `audit-service` job — its tests don't run in CI.
-- Add a `test-audit-service` job mirroring `test-email-service`.
+### 4. CI job for audit-service  ·  ✅ DONE
+`test-audit-service` job added to `.github/workflows/ci.yml` (mirrors `test-email-service`).
 
-### 5. Observability wiring  ·  priority: low
-audit-service isn't scraped/shipped like the other services.
-- Prometheus: add an `audit-service` scrape target in `wallet_system/observability/prometheus.yml`.
-- Promtail: mount `audit_service_logs` and add a scrape job in `promtail-config.yaml`.
-- Add `audit-service` to the relevant `depends_on` lists in docker-compose.
+### 5. Observability wiring  ·  ✅ DONE
+Prometheus scrapes `audit-service:8084/actuator/prometheus`; Promtail ships its logs to Loki
+(mounted `audit_service_logs` + scrape job); added to prometheus/promtail `depends_on`.
 
-### 6. Minor / cleanup  ·  priority: low
-- **DLQ ownership** — both wallet_system and audit-service declare the audit queue/DLQ. They are
-  aligned now (`audit.log.notification` + `…​.dlq`), but ideally the publisher declares only the
-  exchange and the consumer owns the queue + DLQ.
-- **audit-service Dockerfile** `EXPOSE` was corrected to 8084; double-check no stale 8083 refs.
+### 6. Minor / cleanup  ·  ✅ DONE
+- logback now writes `audit-service.log` and DEBUGs `org.side_project.audit_service`.
+- Dockerfile `EXPOSE` is 8084.
+- **DLQ ownership**: kept dual declaration on purpose — the queue stays present regardless of
+  startup order, so no audit events are lost.
