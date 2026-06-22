@@ -38,18 +38,14 @@ in Mongo" run has **not** been verified.
   message to exchange `wallet.audit.log` / routing key `audit.log.notification`).
 - Confirm a document lands in the `audit_logs` collection: `db.audit_logs.find()`.
 
-### 2. Stamp `createdAt` at the publisher  ·  priority: medium
-wallet_system no longer persists, so the `@PrePersist` hook never ran — published events carry
-`createdAt = null`. The consumer currently stamps it on receipt (`AuditLogListener`), which is the
-*consume* time, not the *event* time.
-- Set `createdAt = now()` in `AuditService.record()` (or when building the `AuditLog`) before
-  publishing, so the timestamp reflects when the action happened.
+### 2. Stamp `createdAt` at the publisher  ·  ✅ DONE
+`AuditService.record()` now stamps `createdAt = now()` (event time) before publishing, since the
+`@PrePersist` hook is gone. The consumer keeps a null-fallback as defence.
 
-### 3. Idempotent consumer  ·  priority: medium
-RabbitMQ is at-least-once; a redelivery currently produces a **duplicate** Mongo document because
-there is no stable event id (`AuditLog.id` is null on the wire).
-- Generate a stable event id in wallet_system before publishing and use it as the Mongo `_id`
-  (or an indexed `eventId` with an upsert), so redelivery is a no-op.
+### 3. Idempotent consumer  ·  ✅ DONE
+`AuditService.record()` now stamps a stable `id` (UUID) on each event; the consumer uses it as the
+Mongo `_id`, so `save()` upserts and an at-least-once redelivery overwrites the same document
+instead of duplicating it.
 
 ### 4. CI job for audit-service  ·  priority: medium
 `.github/workflows/ci.yml` has no `audit-service` job — its tests don't run in CI.
