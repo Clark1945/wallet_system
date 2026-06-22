@@ -60,3 +60,16 @@ scrape_configs:
           expression: '^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3} \[[^\]]+\] (?P<level>\S+)'
       - labels:
           level:
+
+  - job_name: audit_service
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          app: audit_service
+          __path__: /logs/audit-service/*.log
+    pipeline_stages:
+      - regex:
+          expression: '^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3} \[[^\]]+\] (?P<level>\S+)'
+      - labels:
+          level:

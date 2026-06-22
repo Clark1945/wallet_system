@@ -12,9 +12,9 @@
 
     <springProfile name="!test">
         <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
-            <file>logs/email-service.log</file>
+            <file>logs/audit-service.log</file>
             <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
-                <fileNamePattern>logs/email-service.%d{yyyy-MM-dd}.log</fileNamePattern>
+                <fileNamePattern>logs/audit-service.%d{yyyy-MM-dd}.log</fileNamePattern>
                 <maxHistory>30</maxHistory>
             </rollingPolicy>
             <encoder>
@@ -35,7 +35,7 @@
         </root>
     </springProfile>
 
-    <logger name="org.side_project.email_service" level="DEBUG" additivity="false">
+    <logger name="org.side_project.audit_service" level="DEBUG" additivity="false">
         <springProfile name="!test">
             <appender-ref ref="CONSOLE"/>
             <appender-ref ref="FILE"/>

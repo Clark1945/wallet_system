@@ -19,6 +19,11 @@ scrape_configs:
     static_configs:
       - targets: ['email-service:8083']
 
+  - job_name: audit-service
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ['audit-service:8084']
+
   - job_name: mock-bank
     metrics_path: /actuator/prometheus
     static_configs:
