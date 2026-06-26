@@ -44,10 +44,20 @@ One env var per service drives both that service's `image:` tag and its build:
   `args.APP_VERSION` and its `image:` tag (the in-container build arg is named `APP_VERSION` for
   every service; only the env var that feeds it differs).
 
-**To bump a version:** bump only the changed service's `<SVC>_VERSION` in `.env` (also update
-`.env.example`'s default), then `docker compose up --build`. For a plain local Maven build, use
-`./mvnw package -Drevision=X.Y.Z`. The next maturity step is to stop hand-editing these and let CI
-derive each version from `git describe`/commit SHA.
+**Automatic versioning (preferred for local demo):** run `bash scripts/dev-up.sh` instead of
+`docker compose up --build`. It derives each service's version on the host from git — the short SHA
+of the last commit that touched that service's directory (`<base>-<sha>`, plus `-dirty` if that
+service has uncommitted changes) — exports the `<SVC>_VERSION` vars, and runs compose. So you never
+hand-edit a version: change only `email-service`, and only its image tag/SHA advances. The semantic
+base lives in one place (`VERSION_BASE` at the top of the script); bump it for a real release.
+Extra args pass through, e.g. `bash scripts/dev-up.sh -d`.
+
+**Manual fallback:** plain `docker compose up --build` still works and uses the `<SVC>_VERSION`
+defaults in `.env` (currently `1.0.0`). For a plain local Maven build, use
+`./mvnw package -Drevision=X.Y.Z`.
+
+This is the lightweight (no-registry) form of automatic versioning. The next maturity step would be
+a CI stage that builds and pushes the git-tagged images to a registry (e.g. ghcr.io) after tests pass.
 
 Note: CI-friendly `${revision}` needs the `flatten-maven-plugin` only if you `mvn install`/`deploy`
 a service as a Maven dependency — these services aren't consumed that way, so it's intentionally omitted.
