@@ -14,14 +14,25 @@ Five Spring Boot services, fronted by an nginx reverse proxy:
 
 ## Versioning
 
-Each service carries its own SemVer, with a **single source of truth** wired end-to-end so
-one change propagates to the JAR, the Docker image tag, and the running app:
+**Each service is versioned independently** (its own SemVer), with a single source of truth per
+service wired end-to-end so one change propagates to that service's JAR, Docker image tag, and the
+running app:
 
 ```
-WALLET_VERSION (.env) ──▶ APP_VERSION (compose build arg) ──▶ -Drevision (mvn)
+<SVC>_VERSION (.env) ──▶ APP_VERSION (compose build arg) ──▶ -Drevision (mvn)
    │                                                              │
    └──▶ Docker image tag  wallet-system/<svc>:<ver>               └──▶ pom <version> ──▶ build-info.properties ──▶ GET /actuator/info
 ```
+
+One env var per service drives both that service's `image:` tag and its build:
+
+| Service | env var |
+|---------|---------|
+| wallet app (`app`) | `WALLET_VERSION` |
+| payment-service | `PAYMENT_VERSION` |
+| email-service | `EMAIL_VERSION` |
+| audit-service | `AUDIT_VERSION` |
+| mock-bank | `MOCKBANK_VERSION` |
 
 - **`pom.xml`** uses Maven CI-friendly versions: `<version>${revision}</version>` with a default
   `<revision>1.0.0</revision>` property. Override at build time with `-Drevision=X.Y.Z`.
@@ -29,13 +40,14 @@ WALLET_VERSION (.env) ──▶ APP_VERSION (compose build arg) ──▶ -Drevi
   at `GET /actuator/info` (`build.version`) — scrapeable by the Prometheus/Grafana stack.
 - **Each `Dockerfile`** takes `ARG APP_VERSION` and passes it through as `-Drevision` to the
   package build.
-- **`docker-compose.yml`** feeds `${WALLET_VERSION}` into both the build `args.APP_VERSION` and the
-  `image:` tag for all five build services.
+- **`docker-compose.yml`** feeds each service's `${<SVC>_VERSION}` into both its build
+  `args.APP_VERSION` and its `image:` tag (the in-container build arg is named `APP_VERSION` for
+  every service; only the env var that feeds it differs).
 
-**To bump a version:** set `WALLET_VERSION` in `.env` (also update `.env.example`'s default), then
-`docker compose up --build`. For a plain local Maven build, use `./mvnw package -Drevision=X.Y.Z`.
-Today all five services share one `WALLET_VERSION`; split into per-service vars (e.g. `APP_VERSION`,
-`EMAIL_VERSION`) if you ever need independent release cadences.
+**To bump a version:** bump only the changed service's `<SVC>_VERSION` in `.env` (also update
+`.env.example`'s default), then `docker compose up --build`. For a plain local Maven build, use
+`./mvnw package -Drevision=X.Y.Z`. The next maturity step is to stop hand-editing these and let CI
+derive each version from `git describe`/commit SHA.
 
 Note: CI-friendly `${revision}` needs the `flatten-maven-plugin` only if you `mvn install`/`deploy`
 a service as a Maven dependency — these services aren't consumed that way, so it's intentionally omitted.
