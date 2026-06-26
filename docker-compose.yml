@@ -54,17 +54,21 @@ services:
   mock-bank:
     build:
       context: ./mock-bank
+      args:
+        APP_VERSION: ${WALLET_VERSION:-1.0.0}
     ports:
       - "8081:8081"
     environment:
       WITHDRAW_WEBHOOK_SECRET: ${WITHDRAW_WEBHOOK_SECRET}
     volumes:
       - mock_bank_logs:/app/logs
-    image: wallet-system/mock-bank:${WALLET_VERSION:-0.0.1}
+    image: wallet-system/mock-bank:${WALLET_VERSION:-1.0.0}
 
   app:
     build:
       context: ./wallet_system
+      args:
+        APP_VERSION: ${WALLET_VERSION:-1.0.0}
     ports:
       - "8080:8080"
     environment:
@@ -104,11 +108,13 @@ services:
         condition: service_started
       rabbitmq:
         condition: service_healthy
-    image: wallet-system/app:${WALLET_VERSION:-0.0.1}
+    image: wallet-system/app:${WALLET_VERSION:-1.0.0}
 
   payment-service:
     build:
       context: ./payment-service
+      args:
+        APP_VERSION: ${WALLET_VERSION:-1.0.0}
     ports:
       - "8082:8082"
     environment:
@@ -130,7 +136,7 @@ services:
     depends_on:
       redis:
         condition: service_healthy
-    image: wallet-system/payment-service:${WALLET_VERSION:-0.0.1}
+    image: wallet-system/payment-service:${WALLET_VERSION:-1.0.0}
 
   nginx:
     image: nginx:alpine
@@ -209,6 +215,8 @@ services:
   email-service:
     build:
       context: ./email-service
+      args:
+        APP_VERSION: ${WALLET_VERSION:-1.0.0}
     environment:
       RABBITMQ_HOST: rabbitmq
       RABBITMQ_PORT: 5672
@@ -224,11 +232,13 @@ services:
     depends_on:
       rabbitmq:
         condition: service_healthy
-    image: wallet-system/email-service:${WALLET_VERSION:-0.0.1}
+    image: wallet-system/email-service:${WALLET_VERSION:-1.0.0}
 
   audit-service:
     build:
       context: ./audit-service
+      args:
+        APP_VERSION: ${WALLET_VERSION:-1.0.0}
     environment:
       RABBITMQ_HOST: rabbitmq
       RABBITMQ_PORT: 5672
@@ -243,7 +253,7 @@ services:
         condition: service_healthy
       mongo:
         condition: service_healthy
-    image: wallet-system/audit-service:${WALLET_VERSION:-0.0.1}
+    image: wallet-system/audit-service:${WALLET_VERSION:-1.0.0}
 
   grafana:
     image: grafana/grafana:11.0.0

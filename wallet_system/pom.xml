@@ -10,7 +10,7 @@
     </parent>
     <groupId>org.side_project</groupId>
     <artifactId>wallet_system</artifactId>
-    <version>1.0.0</version>
+    <version>${revision}</version>
     <name>wallet_system</name>
     <description>wallet_system</description>
     <url/>
@@ -27,6 +27,9 @@
         <url/>
     </scm>
     <properties>
+        <!-- Single source of truth for this service's version (Maven CI-friendly versions).
+             Overridden at build time via -Drevision=X.Y.Z (see Dockerfile / docker-compose). -->
+        <revision>1.0.0</revision>
         <java.version>17</java.version>
         <!-- SonarCloud — replace these two values with your project's settings -->
         <sonar.projectKey>Clark1945_wallet_system</sonar.projectKey>
@@ -198,6 +201,15 @@
                         </exclude>
                     </excludes>
                 </configuration>
+                <executions>
+                    <!-- Generates META-INF/build-info.properties so the running app
+                         reports its version at GET /actuator/info. -->
+                    <execution>
+                        <goals>
+                            <goal>build-info</goal>
+                        </goals>
+                    </execution>
+                </executions>
             </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>

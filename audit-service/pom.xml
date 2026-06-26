@@ -10,11 +10,14 @@
     </parent>
     <groupId>org.side_project</groupId>
     <artifactId>audit-service</artifactId>
-    <version>1.0.0</version>
+    <version>${revision}</version>
     <name>audit-service</name>
     <description>Async audit dispatch service — consumes RabbitMQ messages and save it into mongoDB</description>
 
     <properties>
+        <!-- Single source of truth for this service's version (Maven CI-friendly versions).
+             Overridden at build time via -Drevision=X.Y.Z (see Dockerfile / docker-compose). -->
+        <revision>1.0.0</revision>
         <java.version>17</java.version>
     </properties>
 
@@ -125,6 +128,15 @@
                         </exclude>
                     </excludes>
                 </configuration>
+                <executions>
+                    <!-- Generates META-INF/build-info.properties so the running app
+                         reports its version at GET /actuator/info. -->
+                    <execution>
+                        <goals>
+                            <goal>build-info</goal>
+                        </goals>
+                    </execution>
+                </executions>
             </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>

@@ -12,6 +12,34 @@ Five Spring Boot services, fronted by an nginx reverse proxy:
 - **`audit-service/`** — async audit-log consumer (port 8084); consumes RabbitMQ messages and persists them to MongoDB
 - **`nginx/`** — reverse proxy and single browser-facing HTTP entry point (port 80); routes `/payment/**` to payment-service and everything else to the wallet app. See `nginx/nginx.conf`.
 
+## Versioning
+
+Each service carries its own SemVer, with a **single source of truth** wired end-to-end so
+one change propagates to the JAR, the Docker image tag, and the running app:
+
+```
+WALLET_VERSION (.env) ──▶ APP_VERSION (compose build arg) ──▶ -Drevision (mvn)
+   │                                                              │
+   └──▶ Docker image tag  wallet-system/<svc>:<ver>               └──▶ pom <version> ──▶ build-info.properties ──▶ GET /actuator/info
+```
+
+- **`pom.xml`** uses Maven CI-friendly versions: `<version>${revision}</version>` with a default
+  `<revision>1.0.0</revision>` property. Override at build time with `-Drevision=X.Y.Z`.
+- **`spring-boot-maven-plugin`** runs the `build-info` goal, so every service reports its version
+  at `GET /actuator/info` (`build.version`) — scrapeable by the Prometheus/Grafana stack.
+- **Each `Dockerfile`** takes `ARG APP_VERSION` and passes it through as `-Drevision` to the
+  package build.
+- **`docker-compose.yml`** feeds `${WALLET_VERSION}` into both the build `args.APP_VERSION` and the
+  `image:` tag for all five build services.
+
+**To bump a version:** set `WALLET_VERSION` in `.env` (also update `.env.example`'s default), then
+`docker compose up --build`. For a plain local Maven build, use `./mvnw package -Drevision=X.Y.Z`.
+Today all five services share one `WALLET_VERSION`; split into per-service vars (e.g. `APP_VERSION`,
+`EMAIL_VERSION`) if you ever need independent release cadences.
+
+Note: CI-friendly `${revision}` needs the `flatten-maven-plugin` only if you `mvn install`/`deploy`
+a service as a Maven dependency — these services aren't consumed that way, so it's intentionally omitted.
+
 ## Git Hooks (pre-push gate)
 
 Version-controlled hooks live in `.githooks/`. Enable them **once per clone**:
