@@ -10,7 +10,7 @@
     </parent>
     <groupId>org.side_project</groupId>
     <artifactId>payment-service</artifactId>
-    <version>0.0.1-SNAPSHOT</version>
+    <version>1.0.0</version>
     <name>payment-service</name>
     <description>Payment gateway integration service (Stripe + SBPS)</description>
 

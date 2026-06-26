@@ -60,6 +60,7 @@ services:
       WITHDRAW_WEBHOOK_SECRET: ${WITHDRAW_WEBHOOK_SECRET}
     volumes:
       - mock_bank_logs:/app/logs
+    image: wallet-system/mock-bank:${WALLET_VERSION:-0.0.1}
 
   app:
     build:
@@ -103,6 +104,7 @@ services:
         condition: service_started
       rabbitmq:
         condition: service_healthy
+    image: wallet-system/app:${WALLET_VERSION:-0.0.1}
 
   payment-service:
     build:
@@ -128,6 +130,7 @@ services:
     depends_on:
       redis:
         condition: service_healthy
+    image: wallet-system/payment-service:${WALLET_VERSION:-0.0.1}
 
   nginx:
     image: nginx:alpine
@@ -221,6 +224,7 @@ services:
     depends_on:
       rabbitmq:
         condition: service_healthy
+    image: wallet-system/email-service:${WALLET_VERSION:-0.0.1}
 
   audit-service:
     build:
@@ -239,6 +243,7 @@ services:
         condition: service_healthy
       mongo:
         condition: service_healthy
+    image: wallet-system/audit-service:${WALLET_VERSION:-0.0.1}
 
   grafana:
     image: grafana/grafana:11.0.0

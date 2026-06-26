@@ -10,7 +10,7 @@
     </parent>
     <groupId>mockbank</groupId>
     <artifactId>mock-bank</artifactId>
-    <version>0.0.1-SNAPSHOT</version>
+    <version>1.0.0</version>
     <name>mock-bank</name>
     <description>Mock bank server for wallet system withdrawal simulation</description>
 
