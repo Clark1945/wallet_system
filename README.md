@@ -12,22 +12,26 @@
 
 | 服務 | 說明 | Port |
 |------|------|------|
+| [`nginx/`](nginx/) | 反向代理 — 瀏覽器單一進入點 | 80 |
 | [`wallet_system/`](wallet_system/) | 主應用程式 — 身分驗證、錢包、交易 | 8080 |
 | [`mock-bank/`](mock-bank/) | 模擬銀行 API，用於出金 Webhook 測試 | 8081 |
 | [`payment-service/`](payment-service/) | 支付閘道服務 — Stripe、SoftBank Payment | 8082 |
 | [`email-service/`](email-service/) | 非同步 Email 發送服務 — 消費 RabbitMQ 訊息 | 8083 |
+| [`audit-service/`](audit-service/) | 非同步稽核日誌服務 — 消費 RabbitMQ 訊息並寫入 MongoDB | 8084 |
 
 ```
-瀏覽器 ──► wallet_system (8080)
-               │  支付 token
-               ▼
-        payment-service (8082) ──► Stripe / SBPS
-               │  internal API
-               ▼
-        wallet_system (8080) ──► RabbitMQ ──► email-service (8083) ──► SMTP
-               │
-               ▼
-        mock-bank (8081) ── webhook ──► wallet_system
+瀏覽器 ──► nginx (80) ──► wallet_system (8080)
+                            │  支付 token
+                            ▼
+                     payment-service (8082) ──► Stripe / SBPS
+                            │  internal API
+                            ▼
+                     wallet_system (8080)
+                            ├─► RabbitMQ ──► email-service (8083) ──► SMTP
+                            ├─► RabbitMQ ──► audit-service (8084) ──► MongoDB
+                            │
+                            ▼
+                     mock-bank (8081) ── webhook ──► wallet_system
 ```
 
 ### 功能特色
@@ -56,6 +60,7 @@
 
 **可觀測性**
 - TraceId 跨非同步邊界傳播
+- 稽核日誌：認證與金流事件的 append-only 軌跡，經 RabbitMQ 寫入 MongoDB（`audit-service`）
 - Prometheus metrics + Grafana 儀表板（[http://localhost:3000](http://localhost:3000)）
 - Loki + Promtail 集中化日誌
 - RabbitMQ Management UI（[http://localhost:15672](http://localhost:15672)）
@@ -73,13 +78,18 @@ cp .env.example .env
 
 # 2. 建置並啟動所有服務（從 repo 根目錄執行）
 docker compose up --build
+
+# （可選）改用 scripts/dev-up.sh，會自動依 git 為每個服務標上版號
+#   bash scripts/dev-up.sh -d      # Git Bash / macOS / Linux
+#   .\scripts\dev-up.ps1 -d        # Windows PowerShell
 ```
 
-啟動的服務：PostgreSQL、Redis、RabbitMQ、mock-bank、wallet app、payment-service、email-service、Loki、Promtail、Grafana
+啟動的服務：nginx、PostgreSQL、Redis、MongoDB、RabbitMQ、mock-bank、wallet app、payment-service、email-service、audit-service、Prometheus、postgres-exporter、redis-exporter、Loki、Promtail、Grafana
 
 | 入口 | URL |
 |------|-----|
-| 錢包應用 | [http://localhost:8080](http://localhost:8080) |
+| 進入點（nginx） | [http://localhost](http://localhost) |
+| 錢包應用（直連） | [http://localhost:8080](http://localhost:8080) |
 | Grafana | [http://localhost:3000](http://localhost:3000) |
 | RabbitMQ UI | [http://localhost:15672](http://localhost:15672) |
 | Swagger UI | [http://localhost:8080/swagger-ui.html](http://localhost:8080/swagger-ui.html) |
@@ -149,7 +159,7 @@ docker compose up --build
 
 ### 技術棧
 
-Spring Boot 4.0.5 · Java 17 · Spring Security · PostgreSQL 14 · Redis · RabbitMQ · Flyway · Thymeleaf · Stripe · SBPS · Docker Compose · Loki · Grafana · Prometheus
+Spring Boot 4.0.5 · Java 17 · Spring Security · PostgreSQL 14 · Redis · MongoDB · RabbitMQ · Flyway · Thymeleaf · Stripe · SBPS · nginx · Docker Compose · Loki · Grafana · Prometheus
 
 ---
 
@@ -161,22 +171,26 @@ A digital wallet microservices platform built with Spring Boot, featuring multip
 
 | Service | Description | Port |
 |---------|-------------|------|
+| [`nginx/`](nginx/) | Reverse proxy — single browser-facing entry point | 80 |
 | [`wallet_system/`](wallet_system/) | Core app — auth, wallet, transactions | 8080 |
 | [`mock-bank/`](mock-bank/) | Mock bank API for withdrawal webhook simulation | 8081 |
 | [`payment-service/`](payment-service/) | Payment gateway handler — Stripe, SoftBank Payment | 8082 |
 | [`email-service/`](email-service/) | Async email dispatcher — consumes RabbitMQ messages | 8083 |
+| [`audit-service/`](audit-service/) | Async audit-log consumer — consumes RabbitMQ messages, persists to MongoDB | 8084 |
 
 ```
-Browser ──► wallet_system (8080)
-                │  payment token
-                ▼
-         payment-service (8082) ──► Stripe / SBPS
-                │  internal API
-                ▼
-         wallet_system (8080) ──► RabbitMQ ──► email-service (8083) ──► SMTP
-                │
-                ▼
-         mock-bank (8081) ── webhook ──► wallet_system
+Browser ──► nginx (80) ──► wallet_system (8080)
+                             │  payment token
+                             ▼
+                      payment-service (8082) ──► Stripe / SBPS
+                             │  internal API
+                             ▼
+                      wallet_system (8080)
+                             ├─► RabbitMQ ──► email-service (8083) ──► SMTP
+                             ├─► RabbitMQ ──► audit-service (8084) ──► MongoDB
+                             │
+                             ▼
+                      mock-bank (8081) ── webhook ──► wallet_system
 ```
 
 ### Features
@@ -205,6 +219,7 @@ Browser ──► wallet_system (8080)
 
 **Observability**
 - TraceId propagation across async boundaries
+- Audit log: append-only trail of auth & money events, persisted to MongoDB via RabbitMQ (`audit-service`)
 - Prometheus metrics + Grafana dashboard ([http://localhost:3000](http://localhost:3000))
 - Centralized logging with Loki + Promtail
 - RabbitMQ Management UI ([http://localhost:15672](http://localhost:15672))
@@ -222,13 +237,18 @@ cp .env.example .env
 
 # 2. Build and start all services (run from repo root)
 docker compose up --build
+
+# (optional) use scripts/dev-up.sh instead — it auto-tags each service's version from git
+#   bash scripts/dev-up.sh -d      # Git Bash / macOS / Linux
+#   .\scripts\dev-up.ps1 -d        # Windows PowerShell
 ```
 
-Starts: PostgreSQL, Redis, RabbitMQ, mock-bank, wallet app, payment-service, email-service, Loki, Promtail, Grafana
+Starts: nginx, PostgreSQL, Redis, MongoDB, RabbitMQ, mock-bank, wallet app, payment-service, email-service, audit-service, Prometheus, postgres-exporter, redis-exporter, Loki, Promtail, Grafana
 
 | Endpoint | URL |
 |----------|-----|
-| Wallet app | [http://localhost:8080](http://localhost:8080) |
+| Entry point (nginx) | [http://localhost](http://localhost) |
+| Wallet app (direct) | [http://localhost:8080](http://localhost:8080) |
 | Grafana | [http://localhost:3000](http://localhost:3000) |
 | RabbitMQ UI | [http://localhost:15672](http://localhost:15672) |
 | Swagger UI | [http://localhost:8080/swagger-ui.html](http://localhost:8080/swagger-ui.html) |
@@ -298,7 +318,7 @@ If no webhook arrives within 5 minutes, `TransactionTimeoutJob` automatically re
 
 ### Tech Stack
 
-Spring Boot 4.0.5 · Java 17 · Spring Security · PostgreSQL 14 · Redis · RabbitMQ · Flyway · Thymeleaf · Stripe · SBPS · Docker Compose · Loki · Grafana · Prometheus
+Spring Boot 4.0.5 · Java 17 · Spring Security · PostgreSQL 14 · Redis · MongoDB · RabbitMQ · Flyway · Thymeleaf · Stripe · SBPS · nginx · Docker Compose · Loki · Grafana · Prometheus
 
 ---
 
@@ -310,22 +330,26 @@ Spring Boot で構築されたデジタルウォレットのマイクロサー�
 
 | サービス | 説明 | Port |
 |---------|------|------|
+| [`nginx/`](nginx/) | リバースプロキシ — ブラウザ単一エントリポイント | 80 |
 | [`wallet_system/`](wallet_system/) | メインアプリ — 認証・ウォレット・取引 | 8080 |
 | [`mock-bank/`](mock-bank/) | 出金 Webhook テスト用モック銀行 API | 8081 |
 | [`payment-service/`](payment-service/) | 決済ゲートウェイサービス — Stripe・SoftBank Payment | 8082 |
 | [`email-service/`](email-service/) | 非同期 Email 送信サービス — RabbitMQ メッセージを消費 | 8083 |
+| [`audit-service/`](audit-service/) | 非同期監査ログサービス — RabbitMQ メッセージを消費し MongoDB に永続化 | 8084 |
 
 ```
-ブラウザ ──► wallet_system (8080)
-                 │  支払いトークン
-                 ▼
-          payment-service (8082) ──► Stripe / SBPS
-                 │  internal API
-                 ▼
-          wallet_system (8080) ──► RabbitMQ ──► email-service (8083) ──► SMTP
-                 │
-                 ▼
-          mock-bank (8081) ── webhook ──► wallet_system
+ブラウザ ──► nginx (80) ──► wallet_system (8080)
+                             │  支払いトークン
+                             ▼
+                      payment-service (8082) ──► Stripe / SBPS
+                             │  internal API
+                             ▼
+                      wallet_system (8080)
+                             ├─► RabbitMQ ──► email-service (8083) ──► SMTP
+                             ├─► RabbitMQ ──► audit-service (8084) ──► MongoDB
+                             │
+                             ▼
+                      mock-bank (8081) ── webhook ──► wallet_system
 ```
 
 ### 機能一覧
@@ -354,6 +378,7 @@ Spring Boot で構築されたデジタルウォレットのマイクロサー�
 
 **可観測性**
 - 非同期処理を跨ぐ TraceId 伝播
+- 監査ログ：認証・金銭イベントの追記専用トレイルを RabbitMQ 経由で MongoDB に永続化（`audit-service`）
 - Prometheus メトリクス + Grafana ダッシュボード（[http://localhost:3000](http://localhost:3000)）
 - Loki + Promtail による集中ログ管理
 - RabbitMQ Management UI（[http://localhost:15672](http://localhost:15672)）
@@ -371,13 +396,18 @@ cp .env.example .env
 
 # 2. 全サービスをビルド・起動（リポジトリルートで実行）
 docker compose up --build
+
+# （任意）scripts/dev-up.sh を使うと git からサービスごとにバージョンを自動付与します
+#   bash scripts/dev-up.sh -d      # Git Bash / macOS / Linux
+#   .\scripts\dev-up.ps1 -d        # Windows PowerShell
 ```
 
-起動されるサービス：PostgreSQL、Redis、RabbitMQ、mock-bank、wallet app、payment-service、email-service、Loki、Promtail、Grafana
+起動されるサービス：nginx、PostgreSQL、Redis、MongoDB、RabbitMQ、mock-bank、wallet app、payment-service、email-service、audit-service、Prometheus、postgres-exporter、redis-exporter、Loki、Promtail、Grafana
 
 | 入口 | URL |
 |------|-----|
-| ウォレットアプリ | [http://localhost:8080](http://localhost:8080) |
+| エントリポイント（nginx） | [http://localhost](http://localhost) |
+| ウォレットアプリ（直接） | [http://localhost:8080](http://localhost:8080) |
 | Grafana | [http://localhost:3000](http://localhost:3000) |
 | RabbitMQ UI | [http://localhost:15672](http://localhost:15672) |
 | Swagger UI | [http://localhost:8080/swagger-ui.html](http://localhost:8080/swagger-ui.html) |
@@ -447,6 +477,4 @@ docker compose up --build
 
 ### 技術スタック
 
-Spring Boot 4.0.5 · Java 17 · Spring Security · PostgreSQL 14 · Redis · RabbitMQ · Flyway · Thymeleaf · Stripe · SBPS · Docker Compose · Loki · Grafana · Prometheus
-
-.\build-and-run.ps1 -s -d  
+Spring Boot 4.0.5 · Java 17 · Spring Security · PostgreSQL 14 · Redis · MongoDB · RabbitMQ · Flyway · Thymeleaf · Stripe · SBPS · nginx · Docker Compose · Loki · Grafana · Prometheus
