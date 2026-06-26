@@ -44,8 +44,9 @@ One env var per service drives both that service's `image:` tag and its build:
   `args.APP_VERSION` and its `image:` tag (the in-container build arg is named `APP_VERSION` for
   every service; only the env var that feeds it differs).
 
-**Automatic versioning (preferred for local demo):** run `bash scripts/dev-up.sh` instead of
-`docker compose up --build`. It derives each service's version on the host from git — the short SHA
+**Automatic versioning (preferred for local demo):** run `bash scripts/dev-up.sh` (or, on Windows
+without Git Bash, `powershell -ExecutionPolicy Bypass -File scripts\dev-up.ps1` — same logic) instead
+of `docker compose up --build`. It derives each service's version on the host from git — the short SHA
 of the last commit that touched that service's directory (`<base>-<sha>`, plus `-dirty` if that
 service has uncommitted changes) — exports the `<SVC>_VERSION` vars, and runs compose. So you never
 hand-edit a version: change only `email-service`, and only its image tag/SHA advances. The semantic
