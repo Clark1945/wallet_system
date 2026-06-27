@@ -62,6 +62,7 @@
 - TraceId 跨非同步邊界傳播
 - 稽核日誌：認證與金流事件的 append-only 軌跡，經 RabbitMQ 寫入 MongoDB（`audit-service`）
 - Prometheus metrics + Grafana 儀表板（[http://localhost:3000](http://localhost:3000)）
+- Prometheus 告警規則 + Alertmanager（[http://localhost:9093](http://localhost:9093)）：DLQ 堆積、佇列積壓、RabbitMQ 失聯時觸發告警
 - Loki + Promtail 集中化日誌
 - RabbitMQ Management UI（[http://localhost:15672](http://localhost:15672)）
 - Swagger UI：[http://localhost:8080/swagger-ui.html](http://localhost:8080/swagger-ui.html)
@@ -84,13 +85,15 @@ docker compose up --build
 #   .\scripts\dev-up.ps1 -d        # Windows PowerShell
 ```
 
-啟動的服務：nginx、PostgreSQL、Redis、MongoDB、RabbitMQ、mock-bank、wallet app、payment-service、email-service、audit-service、Prometheus、postgres-exporter、redis-exporter、Loki、Promtail、Grafana
+啟動的服務：nginx、PostgreSQL、Redis、MongoDB、RabbitMQ、mock-bank、wallet app、payment-service、email-service、audit-service、Prometheus、Alertmanager、postgres-exporter、redis-exporter、Loki、Promtail、Grafana
 
 | 入口 | URL |
 |------|-----|
 | 進入點（nginx） | [http://localhost](http://localhost) |
 | 錢包應用（直連） | [http://localhost:8080](http://localhost:8080) |
 | Grafana | [http://localhost:3000](http://localhost:3000) |
+| Prometheus | [http://localhost:9090](http://localhost:9090) |
+| Alertmanager | [http://localhost:9093](http://localhost:9093) |
 | RabbitMQ UI | [http://localhost:15672](http://localhost:15672) |
 | Swagger UI | [http://localhost:8080/swagger-ui.html](http://localhost:8080/swagger-ui.html) |
 
@@ -221,6 +224,7 @@ Browser ──► nginx (80) ──► wallet_system (8080)
 - TraceId propagation across async boundaries
 - Audit log: append-only trail of auth & money events, persisted to MongoDB via RabbitMQ (`audit-service`)
 - Prometheus metrics + Grafana dashboard ([http://localhost:3000](http://localhost:3000))
+- Prometheus alert rules + Alertmanager ([http://localhost:9093](http://localhost:9093)): fires on dead-letter queue buildup, queue backlog, and RabbitMQ outage
 - Centralized logging with Loki + Promtail
 - RabbitMQ Management UI ([http://localhost:15672](http://localhost:15672))
 - Swagger UI: [http://localhost:8080/swagger-ui.html](http://localhost:8080/swagger-ui.html)
@@ -243,13 +247,15 @@ docker compose up --build
 #   .\scripts\dev-up.ps1 -d        # Windows PowerShell
 ```
 
-Starts: nginx, PostgreSQL, Redis, MongoDB, RabbitMQ, mock-bank, wallet app, payment-service, email-service, audit-service, Prometheus, postgres-exporter, redis-exporter, Loki, Promtail, Grafana
+Starts: nginx, PostgreSQL, Redis, MongoDB, RabbitMQ, mock-bank, wallet app, payment-service, email-service, audit-service, Prometheus, Alertmanager, postgres-exporter, redis-exporter, Loki, Promtail, Grafana
 
 | Endpoint | URL |
 |----------|-----|
 | Entry point (nginx) | [http://localhost](http://localhost) |
 | Wallet app (direct) | [http://localhost:8080](http://localhost:8080) |
 | Grafana | [http://localhost:3000](http://localhost:3000) |
+| Prometheus | [http://localhost:9090](http://localhost:9090) |
+| Alertmanager | [http://localhost:9093](http://localhost:9093) |
 | RabbitMQ UI | [http://localhost:15672](http://localhost:15672) |
 | Swagger UI | [http://localhost:8080/swagger-ui.html](http://localhost:8080/swagger-ui.html) |
 
@@ -380,6 +386,7 @@ Spring Boot で構築されたデジタルウォレットのマイクロサー�
 - 非同期処理を跨ぐ TraceId 伝播
 - 監査ログ：認証・金銭イベントの追記専用トレイルを RabbitMQ 経由で MongoDB に永続化（`audit-service`）
 - Prometheus メトリクス + Grafana ダッシュボード（[http://localhost:3000](http://localhost:3000)）
+- Prometheus アラートルール + Alertmanager（[http://localhost:9093](http://localhost:9093)）：DLQ 滞留・キュー滞積・RabbitMQ 不通時にアラート発火
 - Loki + Promtail による集中ログ管理
 - RabbitMQ Management UI（[http://localhost:15672](http://localhost:15672)）
 - Swagger UI：[http://localhost:8080/swagger-ui.html](http://localhost:8080/swagger-ui.html)
@@ -402,13 +409,15 @@ docker compose up --build
 #   .\scripts\dev-up.ps1 -d        # Windows PowerShell
 ```
 
-起動されるサービス：nginx、PostgreSQL、Redis、MongoDB、RabbitMQ、mock-bank、wallet app、payment-service、email-service、audit-service、Prometheus、postgres-exporter、redis-exporter、Loki、Promtail、Grafana
+起動されるサービス：nginx、PostgreSQL、Redis、MongoDB、RabbitMQ、mock-bank、wallet app、payment-service、email-service、audit-service、Prometheus、Alertmanager、postgres-exporter、redis-exporter、Loki、Promtail、Grafana
 
 | 入口 | URL |
 |------|-----|
 | エントリポイント（nginx） | [http://localhost](http://localhost) |
 | ウォレットアプリ（直接） | [http://localhost:8080](http://localhost:8080) |
 | Grafana | [http://localhost:3000](http://localhost:3000) |
+| Prometheus | [http://localhost:9090](http://localhost:9090) |
+| Alertmanager | [http://localhost:9093](http://localhost:9093) |
 | RabbitMQ UI | [http://localhost:15672](http://localhost:15672) |
 | Swagger UI | [http://localhost:8080/swagger-ui.html](http://localhost:8080/swagger-ui.html) |
 

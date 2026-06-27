@@ -103,10 +103,11 @@ using the SDKMAN-default JDK (keep it on Java 17 — JaCoCo 0.8.12 cannot instru
 # Full stack — run from repo root
 # Requires wallet_system/.env (copy from .env.example and fill in credentials)
 # Starts: nginx, PostgreSQL, Redis, MongoDB, RabbitMQ, mock-bank, wallet app, payment-service,
-#         email-service, audit-service, Prometheus, postgres-exporter, redis-exporter,
-#         Loki, Promtail, Grafana
+#         email-service, audit-service, Prometheus, Alertmanager, postgres-exporter,
+#         redis-exporter, Loki, Promtail, Grafana
 docker compose up --build
 # Entry point (via nginx): http://localhost  |  Grafana: http://localhost:3000
+#   Prometheus: http://localhost:9090  |  Alertmanager: http://localhost:9093
 # The wallet app's own port 8080 is also published for direct access during development.
 
 # email-service only
@@ -154,12 +155,38 @@ RabbitMQ Management UI: `http://localhost:15672` (credentials from `RABBITMQ_USE
 Audit logging is decoupled from business logic the same way email is:
 
 1. `wallet_system` enriches an `AuditLog` (actor, action, result, request context) and **publishes** it via `AuditLogPublisher` → `RabbitTemplate.convertAndSend(exchange="wallet.audit.log", routingKey="audit.log.notification")`. It no longer writes to its own DB.
-2. RabbitMQ routes to durable queue `audit.log.notification` (with dead-letter queue `audit.log.notification.dlq` for poison messages).
+2. RabbitMQ routes to durable queue `audit.log.notification` (with dead-letter queue `audit.log.notification.dlq` for poison messages). The DLQ has **no listener by design** — it holds un-processable messages for manual inspection; a Prometheus alert fires when it is non-empty (see "Observability & Alerting").
 3. `audit-service` `@RabbitListener` consumes the message and persists it to the MongoDB `audit_logs` collection.
 
 The publisher stamps a `__TypeId__` header; `audit-service` configures `Jackson2JavaTypeMapper.TypePrecedence.INFERRED` so the message deserializes into its own `AuditLog` type. The Jackson 2 `ObjectMapper` is built explicitly (Spring Boot 4 auto-configures a Jackson 3 bean) with `JavaTimeModule` registered for the `java.time` fields.
 
 Test profile: `NoOpAuditLogPublisher` (`@Profile("test")`) on the wallet side — no RabbitMQ/MongoDB needed for tests.
+
+## Observability & Alerting
+
+The monitoring stack is **Prometheus + Alertmanager + Grafana**, with config under
+`wallet_system/observability/`:
+
+- **`prometheus.yml`** — scrapes every service's `/actuator/prometheus`, the exporters, and
+  RabbitMQ. It references `alert.rules.yml` and routes firing alerts to `alertmanager:9093`.
+- **`alert.rules.yml`** — alert rules (see below).
+- **`alertmanager.yml`** — routing/receivers. Ships with a **no-op default receiver**, so alerts are
+  evaluated and visible in the UIs but **not pushed anywhere until you fill in a Slack/email receiver**
+  (templates are commented in the file). Mounted into the `alertmanager` service in `docker-compose.yml`
+  (UI: `http://localhost:9093`; Prometheus alerts page: `http://localhost:9090/alerts`).
+
+**Per-queue metrics gotcha:** RabbitMQ's `rabbitmq_prometheus` plugin exposes only *aggregated*
+metrics at `/metrics` — it does **not** include per-queue depth. To watch DLQ/queue depth, a second
+scrape job (`rabbitmq-detailed`) hits `/metrics/detailed?family=queue_coarse_metrics`, which yields
+`rabbitmq_detailed_queue_messages{queue="…"}`. The `family` filter keeps cardinality bounded.
+
+Alert rules currently defined:
+
+| Alert | Expr (abridged) | Fires when |
+|-------|-----------------|------------|
+| `RabbitMQDeadLetterQueueNotEmpty` | `rabbitmq_detailed_queue_messages{queue=~".*\.dlq"} > 0` for 1m | Any `*.dlq` holds a poison message (covers both `audit.log.notification.dlq` and `email.notifications.dlq`) |
+| `AuditQueueBackingUp` | `…{queue="audit.log.notification"} > 100` for 5m | audit-service down or lagging |
+| `RabbitMQDown` | `up{job="rabbitmq"} == 0` for 1m | Broker unreachable (critical) |
 
 ## Deposit Flow (Cross-Service)
 
