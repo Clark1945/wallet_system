@@ -195,6 +195,9 @@ services:
       - --config.file=/etc/alertmanager/alertmanager.yml
     volumes:
       - ./wallet_system/observability/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      # SMTP app password, kept out of git (see .gitignore). Copy the .example file
+      # and fill in your Gmail app password before starting.
+      - ./wallet_system/observability/alertmanager-smtp-password:/etc/alertmanager/smtp_password:ro
 
   loki:
     image: grafana/loki:3.0.0

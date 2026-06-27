@@ -37,6 +37,9 @@ uploads/
 application-local.yaml
 application-local.yml
 
+### Secrets (keep the .example, ignore the real file) ###
+wallet_system/observability/alertmanager-smtp-password
+
 ### Claude Code ###
 # Ignore local Claude config, but keep shared project skills tracked
 .claude/*

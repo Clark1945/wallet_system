@@ -1,34 +1,42 @@
 # Alertmanager configuration.
 #
-# Out of the box every alert is routed to the 'default' receiver, which has no
-# notification integration — so alerts are evaluated and visible in the
-# Alertmanager UI (http://localhost:9093) and Prometheus (http://localhost:9090/alerts),
-# but nothing is pushed anywhere yet. To actually get notified, uncomment and fill
-# in one of the receivers below (Slack or email) and point the route at it.
+# Firing alerts are routed to the 'email' receiver below, which sends mail via
+# Gmail SMTP. The SMTP app password is NOT stored in this file (which is in git);
+# it is read at runtime from `auth_password_file`, mounted into the container from
+# a gitignored host file (see docker-compose.yml + .gitignore).
+#
+# To enable notifications:
+#   1. Create wallet_system/observability/alertmanager-smtp-password with your
+#      Gmail app password as the only content (copy the .example file).
+#   2. Set `from` / `auth_username` below to the Gmail account that owns that
+#      app password (defaults to the alert recipient).
+#   3. (Re)start the alertmanager container.
+# Alerts remain visible in the UI (http://localhost:9093) regardless.
 
 route:
-  receiver: default
+  receiver: email
   group_by: ['alertname']
   group_wait: 30s
   group_interval: 5m
   repeat_interval: 4h
 
 receivers:
-  - name: default
+  - name: email
+    email_configs:
+      - to: 'dmc950213@gmail.com'
+        from: 'dmc950213@gmail.com'
+        smarthost: 'smtp.gmail.com:587'
+        auth_username: 'dmc950213@gmail.com'
+        auth_password_file: '/etc/alertmanager/smtp_password'
+        require_tls: true
+        send_resolved: true
+        headers:
+          Subject: '[wallet-system] {{ .CommonAnnotations.summary }}'
 
-  # --- Slack (recommended; fill in your incoming-webhook URL) ---
+  # --- Slack (alternative; fill in your incoming-webhook URL and repoint route) ---
   # - name: slack
   #   slack_configs:
   #     - api_url: 'https://hooks.slack.com/services/XXX/YYY/ZZZ'
   #       channel: '#alerts'
   #       title: '{{ .CommonAnnotations.summary }}'
   #       text: '{{ .CommonAnnotations.description }}'
-
-  # --- Email ---
-  # - name: email
-  #   email_configs:
-  #     - to: 'oncall@example.com'
-  #       from: 'alertmanager@example.com'
-  #       smarthost: 'smtp.gmail.com:587'
-  #       auth_username: 'you@gmail.com'
-  #       auth_password: 'app-password'
