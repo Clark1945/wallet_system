@@ -1,0 +1,35 @@
+groups:
+  - name: rabbitmq
+    rules:
+      # Any message in a dead-letter queue means a "poison" message that the
+      # consumer could not process (e.g. deserialization failure). DLQs have no
+      # listener by design — they hold messages for manual inspection — so a
+      # non-empty DLQ needs a human to look. Matches every *.dlq queue.
+      - alert: RabbitMQDeadLetterQueueNotEmpty
+        expr: rabbitmq_detailed_queue_messages{queue=~".*\\.dlq"} > 0
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Dead-letter queue {{ $labels.queue }} is not empty"
+          description: "{{ $labels.queue }} holds {{ $value }} poison message(s). No consumer drains a DLQ; inspect via the RabbitMQ Management UI (http://localhost:15672) and re-publish or discard."
+
+      # Main audit queue backing up — consumer (audit-service) is down or too slow.
+      - alert: AuditQueueBackingUp
+        expr: rabbitmq_detailed_queue_messages{queue="audit.log.notification"} > 100
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Audit queue backing up ({{ $value }} messages)"
+          description: "audit.log.notification has {{ $value }} undelivered messages for 5m — audit-service may be down or lagging."
+
+      # Broker itself unreachable.
+      - alert: RabbitMQDown
+        expr: up{job="rabbitmq"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "RabbitMQ is down"
+          description: "Prometheus cannot scrape rabbitmq:15692. Email and audit delivery are stalled."
