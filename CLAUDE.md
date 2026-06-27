@@ -170,10 +170,11 @@ The monitoring stack is **Prometheus + Alertmanager + Grafana**, with config und
 - **`prometheus.yml`** — scrapes every service's `/actuator/prometheus`, the exporters, and
   RabbitMQ. It references `alert.rules.yml` and routes firing alerts to `alertmanager:9093`.
 - **`alert.rules.yml`** — alert rules (see below).
-- **`alertmanager.yml`** — routing/receivers. Ships with a **no-op default receiver**, so alerts are
-  evaluated and visible in the UIs but **not pushed anywhere until you fill in a Slack/email receiver**
-  (templates are commented in the file). Mounted into the `alertmanager` service in `docker-compose.yml`
-  (UI: `http://localhost:9093`; Prometheus alerts page: `http://localhost:9090/alerts`).
+- **`alertmanager.yml`** — routing/receivers. Routes all firing alerts to an **email receiver**
+  (Gmail SMTP). A commented Slack template is also included. Mounted into the `alertmanager` service
+  in `docker-compose.yml` (UI: `http://localhost:9093`; Prometheus alerts page:
+  `http://localhost:9090/alerts`). See "Alert email & the SMTP password secret" below for how the
+  password is supplied without ever entering git.
 
 **Per-queue metrics gotcha:** RabbitMQ's `rabbitmq_prometheus` plugin exposes only *aggregated*
 metrics at `/metrics` — it does **not** include per-queue depth. To watch DLQ/queue depth, a second
@@ -187,6 +188,33 @@ Alert rules currently defined:
 | `RabbitMQDeadLetterQueueNotEmpty` | `rabbitmq_detailed_queue_messages{queue=~".*\.dlq"} > 0` for 1m | Any `*.dlq` holds a poison message (covers both `audit.log.notification.dlq` and `email.notifications.dlq`) |
 | `AuditQueueBackingUp` | `…{queue="audit.log.notification"} > 100` for 5m | audit-service down or lagging |
 | `RabbitMQDown` | `up{job="rabbitmq"} == 0` for 1m | Broker unreachable (critical) |
+
+### Alert email & the SMTP password secret
+
+Alertmanager sends alert email via Gmail SMTP. The app password is **never stored in git** —
+`alertmanager.yml` reads it at runtime from `auth_password_file: /etc/alertmanager/smtp_password`,
+and that path is populated differently per environment:
+
+- **Local/dev** — the base `docker-compose.yml` bind-mounts the gitignored host file
+  `wallet_system/observability/alertmanager-smtp-password` to that path. Create it once by copying
+  `alertmanager-smtp-password.example` and pasting your Gmail **app password** (not your login
+  password — generate one under Google Account → Security → App passwords). Then
+  `docker compose up -d alertmanager`. The committed `.example` documents the expected format.
+- **Production** — bring up the stack with the prod override:
+  `docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d`. `docker-compose.prod.yml`
+  re-points the same container path to a host file **outside the repo**
+  (`/etc/wallet-system/secrets/alertmanager-smtp-password`) that your deploy pipeline writes from a
+  secret store (GitHub Actions secret, Vault, SSM, …). Compose merges `volumes` by container path,
+  so the prod entry cleanly replaces the dev bind-mount; `alertmanager.yml` is unchanged. Alertmanager
+  cannot read env vars in its config — if your platform only exposes the secret as an env var, write
+  it to a file via an entrypoint and point `auth_password_file` there (or use Docker/K8s secrets,
+  which mount as files).
+
+Verify a send without waiting for a real alert: `POST /api/v2/alerts` a synthetic alert to
+`alertmanager:9093`, or publish a message to a `*.dlq` queue; then check
+`alertmanager_notifications_total{integration="email"}` increments and
+`alertmanager_notifications_failed_total{integration="email",...}` stays `0` at
+`http://localhost:9093/metrics`.
 
 ## Deposit Flow (Cross-Service)
 

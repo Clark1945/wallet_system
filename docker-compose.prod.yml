@@ -1,0 +1,27 @@
+# Production overrides for docker-compose.yml.
+#
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+#
+# The only delta from the base compose is HOW the Alertmanager SMTP app password
+# is supplied.
+#
+# In dev, the base docker-compose.yml bind-mounts the gitignored host file
+# wallet_system/observability/alertmanager-smtp-password into the container. That
+# file is intentionally NOT in git, so it does not exist on a production host.
+#
+# In prod the password must be injected out-of-band by your deploy pipeline — it
+# never lives in the repo. Here we read it from a file written OUTSIDE the repo
+# (e.g. a deploy step that does `echo "$SMTP_PWD" > /etc/wallet-system/secrets/...`
+# from a GitHub Actions / Vault / SSM secret). Compose merges `volumes` by the
+# container mount path, so the entry below REPLACES the dev bind-mount for
+# /etc/alertmanager/smtp_password — the in-repo dev path is never referenced in
+# production. alertmanager.yml is unchanged: it still reads
+# auth_password_file: /etc/alertmanager/smtp_password.
+
+services:
+  alertmanager:
+    volumes:
+      - ./wallet_system/observability/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      # Host path populated by the deploy pipeline from a secret store; not in git.
+      - /etc/wallet-system/secrets/alertmanager-smtp-password:/etc/alertmanager/smtp_password:ro

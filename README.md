@@ -97,6 +97,32 @@ docker compose up --build
 | RabbitMQ UI | [http://localhost:15672](http://localhost:15672) |
 | Swagger UI | [http://localhost:8080/swagger-ui.html](http://localhost:8080/swagger-ui.html) |
 
+### 告警 Email 通知
+
+Alertmanager 透過 Gmail SMTP 寄送告警信。**SMTP app password 不進 git**，Alertmanager 於執行時從
+`auth_password_file`(容器內 `/etc/alertmanager/smtp_password`)讀取,各環境注入方式不同:
+
+- **本地/開發**:`docker-compose.yml` 會把被 gitignore 的
+  `wallet_system/observability/alertmanager-smtp-password` 掛載進去。第一次先複製範本並填入 Gmail
+  app password(非登入密碼,於 Google 帳號 → 安全性 → 應用程式密碼產生):
+
+  ```bash
+  cp wallet_system/observability/alertmanager-smtp-password.example \
+     wallet_system/observability/alertmanager-smtp-password
+  # 編輯該檔貼上 app password,然後:
+  docker compose up -d alertmanager
+  ```
+
+- **正式環境**:用 prod override 啟動,密碼改由部署流程從 secret store(GitHub Actions secret、Vault、
+  SSM…)寫到 **repo 之外**的檔案,完全不經過 git:
+
+  ```bash
+  docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+  ```
+
+  `docker-compose.prod.yml` 把同一個容器路徑改指向 `/etc/wallet-system/secrets/alertmanager-smtp-password`
+  (compose 以容器路徑為鍵合併 volume,故乾淨取代開發用的掛載);`alertmanager.yml` 不需改動。
+
 ### 測試帳號（Demo）
 
 無需填寫憑證即可體驗功能：
@@ -259,6 +285,36 @@ Starts: nginx, PostgreSQL, Redis, MongoDB, RabbitMQ, mock-bank, wallet app, paym
 | RabbitMQ UI | [http://localhost:15672](http://localhost:15672) |
 | Swagger UI | [http://localhost:8080/swagger-ui.html](http://localhost:8080/swagger-ui.html) |
 
+### Alert email notifications
+
+Alertmanager sends alert email via Gmail SMTP. The **SMTP app password never enters git** —
+Alertmanager reads it at runtime from `auth_password_file` (`/etc/alertmanager/smtp_password` in the
+container), supplied differently per environment:
+
+- **Local/dev** — `docker-compose.yml` bind-mounts the gitignored
+  `wallet_system/observability/alertmanager-smtp-password`. Create it once from the template and paste
+  your Gmail app password (not your login password — generate one under Google Account → Security →
+  App passwords):
+
+  ```bash
+  cp wallet_system/observability/alertmanager-smtp-password.example \
+     wallet_system/observability/alertmanager-smtp-password
+  # edit the file, paste the app password, then:
+  docker compose up -d alertmanager
+  ```
+
+- **Production** — bring the stack up with the prod override; the password is injected by your deploy
+  pipeline from a secret store (GitHub Actions secret, Vault, SSM, …) into a file **outside the repo**,
+  never via git:
+
+  ```bash
+  docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+  ```
+
+  `docker-compose.prod.yml` re-points the same container path to
+  `/etc/wallet-system/secrets/alertmanager-smtp-password` (Compose merges volumes by container path, so
+  it cleanly replaces the dev bind-mount); `alertmanager.yml` is unchanged.
+
 ### Demo Account
 
 Try the app without configuring any credentials:
@@ -420,6 +476,35 @@ docker compose up --build
 | Alertmanager | [http://localhost:9093](http://localhost:9093) |
 | RabbitMQ UI | [http://localhost:15672](http://localhost:15672) |
 | Swagger UI | [http://localhost:8080/swagger-ui.html](http://localhost:8080/swagger-ui.html) |
+
+### アラートメール通知
+
+Alertmanager は Gmail SMTP でアラートメールを送信します。**SMTP アプリパスワードは git に入れません**。
+Alertmanager は実行時に `auth_password_file`(コンテナ内 `/etc/alertmanager/smtp_password`)から読み込み、
+環境ごとに注入方法が異なります:
+
+- **ローカル/開発** — `docker-compose.yml` が gitignore 済みの
+  `wallet_system/observability/alertmanager-smtp-password` をマウントします。初回はテンプレートを複製し、
+  Gmail アプリパスワード(ログインパスワードではなく、Google アカウント → セキュリティ → アプリパスワード
+  で生成)を貼り付けます:
+
+  ```bash
+  cp wallet_system/observability/alertmanager-smtp-password.example \
+     wallet_system/observability/alertmanager-smtp-password
+  # ファイルを編集してアプリパスワードを貼り付け、その後:
+  docker compose up -d alertmanager
+  ```
+
+- **本番環境** — prod オーバーライドで起動します。パスワードはデプロイパイプラインが secret store
+  (GitHub Actions secret、Vault、SSM…)から **リポジトリ外** のファイルへ書き出し、git を一切経由しません:
+
+  ```bash
+  docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+  ```
+
+  `docker-compose.prod.yml` は同じコンテナパスを `/etc/wallet-system/secrets/alertmanager-smtp-password`
+  に向け直します(Compose はコンテナパスをキーに volume をマージするため、開発用マウントをきれいに置き換え
+  ます)。`alertmanager.yml` は変更不要です。
 
 ### デモアカウント
 
