@@ -16,7 +16,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -145,7 +145,7 @@ public class AuthService {
     @Transactional
     public void updateLastLogin(UUID memberId) {
         memberRepository.findById(memberId).ifPresent(m -> {
-            m.setLastLoginAt(LocalDateTime.now());
+            m.setLastLoginAt(Instant.now());
             memberRepository.save(m);
         });
     }

@@ -242,7 +242,7 @@
             </thead>
             <tbody>
             <tr th:each="tx : ${txPage.content}">
-                <td th:text="${#temporals.format(tx.createdAt, 'yyyy-MM-dd HH:mm')}"></td>
+                <td th:text="${#temporals.format(tx.createdAtLocal, 'yyyy-MM-dd HH:mm')}"></td>
                 <td>
                     <span class="type-badge"
                           th:classappend="'type-' + ${tx.type}"

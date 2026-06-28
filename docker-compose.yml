@@ -77,6 +77,10 @@ services:
     ports:
       - "8080:8080"
     environment:
+      # Local time zone for log timestamps and LocalDate.now() ("today"). Stored event times are
+      # absolute UTC instants (Instant/timestamptz) and do NOT depend on this — display conversion
+      # to Asia/Taipei happens in the app (AppZone). Taiwan has no DST.
+      TZ: Asia/Taipei
       SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/wallet_db
       SPRING_DATASOURCE_USERNAME: postgres
       SPRING_DATASOURCE_PASSWORD: postgres
@@ -276,6 +280,8 @@ services:
       RABBITMQ_USER: ${RABBITMQ_USER}
       RABBITMQ_PASS: ${RABBITMQ_PASS}
       MONGODB_URI: mongodb://mongo:27017/audit
+      # Local time zone for log readability only; audit timestamps are absolute Instants.
+      TZ: Asia/Taipei
     volumes:
       - audit_service_logs:/app/logs
     restart: on-failure

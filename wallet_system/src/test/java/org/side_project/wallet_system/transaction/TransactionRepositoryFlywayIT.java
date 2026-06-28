@@ -2,6 +2,7 @@ package org.side_project.wallet_system.transaction;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.side_project.wallet_system.config.AppZone;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase;
@@ -85,7 +86,9 @@ class TransactionRepositoryFlywayIT {
     void transactionSpec_filtersByDateRange() {
         save(TransactionType.DEPOSIT, "100.00", walletId); // created_at = now() via @PrePersist
 
-        LocalDate today = LocalDate.now();
+        // Use the same zone the filter interprets dates in, so "today" lines up with the just-saved
+        // row's instant regardless of the CI host's zone.
+        LocalDate today = LocalDate.now(AppZone.DISPLAY);
         assertThat(transactionRepository.findAll(
                 TransactionSpec.filter(walletId, null, today, today))).hasSize(1);
 

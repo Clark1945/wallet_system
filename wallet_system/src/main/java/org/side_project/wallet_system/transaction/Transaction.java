@@ -4,8 +4,10 @@ import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.side_project.wallet_system.config.AppZone;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
@@ -44,10 +46,16 @@ public class Transaction {
     private String notifyEmail;
 
     @Column(nullable = false)
-    private LocalDateTime createdAt;
+    private Instant createdAt;
 
     @PrePersist
     protected void onCreate() {
-        createdAt = LocalDateTime.now();
+        createdAt = Instant.now();
+    }
+
+    /** {@code createdAt} rendered in the app's display zone, for the view layer. */
+    @Transient
+    public LocalDateTime getCreatedAtLocal() {
+        return createdAt == null ? null : LocalDateTime.ofInstant(createdAt, AppZone.DISPLAY);
     }
 }

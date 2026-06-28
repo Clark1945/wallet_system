@@ -73,6 +73,10 @@ spring:
     properties:
       hibernate:
         format_sql: true
+        # Bind Instant/timestamptz in UTC regardless of the JVM/DB session zone, so storage is
+        # always the absolute instant. Display-time conversion to Asia/Taipei happens in the app.
+        jdbc:
+          time_zone: UTC
 
 logging:
   level:
