@@ -233,6 +233,7 @@ services:
       - payment_service_logs:/logs/payment-service:ro
       - email_service_logs:/logs/email-service:ro
       - audit_service_logs:/logs/audit-service:ro
+      - nginx_logs:/logs/nginx:ro
     depends_on:
       - loki
       - app
@@ -240,6 +241,7 @@ services:
       - payment-service
       - email-service
       - audit-service
+      - nginx
 
   email-service:
     build:
