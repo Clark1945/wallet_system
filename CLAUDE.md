@@ -12,6 +12,33 @@ Five Spring Boot services, fronted by an nginx reverse proxy:
 - **`audit-service/`** — async audit-log consumer (port 8084); consumes RabbitMQ messages and persists them to MongoDB
 - **`nginx/`** — reverse proxy and single browser-facing HTTP entry point (port 80); routes `/payment/**` to payment-service and everything else to the wallet app. See `nginx/nginx.conf`.
 
+## Docker Networking
+
+Two Docker networks segment the stack so that **mock-bank is treated as an external
+bank** and cannot reach the internal datastores:
+
+- **`default`** (implicit) — the internal tier. Every service that does **not** list a
+  `networks:` key lives here: `db`, `redis`, `rabbitmq`, `mongo`, `payment-service`,
+  `nginx`, and the whole observability stack.
+- **`external`** (defined in `docker-compose.yml`) — the bank boundary. **`mock-bank`
+  lives here only**, so it can reach `app` (for the withdrawal callback) but is isolated
+  from `db` / `redis` / `rabbitmq` / `mongo`.
+
+Only two services bridge the two networks:
+
+| Service | Networks | Why |
+|---------|----------|-----|
+| `app` | `default` + `external` | Reaches the internal tier **and** calls mock-bank (outbound withdrawal + receives its callback) |
+| `prometheus` | `default` + `external` | Scrapes everything on the internal tier **and** mock-bank's `/actuator/prometheus` across the boundary |
+| `mock-bank` | `external` only | Isolated — can only resolve/reach `app`, never the datastores |
+| everything else | `default` (implicit) | Internal tier |
+
+Gotcha: once a service declares a `networks:` key it leaves `default`, so anything that
+must stay reachable on the internal tier (here `app`/`prometheus`) lists `default`
+explicitly alongside `external`. Host port mappings (e.g. `8081:8081`) are unaffected by
+the split. To fully sandbox mock-bank's internet egress too, add `internal: true` to the
+`external` network — the callback to `app` only needs Docker DNS, not the internet.
+
 ## Versioning
 
 **Each service is versioned independently** (its own SemVer), with a single source of truth per
