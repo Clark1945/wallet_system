@@ -154,6 +154,7 @@ services:
       - "80:80"
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - nginx_logs:/var/log/nginx
     depends_on:
       - app
       - payment-service
@@ -232,6 +233,7 @@ services:
       - payment_service_logs:/logs/payment-service:ro
       - email_service_logs:/logs/email-service:ro
       - audit_service_logs:/logs/audit-service:ro
+      - nginx_logs:/logs/nginx:ro
     depends_on:
       - loki
       - app
@@ -239,6 +241,7 @@ services:
       - payment-service
       - email-service
       - audit-service
+      - nginx
 
   email-service:
     build:
@@ -309,6 +312,7 @@ volumes:
   postgres_data:
   uploads:
   app_logs:
+  nginx_logs:
   mock_bank_logs:
   payment_service_logs:
   email_service_logs:

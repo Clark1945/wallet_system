@@ -73,3 +73,20 @@ scrape_configs:
           expression: '^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3} \[[^\]]+\] (?P<level>\S+)'
       - labels:
           level:
+
+  # nginx logs in its own access-log format (not the Spring Boot layout), and
+  # the image symlinks access.log/error.log to stdout/stderr — so glob only the
+  # real file (nginx_*.log) to avoid tailing those symlinks, and extract the
+  # HTTP status as a label (bounded cardinality).
+  - job_name: nginx
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          app: nginx
+          __path__: /logs/nginx/nginx_*.log
+    pipeline_stages:
+      - regex:
+          expression: '^\S+ - "[^"]*" (?P<status>\d{3}) '
+      - labels:
+          status:

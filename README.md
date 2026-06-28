@@ -113,15 +113,30 @@ Alertmanager 透過 Gmail SMTP 寄送告警信。**SMTP app password 不進 git*
   docker compose up -d alertmanager
   ```
 
-- **正式環境**:用 prod override 啟動,密碼改由部署流程從 secret store(GitHub Actions secret、Vault、
-  SSM…)寫到 **repo 之外**的檔案,完全不經過 git:
+- **正式環境(手動 SSH 部署到 VPS)**:密碼是 VPS 上一個 **repo 之外**、你手動建立的檔案,完全不經過
+  git/CI(與 `.env` 裡的其他秘密同理)。
+
+  **首次設定(每台主機只做一次)**:
+
+  ```bash
+  # 1. 在 repo 外建立秘密檔,貼上 Gmail app password(整個檔案只有那串)
+  sudo mkdir -p /etc/wallet-system/secrets
+  sudo nano /etc/wallet-system/secrets/alertmanager-smtp-password
+  # 2. 讓容器內的 alertmanager(以 nobody / uid 65534 執行)讀得到
+  sudo chown 65534:65534 /etc/wallet-system/secrets/alertmanager-smtp-password
+  sudo chmod 600 /etc/wallet-system/secrets/alertmanager-smtp-password
+  ```
+
+  **每次部署**(用 prod override 啟動):
 
   ```bash
   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
   ```
 
-  `docker-compose.prod.yml` 把同一個容器路徑改指向 `/etc/wallet-system/secrets/alertmanager-smtp-password`
+  `docker-compose.prod.yml` 把容器路徑 `/etc/alertmanager/smtp_password` 指向上面那個 host 檔
   (compose 以容器路徑為鍵合併 volume,故乾淨取代開發用的掛載);`alertmanager.yml` 不需改動。
+  ⚠️ **密碼檔必須先存在再 `up`**,否則 Docker 會在該路徑建一個空目錄、寄信會默默失敗。
+  (走 CI/CD 部署時,改由 pipeline 從 secret store(GitHub Actions secret、Vault、SSM…)把同一個檔寫出來。)
 
 ### 測試帳號（Demo）
 
@@ -303,17 +318,31 @@ container), supplied differently per environment:
   docker compose up -d alertmanager
   ```
 
-- **Production** — bring the stack up with the prod override; the password is injected by your deploy
-  pipeline from a secret store (GitHub Actions secret, Vault, SSM, …) into a file **outside the repo**,
-  never via git:
+- **Production (manual SSH deploy to a VPS)** — the password is a file **outside the repo** that you
+  create by hand on the host; it never goes through git/CI (same as your other `.env` secrets).
+
+  **First-time setup (once per host):**
+
+  ```bash
+  # 1. Create the secret file outside the repo; paste your Gmail app password (only that string)
+  sudo mkdir -p /etc/wallet-system/secrets
+  sudo nano /etc/wallet-system/secrets/alertmanager-smtp-password
+  # 2. Make it readable by the alertmanager container (runs as nobody / uid 65534)
+  sudo chown 65534:65534 /etc/wallet-system/secrets/alertmanager-smtp-password
+  sudo chmod 600 /etc/wallet-system/secrets/alertmanager-smtp-password
+  ```
+
+  **Each deploy** (bring the stack up with the prod override):
 
   ```bash
   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
   ```
 
-  `docker-compose.prod.yml` re-points the same container path to
-  `/etc/wallet-system/secrets/alertmanager-smtp-password` (Compose merges volumes by container path, so
-  it cleanly replaces the dev bind-mount); `alertmanager.yml` is unchanged.
+  `docker-compose.prod.yml` points the container path `/etc/alertmanager/smtp_password` at that host
+  file (Compose merges volumes by container path, so it cleanly replaces the dev bind-mount);
+  `alertmanager.yml` is unchanged. ⚠️ **The secret file must exist before `up`**, otherwise Docker
+  creates an empty directory at that path and email sends fail silently. (For a CI/CD deploy, the
+  pipeline writes the same file from a secret store — GitHub Actions secret, Vault, SSM, …)
 
 ### Demo Account
 
@@ -495,16 +524,31 @@ Alertmanager は実行時に `auth_password_file`(コンテナ内 `/etc/alertman
   docker compose up -d alertmanager
   ```
 
-- **本番環境** — prod オーバーライドで起動します。パスワードはデプロイパイプラインが secret store
-  (GitHub Actions secret、Vault、SSM…)から **リポジトリ外** のファイルへ書き出し、git を一切経由しません:
+- **本番環境(VPS への手動 SSH デプロイ)** — パスワードはホスト上で手動作成する **リポジトリ外** の
+  ファイルです。git/CI を一切経由しません(`.env` の他のシークレットと同様)。
+
+  **初回セットアップ(ホストごとに一度だけ):**
+
+  ```bash
+  # 1. リポジトリ外にシークレットファイルを作成し、Gmail アプリパスワード(その文字列のみ)を貼り付け
+  sudo mkdir -p /etc/wallet-system/secrets
+  sudo nano /etc/wallet-system/secrets/alertmanager-smtp-password
+  # 2. alertmanager コンテナ(nobody / uid 65534 で実行)が読めるようにする
+  sudo chown 65534:65534 /etc/wallet-system/secrets/alertmanager-smtp-password
+  sudo chmod 600 /etc/wallet-system/secrets/alertmanager-smtp-password
+  ```
+
+  **毎回のデプロイ**(prod オーバーライドで起動):
 
   ```bash
   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
   ```
 
-  `docker-compose.prod.yml` は同じコンテナパスを `/etc/wallet-system/secrets/alertmanager-smtp-password`
-  に向け直します(Compose はコンテナパスをキーに volume をマージするため、開発用マウントをきれいに置き換え
-  ます)。`alertmanager.yml` は変更不要です。
+  `docker-compose.prod.yml` はコンテナパス `/etc/alertmanager/smtp_password` を上記のホストファイルへ
+  向けます(Compose はコンテナパスをキーに volume をマージするため、開発用マウントをきれいに置き換えます)。
+  `alertmanager.yml` は変更不要です。⚠️ **シークレットファイルは `up` の前に存在している必要があります**。
+  なければ Docker がそのパスに空ディレクトリを作成し、メール送信が静かに失敗します。(CI/CD デプロイの場合は
+  パイプラインが secret store(GitHub Actions secret、Vault、SSM…)から同じファイルを書き出します。)
 
 ### デモアカウント
 
