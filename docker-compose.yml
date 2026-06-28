@@ -62,6 +62,11 @@ services:
       WITHDRAW_WEBHOOK_SECRET: ${WITHDRAW_WEBHOOK_SECRET}
     volumes:
       - mock_bank_logs:/app/logs
+    # mock-bank simulates an EXTERNAL bank: it lives only on the `external` network,
+    # so it can reach `app` (for the withdrawal callback) but is isolated from the
+    # internal infrastructure (db / redis / rabbitmq / mongo) on the default network.
+    networks:
+      - external
     image: wallet-system/mock-bank:${MOCKBANK_VERSION:-1.0.0}
 
   app:
@@ -97,6 +102,11 @@ services:
       - uploads:/app/uploads
       - app_logs:/app/logs
     restart: on-failure
+    # Multi-homed: `default` reaches the internal tier (db/redis/rabbitmq/…),
+    # `external` reaches mock-bank for the outbound withdrawal call + its callback.
+    networks:
+      - default
+      - external
     depends_on:
       db:
         condition: service_healthy
@@ -176,6 +186,10 @@ services:
       - ./wallet_system/observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - ./wallet_system/observability/alert.rules.yml:/etc/prometheus/alert.rules.yml:ro
       - prometheus_data:/prometheus
+    # Also on `external` so it can scrape mock-bank's /actuator/prometheus across the boundary.
+    networks:
+      - default
+      - external
     depends_on:
       - app
       - payment-service
@@ -282,6 +296,14 @@ services:
     depends_on:
       - loki
       - prometheus
+
+networks:
+  # The implicit `default` network is the internal tier: every service that does NOT
+  # list `networks:` (db, redis, rabbitmq, mongo, payment-service, nginx, the
+  # observability stack, …) lives here. Only `app` and `prometheus` are also attached
+  # to `external` to bridge across to mock-bank.
+  external:
+    driver: bridge
 
 volumes:
   postgres_data:
