@@ -9,7 +9,7 @@ import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.UUID;
 
 /**
@@ -55,5 +55,5 @@ public class AuditLog {
     /** Correlates the audit document with application logs via the MDC trace id. */
     private String traceId;
 
-    private LocalDateTime createdAt;
+    private Instant createdAt;
 }

@@ -8,7 +8,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.side_project.wallet_system.wallet.WalletService;
 
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
@@ -76,7 +76,7 @@ class TransactionTimeoutJobTest {
 
     @Test
     void job_doesNothingWhenNoStaleTransactions() {
-        given(transactionRepository.findByStatusAndCreatedAtBefore(any(), any(LocalDateTime.class)))
+        given(transactionRepository.findByStatusAndCreatedAtBefore(any(), any(Instant.class)))
                 .willReturn(List.of());
 
         job.expireStaleTransactions();

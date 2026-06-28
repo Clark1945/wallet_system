@@ -1,6 +1,7 @@
 package org.side_project.wallet_system.transaction;
 
 import jakarta.persistence.criteria.Predicate;
+import org.side_project.wallet_system.config.AppZone;
 import org.springframework.data.jpa.domain.Specification;
 
 import java.time.LocalDate;
@@ -27,11 +28,15 @@ public class TransactionSpec {
             if (type != null) {
                 predicates.add(cb.equal(root.get("type"), type));
             }
+            // The user picks dates on their wall clock (Asia/Taipei); convert each day boundary to the
+            // matching absolute instant so it compares correctly against the UTC-stored createdAt.
             if (startDate != null) {
-                predicates.add(cb.greaterThanOrEqualTo(root.get("createdAt"), startDate.atStartOfDay()));
+                predicates.add(cb.greaterThanOrEqualTo(root.get("createdAt"),
+                        startDate.atStartOfDay(AppZone.DISPLAY).toInstant()));
             }
             if (endDate != null) {
-                predicates.add(cb.lessThan(root.get("createdAt"), endDate.plusDays(1).atStartOfDay()));
+                predicates.add(cb.lessThan(root.get("createdAt"),
+                        endDate.plusDays(1).atStartOfDay(AppZone.DISPLAY).toInstant()));
             }
 
             query.orderBy(cb.desc(root.get("createdAt")));

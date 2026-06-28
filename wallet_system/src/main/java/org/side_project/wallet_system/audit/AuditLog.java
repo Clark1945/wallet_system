@@ -7,7 +7,7 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.UUID;
 
 /**
@@ -52,5 +52,5 @@ public class AuditLog {
     /** Correlates the audit event with application logs via the MDC trace id. */
     private String traceId;
 
-    private LocalDateTime createdAt;
+    private Instant createdAt;
 }

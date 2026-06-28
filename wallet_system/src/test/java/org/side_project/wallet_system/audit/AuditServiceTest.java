@@ -13,7 +13,7 @@ import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -117,7 +117,7 @@ class AuditServiceTest {
         MDC.put("traceId", "request-trace");
 
         UUID presetId = UUID.randomUUID();
-        LocalDateTime presetCreatedAt = LocalDateTime.of(2020, 1, 1, 0, 0);
+        Instant presetCreatedAt = Instant.parse("2020-01-01T00:00:00Z");
         AuditLog entry = AuditLog.builder()
                 .action(AuditAction.LOGIN_SUCCESS).result(AuditResult.SUCCESS)
                 .id(presetId).createdAt(presetCreatedAt)

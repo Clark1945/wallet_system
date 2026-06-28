@@ -9,7 +9,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.UUID;
 
 /**
@@ -43,7 +43,7 @@ public class AuditService {
                 entry.setId(UUID.randomUUID());
             }
             if (entry.getCreatedAt() == null) {
-                entry.setCreatedAt(LocalDateTime.now());
+                entry.setCreatedAt(Instant.now());
             }
             enrichFromRequestContext(entry);
             auditLogPublisher.publish(entry);

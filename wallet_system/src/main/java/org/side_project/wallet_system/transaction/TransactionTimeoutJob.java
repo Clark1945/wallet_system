@@ -6,7 +6,8 @@ import org.side_project.wallet_system.wallet.WalletService;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
-import java.time.LocalDateTime;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
 
 @Slf4j
@@ -19,7 +20,7 @@ public class TransactionTimeoutJob {
 
     @Scheduled(fixedDelay = 60_000)
     public void expireStaleTransactions() {
-        LocalDateTime cutoff = LocalDateTime.now().minusMinutes(5);
+        Instant cutoff = Instant.now().minus(Duration.ofMinutes(5));
 
         List<Transaction> stalePending =
                 transactionRepository.findByStatusAndCreatedAtBefore(TransactionStatus.PENDING, cutoff);

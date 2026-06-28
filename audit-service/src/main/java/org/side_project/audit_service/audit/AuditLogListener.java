@@ -6,7 +6,7 @@ import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 /**
  * Consumes audit events published by wallet_system (exchange {@code wallet.audit.log}) and
@@ -22,9 +22,10 @@ public class AuditLogListener {
 
     @RabbitListener(queues = "${rabbitmq.queue}")
     public void handle(AuditLog auditLog) {
-        // The publisher no longer persists, so createdAt may be unset — stamp it on receipt.
+        // Normally the publisher stamps createdAt; stamp on receipt only as a fallback. Instant is an
+        // absolute UTC instant, so it survives JSON transport across services without zone ambiguity.
         if (auditLog.getCreatedAt() == null) {
-            auditLog.setCreatedAt(LocalDateTime.now());
+            auditLog.setCreatedAt(Instant.now());
         }
         auditLogRepository.save(auditLog);
         log.info("Audit log persisted: action={}, actorId={}, traceId={}",
