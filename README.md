@@ -4,6 +4,9 @@
 
 ---
 
+### Architecture
+https://viewer.diagrams.net/?tags=%7B%7D&lightbox=1&highlight=0000ff&edit=_blank&layers=1&nav=1&title=wallet-system.drawio&dark=auto#Uhttps%3A%2F%2Fdrive.google.com%2Fuc%3Fid%3D1_xx2Ctc7uOBeswrEKeFwKal1kBo35N3y%26export%3Ddownload
+
 ## 繁體中文
 
 一個以 Spring Boot 建構的數位錢包微服務平台，支援多種支付管道、非同步出金流程、RabbitMQ 解偶 Email 通知，以及完整的身分驗證機制。
