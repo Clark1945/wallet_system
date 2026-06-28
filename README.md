@@ -57,6 +57,7 @@
 - 所有 Webhook 皆驗簽（Stripe SDK、SBPS SHA-1、HMAC-SHA256）
 - Redis 速率限制（入金 10 次/分、出金 5 次/分、轉帳 10 次/分）
 - 頭像上傳路徑穿越防護
+- 網路隔離：mock-bank 被視為外部銀行，僅位於獨立的 `external` Docker 網路，無法存取內部資料層（PostgreSQL / Redis / RabbitMQ / MongoDB）
 
 **可觀測性**
 - TraceId 跨非同步邊界傳播
@@ -260,6 +261,7 @@ Browser ──► nginx (80) ──► wallet_system (8080)
 - Webhook signature verification for all gateways (Stripe SDK, SBPS SHA-1, HMAC-SHA256)
 - Redis-backed rate limiting (deposit 10/min, withdrawal 5/min, transfer 10/min)
 - Path-traversal protection on avatar uploads
+- Network isolation: mock-bank is treated as an external bank, living only on a separate `external` Docker network with no access to the internal datastores (PostgreSQL / Redis / RabbitMQ / MongoDB)
 
 **Observability**
 - TraceId propagation across async boundaries
@@ -466,6 +468,7 @@ Spring Boot で構築されたデジタルウォレットのマイクロサー�
 - 全 Webhook の署名検証（Stripe SDK・SBPS SHA-1・HMAC-SHA256）
 - Redis レートリミット（入金 10 回/分・出金 5 回/分・送金 10 回/分）
 - アバターアップロードのパストラバーサル防止
+- ネットワーク分離：mock-bank は外部銀行として扱われ、独立した `external` Docker ネットワークにのみ配置され、内部データストア（PostgreSQL / Redis / RabbitMQ / MongoDB）にはアクセスできません
 
 **可観測性**
 - 非同期処理を跨ぐ TraceId 伝播
