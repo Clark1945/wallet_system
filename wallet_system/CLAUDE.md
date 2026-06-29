@@ -198,6 +198,12 @@ The fallback returns the raw key if no translation exists.
 
 `TestModeModelAdvice` (`@ControllerAdvice`) sets `isTestMode=true` in the model whenever this account is authenticated, used by templates to show a demo watermark. Active on all non-prod profiles.
 
+### Admin Access
+
+`Member.isAdmin` (column `is_admin`, default `false`) flags an administrator. The flag is read into the session at login (`LoginSuccessHandler` stamps `SessionConstants.IS_ADMIN`), and `AdminAuthInterceptor` guards `/admin/**` by redirecting non-admins to `/dashboard`.
+
+`AdminSeedInitializer` (`auth/AdminSeedInitializer`) promotes a configured member to admin on startup, mirroring `TestModeInitializer`: it listens for `ApplicationReadyEvent` and sets `isAdmin = true` on the member whose email matches `app.admin-email` (env `ADMIN_EMAIL`). It is idempotent — a blank email, a missing member, or an already-admin member is a no-op (logged, never an error). The seed runs in every profile **except** test, where `application-test.yaml` sets `app.admin-email: ""` to disable it. A promoted member must **re-login** for the session `IS_ADMIN` flag to take effect.
+
 ### Rate Limiting
 
 `RateLimiterService` is a Redis-backed fixed-window limiter (fails open on Redis error). Applied per-member in `WalletController`:

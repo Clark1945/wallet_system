@@ -100,6 +100,7 @@ app:
   upload:
     dir: uploads
   base-url: "http://localhost:8080"
+  admin-email: ${ADMIN_EMAIL:dmc950213@gmail.com}
   test-email: "test1234@gmail.com"
   test-fixed-otp: "123456"
   test-password: "test1234"
