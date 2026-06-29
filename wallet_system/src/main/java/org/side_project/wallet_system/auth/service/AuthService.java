@@ -175,6 +175,12 @@ public class AuthService {
                 .orElseThrow(() -> new IllegalArgumentException("error.member.not.found"));
     }
 
+    public boolean isAdmin(UUID memberId) {
+        return memberRepository.findById(memberId)
+                .map(Member::isAdmin)
+                .orElse(false);
+    }
+
     public Optional<Member> login(String email, String password) {
         log.debug("Login attempt: email={}", email);
         return memberRepository.findByEmail(email)

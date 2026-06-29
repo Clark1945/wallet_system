@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -37,4 +38,13 @@ public interface TransactionRepository extends JpaRepository<Transaction, UUID>,
 
     @Query("SELECT t FROM Transaction t WHERE t.fromWalletId = :walletId OR t.toWalletId = :walletId ORDER BY t.createdAt DESC")
     Page<Transaction> findByWalletId(@Param("walletId") UUID walletId, Pageable pageable);
+
+    /** Admin stats: transaction counts grouped by status, as {@code [status, count]} rows. */
+    @Query("SELECT t.status, COUNT(t) FROM Transaction t GROUP BY t.status")
+    List<Object[]> countGroupedByStatus();
+
+    /** Admin stats: total COMPLETED amount for a given transaction type (0 when none). */
+    @Query("SELECT COALESCE(SUM(t.amount), 0) FROM Transaction t "
+            + "WHERE t.type = :type AND t.status = org.side_project.wallet_system.transaction.TransactionStatus.COMPLETED")
+    BigDecimal sumCompletedAmountByType(@Param("type") TransactionType type);
 }

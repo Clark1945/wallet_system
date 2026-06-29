@@ -62,4 +62,7 @@ public class Member {
 
     @Column(length = 255)
     private String avatarPath;
+
+    @Column(name = "is_admin", nullable = false)
+    private boolean isAdmin = false;
 }

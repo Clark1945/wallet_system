@@ -85,8 +85,25 @@ class LoginSuccessHandlerTest {
 
         then(session).should().setAttribute(SessionConstants.MEMBER_ID, memberId.toString());
         then(session).should().setAttribute(SessionConstants.MEMBER_NAME, "Clark Huang");
+        then(session).should().setAttribute(SessionConstants.IS_ADMIN, false);
         then(authService).should().updateLastLogin(memberId);
         then(response).should().sendRedirect("/dashboard");
+    }
+
+    @Test
+    void googleLogin_adminMember_redirectsToAdmin() throws Exception {
+        UUID memberId = UUID.randomUUID();
+        CustomOAuth2User ou = mock(CustomOAuth2User.class);
+        given(ou.getMemberId()).willReturn(memberId);
+        given(ou.getMemberName()).willReturn("Admin User");
+        given(authentication.getPrincipal()).willReturn(ou);
+        given(request.getSession(true)).willReturn(session);
+        given(authService.isAdmin(memberId)).willReturn(true);
+
+        handler.onAuthenticationSuccess(request, response, authentication);
+
+        then(session).should().setAttribute(SessionConstants.IS_ADMIN, true);
+        then(response).should().sendRedirect("/admin");
     }
 
     // ── unknown principal ─────────────────────────────────────

@@ -59,9 +59,11 @@ public class LoginSuccessHandler implements AuthenticationSuccessHandler {
             String memberName = ou.getMemberName();
             log.info("Login success (GOOGLE): memberId={}, name={}", memberId, memberName);
 
+            boolean admin = authService.isAdmin(memberId);
             HttpSession session = request.getSession(true);
             session.setAttribute(SessionConstants.MEMBER_ID,   memberId.toString());
             session.setAttribute(SessionConstants.MEMBER_NAME, memberName);
+            session.setAttribute(SessionConstants.IS_ADMIN,    admin);
             authService.updateLastLogin(memberId);
 
             AuditLog log = AuditLog.builder()
@@ -71,7 +73,7 @@ public class LoginSuccessHandler implements AuthenticationSuccessHandler {
                     .detail("provider=GOOGLE").build();
             auditService.record(log);
 
-            response.sendRedirect("/dashboard");
+            response.sendRedirect(admin ? "/admin" : "/dashboard");
 
         } else {
             log.warn("Login failed - unknown principal type: {}", principal.getClass().getName());

@@ -69,8 +69,10 @@ public class AuthFlowService {
         }
 
         String memberName = authService.getNameById(memberId);
+        boolean admin = authService.isAdmin(memberId);
         session.setAttribute(SessionConstants.MEMBER_ID,   memberId.toString());
         session.setAttribute(SessionConstants.MEMBER_NAME, memberName);
+        session.setAttribute(SessionConstants.IS_ADMIN,    admin);
         authService.updateLastLogin(memberId);
         AuditLog log = AuditLog.builder()
                 .actorId(memberId).actorEmail(authService.getEmailById(memberId))
@@ -78,7 +80,7 @@ public class AuthFlowService {
                 .targetType("MEMBER").targetId(memberId.toString())
                 .detail("provider=LOCAL").build();
         auditService.record(log);
-        return "redirect:/dashboard";
+        return admin ? "redirect:/admin" : "redirect:/dashboard";
     }
 
     public String resendLoginOtps(String token, RedirectAttributes redirectAttributes, Locale locale) {
