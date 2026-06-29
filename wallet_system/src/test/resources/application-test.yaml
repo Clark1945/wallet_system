@@ -30,6 +30,7 @@ withdraw:
 
 app:
   base-url: "http://localhost:8080"
+  admin-email: ""
   test-email: "test1234@gmail.com"
   test-fixed-otp: "123456"
   test-password: "test1234"
