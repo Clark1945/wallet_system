@@ -33,18 +33,28 @@ $VersionBase = "1.0.0"
 function Get-ServiceVersion {
     param([string]$Dir)
 
-    $sha = (git log -1 --format=%h -- $Dir 2>$null | Select-Object -First 1)
-    if ([string]::IsNullOrWhiteSpace($sha)) { $sha = "nogit" }
-    $sha = $sha.Trim()
+    # git writes benign warnings (e.g. "LF will be replaced by CRLF") to stderr; under the
+    # script-level $ErrorActionPreference='Stop' that stderr write would be wrapped as a
+    # NativeCommandError and abort the script even though git itself succeeded. Relax to
+    # 'Continue' here and judge success solely by $LASTEXITCODE.
+    $prev = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    try {
+        $sha = (git log -1 --format=%h -- $Dir 2>$null | Select-Object -First 1)
+        if ([string]::IsNullOrWhiteSpace($sha)) { $sha = "nogit" }
+        $sha = $sha.Trim()
 
-    # Uncommitted changes in this service dir (working tree or index) -> mark dirty.
-    git diff --quiet -- $Dir 2>$null
-    $dirtyWorkTree = ($LASTEXITCODE -ne 0)
-    git diff --cached --quiet -- $Dir 2>$null
-    $dirtyIndex = ($LASTEXITCODE -ne 0)
-    $dirty = if ($dirtyWorkTree -or $dirtyIndex) { "-dirty" } else { "" }
+        # Uncommitted changes in this service dir (working tree or index) -> mark dirty.
+        git diff --quiet -- $Dir 2>$null
+        $dirtyWorkTree = ($LASTEXITCODE -eq 1)
+        git diff --cached --quiet -- $Dir 2>$null
+        $dirtyIndex = ($LASTEXITCODE -eq 1)
+        $dirty = if ($dirtyWorkTree -or $dirtyIndex) { "-dirty" } else { "" }
 
-    return "$VersionBase-$sha$dirty"
+        return "$VersionBase-$sha$dirty"
+    } finally {
+        $ErrorActionPreference = $prev
+    }
 }
 
 $env:WALLET_VERSION   = Get-ServiceVersion "wallet_system"
@@ -60,4 +70,4 @@ Write-Host ("  {0,-16} {1}" -f "email-service",   $env:EMAIL_VERSION)
 Write-Host ("  {0,-16} {1}" -f "audit-service",   $env:AUDIT_VERSION)
 Write-Host ("  {0,-16} {1}" -f "mock-bank",       $env:MOCKBANK_VERSION)
 
-docker compose up --build @args
+docker compose up -d --build @args

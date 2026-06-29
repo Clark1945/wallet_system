@@ -222,6 +222,20 @@ class AuthControllerIT {
     }
 
     @Test
+    void verifyLoginOtp_adminMember_redirectsToAdmin() throws Exception {
+        UUID memberId = UUID.randomUUID();
+        given(otpService.resolveOtpToken("login-token", OtpType.LOGIN)).willReturn(memberId);
+        given(authService.getNameById(memberId)).willReturn("Admin");
+        given(authService.isAdmin(memberId)).willReturn(true);
+
+        mockMvc.perform(post("/login/otp").with(csrf())
+                        .param("token", "login-token")
+                        .param("code", "654321"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/admin"));
+    }
+
+    @Test
     void verifyLoginOtp_invalid_redirectsBackWithError() throws Exception {
         UUID memberId = UUID.randomUUID();
         given(otpService.resolveOtpToken("login-token", OtpType.LOGIN)).willReturn(memberId);

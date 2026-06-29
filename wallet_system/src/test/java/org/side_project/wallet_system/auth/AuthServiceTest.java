@@ -224,4 +224,30 @@ class AuthServiceTest {
 
         assertThat(authService.findByEmail("bob@test.com")).contains(m);
     }
+
+    @Test
+    void isAdmin_adminMember_returnsTrue() {
+        UUID id = UUID.randomUUID();
+        Member m = new Member();
+        m.setAdmin(true);
+        given(memberRepository.findById(id)).willReturn(Optional.of(m));
+
+        assertThat(authService.isAdmin(id)).isTrue();
+    }
+
+    @Test
+    void isAdmin_nonAdminMember_returnsFalse() {
+        UUID id = UUID.randomUUID();
+        given(memberRepository.findById(id)).willReturn(Optional.of(new Member()));
+
+        assertThat(authService.isAdmin(id)).isFalse();
+    }
+
+    @Test
+    void isAdmin_memberNotFound_returnsFalse() {
+        UUID id = UUID.randomUUID();
+        given(memberRepository.findById(id)).willReturn(Optional.empty());
+
+        assertThat(authService.isAdmin(id)).isFalse();
+    }
 }

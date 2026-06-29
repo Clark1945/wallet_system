@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -27,4 +28,8 @@ public interface WalletRepository extends JpaRepository<Wallet, UUID> {
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT w FROM Wallet w WHERE w.id IN :ids ORDER BY w.id ASC")
     List<Wallet> findByIdsForUpdate(@Param("ids") List<UUID> ids);
+
+    /** Admin stats: total balance held across every wallet (0 when none). */
+    @Query("SELECT COALESCE(SUM(w.balance), 0) FROM Wallet w")
+    BigDecimal sumAllBalances();
 }

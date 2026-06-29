@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title th:text="#{admin.title}">Admin</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: sans-serif; background: #f0f2f5; color: #333; }
+
+        header { background: #1e293b; color: #fff; padding: 1rem 2rem;
+            display: flex; justify-content: space-between; align-items: center; }
+        header h1 { font-size: 1.2rem; }
+        header span { font-size: .9rem; opacity: .85; }
+        .logout-btn { background: rgba(255,255,255,.2); border: 1px solid rgba(255,255,255,.4);
+            color: #fff; padding: .4rem .9rem; border-radius: 4px; cursor: pointer; font-size: .85rem; }
+        .logout-btn:hover { background: rgba(255,255,255,.35); }
+
+        main { max-width: 1080px; margin: 2rem auto; padding: 0 1rem; }
+
+        /* ── Stats grid ── */
+        .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-bottom: 1.5rem; }
+        @media (max-width: 760px) { .stats { grid-template-columns: repeat(2, 1fr); } }
+        .stat-card { background: #fff; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,.08); padding: 1.1rem 1.25rem; }
+        .stat-label { font-size: .78rem; color: #888; }
+        .stat-value { font-size: 1.6rem; font-weight: 700; color: #1e293b; margin-top: .3rem; line-height: 1.1; }
+        .stat-sub { font-size: .72rem; color: #aaa; margin-top: .15rem; }
+
+        .status-counts { background: #fff; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,.08);
+            padding: 1rem 1.25rem; margin-bottom: 1.5rem; }
+        .status-counts h3 { font-size: .92rem; color: #555; margin-bottom: .7rem; }
+        .status-counts .row { display: flex; flex-wrap: wrap; gap: .6rem; }
+        .count-pill { display: inline-flex; align-items: center; gap: .4rem;
+            padding: .35rem .7rem; border-radius: 999px; font-size: .82rem; font-weight: 600; }
+
+        /* ── Table card ── */
+        .table-card { background: #fff; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,.08); padding: 1.25rem; }
+        .table-card h3 { font-size: 1rem; margin-bottom: 1rem; }
+        table { width: 100%; border-collapse: collapse; font-size: .85rem; }
+        th { text-align: left; padding: .5rem .7rem; background: #f8f8f8; border-bottom: 2px solid #eee; color: #555; }
+        td { padding: .55rem .7rem; border-bottom: 1px solid #f0f0f0; }
+        tr:last-child td { border-bottom: none; }
+        .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .78rem; color: #475569; }
+        .type-badge { padding: .2rem .55rem; border-radius: 999px; font-size: .76rem; font-weight: 600; }
+        .type-DEPOSIT  { background: #dcfce7; color: #15803d; }
+        .type-WITHDRAW { background: #fee2e2; color: #b91c1c; }
+        .type-TRANSFER { background: #dbeafe; color: #1d4ed8; }
+        .status-badge { padding: .2rem .55rem; border-radius: 999px; font-size: .74rem; font-weight: 600; }
+        .status-PENDING            { background: #fef9c3; color: #a16207; }
+        .status-REQUEST_COMPLETED  { background: #dbeafe; color: #1d4ed8; }
+        .status-COMPLETED          { background: #dcfce7; color: #15803d; }
+        .status-FAILED             { background: #fee2e2; color: #b91c1c; }
+        .empty { text-align: center; color: #aaa; padding: 1.5rem; }
+
+        /* ── Filter form ── */
+        .filter-form { display: flex; flex-wrap: wrap; gap: .6rem; align-items: flex-end; margin-bottom: 1rem; }
+        .filter-form label { display: block; font-size: .75rem; color: #666; margin-bottom: .2rem; }
+        .filter-form input, .filter-form select {
+            height: 2.1rem; padding: 0 .6rem; border: 1px solid #ccc; border-radius: 4px; font-size: .85rem; }
+        .filter-group { display: flex; flex-direction: column; }
+        .btn-filter { height: 2.1rem; padding: 0 .9rem; background: #1e293b; color: #fff; border: none;
+            border-radius: 4px; font-size: .85rem; cursor: pointer; }
+        .btn-filter:hover { background: #0f172a; }
+        .btn-reset { height: 2.1rem; padding: 0 .9rem; background: #fff; color: #555; border: 1px solid #ccc;
+            border-radius: 4px; font-size: .85rem; cursor: pointer; text-decoration: none;
+            display: inline-flex; align-items: center; }
+        .btn-reset:hover { background: #f3f4f6; }
+
+        /* ── Pagination ── */
+        .pagination { display: flex; justify-content: center; align-items: center;
+            gap: .35rem; margin-top: 1rem; flex-wrap: wrap; }
+        .page-btn { display: inline-flex; align-items: center; justify-content: center;
+            min-width: 2rem; height: 2rem; padding: 0 .5rem; border-radius: 4px;
+            font-size: .85rem; text-decoration: none; color: #1e293b;
+            border: 1px solid #d1d5db; background: #fff; cursor: pointer; }
+        .page-btn:hover { background: #eef2ff; }
+        .page-btn.active { background: #1e293b; color: #fff; border-color: #1e293b; font-weight: 600; }
+        .page-btn.disabled { color: #bbb; border-color: #e5e7eb; cursor: default; pointer-events: none; }
+    </style>
+</head>
+<body>
+
+<header>
+    <h1 th:text="#{admin.title}">Admin · Cash-Flow Control</h1>
+    <div style="display:flex; align-items:center; gap:1rem;">
+        <span th:text="#{dashboard.welcome(${memberName})}">Welcome</span>
+        <form method="post" th:action="@{/logout}" style="margin:0">
+            <button class="logout-btn" type="submit" th:text="#{dashboard.logout}">Logout</button>
+        </form>
+    </div>
+</header>
+
+<main>
+    <!-- Stats -->
+    <div class="stats">
+        <div class="stat-card">
+            <div class="stat-label" th:text="#{admin.stats.members}">Total Members</div>
+            <div class="stat-value" th:text="${stats.totalMembers}">0</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label" th:text="#{admin.stats.deposit}">Total Deposits</div>
+            <div class="stat-value" th:text="'$ ' + ${#numbers.formatDecimal(stats.totalDeposit, 1, 2)}">$ 0.00</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label" th:text="#{admin.stats.withdraw}">Total Withdrawals</div>
+            <div class="stat-value" th:text="'$ ' + ${#numbers.formatDecimal(stats.totalWithdraw, 1, 2)}">$ 0.00</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label" th:text="#{admin.stats.balance}">Total Balance</div>
+            <div class="stat-value" th:text="'$ ' + ${#numbers.formatDecimal(stats.totalBalance, 1, 2)}">$ 0.00</div>
+        </div>
+    </div>
+
+    <!-- Counts by status -->
+    <div class="status-counts">
+        <h3 th:text="#{admin.stats.tx}">Transactions by Status</h3>
+        <div class="row">
+            <span th:each="s : ${statuses}"
+                  class="count-pill"
+                  th:classappend="'status-' + ${s}">
+                <span th:text="#{transaction.status.__${s}__}">Status</span>
+                <strong th:text="${stats.countByStatus.get(s)}">0</strong>
+            </span>
+        </div>
+    </div>
+
+    <!-- Transactions -->
+    <div class="table-card">
+        <h3 th:text="#{admin.history.title}">All Transactions</h3>
+
+        <!-- Filter form -->
+        <form method="get" th:action="@{/admin}" class="filter-form">
+            <div class="filter-group">
+                <label th:text="#{admin.filter.status}">Status</label>
+                <select name="status">
+                    <option value="" th:selected="${filterStatus == null || filterStatus == ''}"
+                            th:text="#{admin.filter.status.all}">All</option>
+                    <option th:each="s : ${statuses}"
+                            th:value="${s}"
+                            th:selected="${filterStatus == s.name()}"
+                            th:text="#{transaction.status.__${s}__}">Status</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <label th:text="#{admin.filter.orderNo}">Order No.</label>
+                <input type="text" name="orderNo" th:value="${filterOrderNo}"/>
+            </div>
+            <div class="filter-group">
+                <label th:text="#{filter.start.date}">From</label>
+                <input type="date" name="startDate" th:value="${filterStart}"/>
+            </div>
+            <div class="filter-group">
+                <label th:text="#{filter.end.date}">To</label>
+                <input type="date" name="endDate" th:value="${filterEnd}"/>
+            </div>
+            <button class="btn-filter" type="submit" th:text="#{filter.submit}">Search</button>
+            <a class="btn-reset" th:href="@{/admin}" th:text="#{filter.reset}">Reset</a>
+        </form>
+
+        <table th:if="${!txPage.empty}">
+            <thead>
+            <tr>
+                <th th:text="#{dashboard.history.time}">Time</th>
+                <th th:text="#{admin.col.name}">Name</th>
+                <th th:text="#{admin.col.actorId}">Actor ID</th>
+                <th th:text="#{admin.col.txId}">Transaction ID</th>
+                <th th:text="#{admin.col.type}">Type</th>
+                <th th:text="#{dashboard.history.status}">Status</th>
+                <th style="text-align:right" th:text="#{admin.col.amount}">Amount</th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr th:each="tx : ${txPage.content}">
+                <td th:text="${#temporals.format(tx.time, 'yyyy-MM-dd HH:mm')}"></td>
+                <td>
+                    <span th:if="${tx.name != null}" th:text="${tx.name}"></span>
+                    <span th:if="${tx.name == null}" style="color:#bbb;">&#8212;</span>
+                </td>
+                <td>
+                    <span th:if="${tx.actorId != null}" class="mono" th:text="${tx.actorId}"></span>
+                    <span th:if="${tx.actorId == null}" style="color:#bbb;">&#8212;</span>
+                </td>
+                <td class="mono" th:text="${tx.transactionId}"></td>
+                <td>
+                    <span class="type-badge"
+                          th:classappend="'type-' + ${tx.type}"
+                          th:text="#{transaction.type.__${tx.type}__}"></span>
+                </td>
+                <td>
+                    <span th:if="${tx.status != null}" class="status-badge"
+                          th:classappend="'status-' + ${tx.status}"
+                          th:text="#{transaction.status.__${tx.status}__}"></span>
+                    <span th:if="${tx.status == null}" style="color:#bbb;">&#8212;</span>
+                </td>
+                <td style="text-align:right" th:text="'$ ' + ${#numbers.formatDecimal(tx.amount, 1, 2)}"></td>
+            </tr>
+            </tbody>
+        </table>
+        <div class="empty" th:if="${txPage.empty}" th:text="#{admin.history.empty}">No transactions found</div>
+
+        <!-- Pagination -->
+        <div th:if="${txPage.totalPages > 1}" class="pagination">
+            <a th:if="${!txPage.first}"
+               th:href="@{/admin(page=${txPage.number - 1}, status=${filterStatus}, orderNo=${filterOrderNo}, startDate=${filterStart}, endDate=${filterEnd})}"
+               class="page-btn">&#8249;</a>
+            <span th:if="${txPage.first}" class="page-btn disabled">&#8249;</span>
+
+            <th:block th:each="i : ${#numbers.sequence(0, txPage.totalPages - 1)}">
+                <a th:href="@{/admin(page=${i}, status=${filterStatus}, orderNo=${filterOrderNo}, startDate=${filterStart}, endDate=${filterEnd})}"
+                   th:text="${i + 1}"
+                   th:class="${i == txPage.number} ? 'page-btn active' : 'page-btn'"></a>
+            </th:block>
+
+            <a th:if="${!txPage.last}"
+               th:href="@{/admin(page=${txPage.number + 1}, status=${filterStatus}, orderNo=${filterOrderNo}, startDate=${filterStart}, endDate=${filterEnd})}"
+               class="page-btn">&#8250;</a>
+            <span th:if="${txPage.last}" class="page-btn disabled">&#8250;</span>
+        </div>
+    </div>
+</main>
+
+<img th:if="${isTestMode}" src="/test-mode.png" alt="" style="position:fixed;bottom:20px;right:20px;width:235px;border-radius:10px;opacity:.88;z-index:999;pointer-events:none;">
+</body>
+</html>
